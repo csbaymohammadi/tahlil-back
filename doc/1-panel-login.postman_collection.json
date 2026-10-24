@@ -1,0 +1,260 @@
+{
+  "info": {
+    "name": "Tahlil Panel Authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Use cookie jar and same-origin public API. Credentials are placeholders. Obtain CSRF before login/mutations. No automatic retries; 204 clears private client state. Logout-all and password change are independent flows requiring separate fresh logins."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1/admin",
+      "type": "string"
+    },
+    {
+      "key": "public_origin",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "<username>",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "<password>",
+      "type": "string"
+    },
+    {
+      "key": "current_password",
+      "value": "<current-password>",
+      "type": "string"
+    },
+    {
+      "key": "new_password",
+      "value": "<new-password>",
+      "type": "string"
+    },
+    {
+      "key": "csrf_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Get CSRF token",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/csrf",
+        "description": "Get CSRF token. See handoff document for required context, errors and unknown-outcome recovery."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set(\"csrf_token\", pm.response.json().data.csrf_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verify credentials and rotate session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{public_origin}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/login",
+        "description": "Verify credentials and rotate session. See handoff document for required context, errors and unknown-outcome recovery.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set(\"csrf_token\", pm.response.json().data.csrf_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resolve current account and session",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/me",
+        "description": "Resolve current account and session. See handoff document for required context, errors and unknown-outcome recovery."
+      }
+    },
+    {
+      "name": "Revoke current session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{public_origin}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          }
+        ],
+        "url": "{{base_url}}/auth/logout",
+        "description": "Revoke current session. See handoff document for required context, errors and unknown-outcome recovery."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 204) pm.collectionVariables.unset(\"csrf_token\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Revoke all devices",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{public_origin}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/logout-all",
+        "description": "Revoke all devices. See handoff document for required context, errors and unknown-outcome recovery.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"{{current_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 204) pm.collectionVariables.unset(\"csrf_token\");"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Change password and revoke all devices",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Origin",
+            "value": "{{public_origin}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/auth/password",
+        "description": "Change password and revoke all devices. See handoff document for required context, errors and unknown-outcome recovery.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"current_password\": \"{{current_password}}\",\n  \"new_password\": \"{{new_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 204) pm.collectionVariables.unset(\"csrf_token\");"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,825 @@
+openapi: 3.1.0
+info:
+  title: 'Tahlil Panel Authentication'
+  version: 1.0.0
+  description: 'Same-origin cookie authentication. No RBAC, bearer tokens, public registration, password recovery or compromised-password screening. Frontend is external; see 1-panel-login-api.md.'
+servers:
+  -
+    url: 'http://localhost:8000/api/v1/admin'
+    description: Development
+  -
+    url: 'https://{public_host}/api/v1/admin'
+    description: 'Deployment placeholder; replace with actual public staging/production host.'
+    variables:
+      public_host:
+        default: replace-with-public-host.example
+paths:
+  /auth/csrf:
+    get:
+      operationId: getCsrf
+      summary: 'Get CSRF token'
+      tags:
+        - 'Panel authentication'
+      security:
+        - {  }
+        -
+          PanelCookie: []
+        -
+          AnonymousContext: []
+      responses:
+        200:
+          description: Success
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfResponse'
+        413:
+          $ref: '#/components/responses/Error413'
+        422:
+          $ref: '#/components/responses/Error422'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      description: 'No body/query. Stable token for an authenticated session or a 15-minute anonymous context; creates context cookie when needed. Does not prove authentication.'
+  /auth/login:
+    post:
+      operationId: login
+      summary: 'Verify credentials and rotate session'
+      tags:
+        - 'Panel authentication'
+      security:
+        -
+          AnonymousContext: []
+        -
+          PanelCookie: []
+      responses:
+        200:
+          description: Success
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        400:
+          $ref: '#/components/responses/Error400'
+        401:
+          $ref: '#/components/responses/Error401'
+        403:
+          $ref: '#/components/responses/Error403'
+        413:
+          $ref: '#/components/responses/Error413'
+        415:
+          $ref: '#/components/responses/Error415'
+        422:
+          $ref: '#/components/responses/Error422'
+        429:
+          $ref: '#/components/responses/Error429'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: 'Synchronizer token from GET /auth/csrf or successful login.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Requires session-bound or anonymous context cookie and CSRF. Username failures are generic. Issues tahlil-panel-session-v2 and clears anonymous cookie. 5 failed pair attempts / 50 total IP attempts per 15 minutes.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+  /auth/me:
+    get:
+      operationId: getMe
+      summary: 'Resolve current account and session'
+      tags:
+        - 'Panel authentication'
+      security:
+        -
+          PanelCookie: []
+      responses:
+        200:
+          description: Success
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdentityResponse'
+        401:
+          $ref: '#/components/responses/Error401'
+        413:
+          $ref: '#/components/responses/Error413'
+        422:
+          $ref: '#/components/responses/Error422'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      description: 'No body/query. Authoritative active/non-deleted account and session-version check; role is optional descriptive data.'
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: 'Revoke current session'
+      tags:
+        - 'Panel authentication'
+      security:
+        - {  }
+        -
+          PanelCookie: []
+      responses:
+        204:
+          description: 'Success, empty body; sign in again for protected access.'
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+        403:
+          $ref: '#/components/responses/Error403'
+        413:
+          $ref: '#/components/responses/Error413'
+        415:
+          $ref: '#/components/responses/Error415'
+        400:
+          $ref: '#/components/responses/Error400'
+        422:
+          $ref: '#/components/responses/Error422'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: false
+          schema:
+            type: string
+          description: 'Synchronizer token from GET /auth/csrf or successful login.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. No body. Authenticated session requires CSRF; missing/expired/revoked sessions still require Origin but no CSRF and return 204. Revocation infrastructure failure returns 503.'
+  /auth/logout-all:
+    post:
+      operationId: logoutAll
+      summary: 'Revoke all devices'
+      tags:
+        - 'Panel authentication'
+      security:
+        -
+          PanelCookie: []
+      responses:
+        204:
+          description: 'Success, empty body; sign in again for protected access.'
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+        400:
+          $ref: '#/components/responses/Error400'
+        401:
+          $ref: '#/components/responses/Error401'
+        403:
+          $ref: '#/components/responses/Error403'
+        413:
+          $ref: '#/components/responses/Error413'
+        415:
+          $ref: '#/components/responses/Error415'
+        422:
+          $ref: '#/components/responses/Error422'
+        429:
+          $ref: '#/components/responses/Error429'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: 'Synchronizer token from GET /auth/csrf or successful login.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutAllRequest'
+  /auth/password:
+    post:
+      operationId: changePassword
+      summary: 'Change password and revoke all devices'
+      tags:
+        - 'Panel authentication'
+      security:
+        -
+          PanelCookie: []
+      responses:
+        204:
+          description: 'Success, empty body; sign in again for protected access.'
+          headers:
+            X-Request-ID:
+              description: 'Server-generated request correlation ID.'
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+                const: no-store
+            Vary:
+              schema:
+                type: string
+              description: 'Includes Cookie.'
+            Set-Cookie:
+              schema:
+                type: string
+              description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+        400:
+          $ref: '#/components/responses/Error400'
+        401:
+          $ref: '#/components/responses/Error401'
+        403:
+          $ref: '#/components/responses/Error403'
+        413:
+          $ref: '#/components/responses/Error413'
+        415:
+          $ref: '#/components/responses/Error415'
+        422:
+          $ref: '#/components/responses/Error422'
+        429:
+          $ref: '#/components/responses/Error429'
+        503:
+          $ref: '#/components/responses/Error503'
+        500:
+          $ref: '#/components/responses/Error500'
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: 'Synchronizer token from GET /auth/csrf or successful login.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordRequest'
+components:
+  securitySchemes:
+    PanelCookie:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+      description: 'Opaque HttpOnly host-only cookie; 7-day absolute / 24-hour idle expiry. Never read into JS.'
+    AnonymousContext:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-csrf-context
+      description: '15-minute anonymous CSRF context, not authenticated access.'
+  schemas:
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+      required:
+        - id
+        - name
+      additionalProperties: false
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        username:
+          type: string
+          minLength: 3
+          maxLength: 120
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        avatar_url:
+          anyOf:
+            -
+              type: string
+            -
+              type: 'null'
+        is_active:
+          type: boolean
+        role:
+          anyOf:
+            -
+              $ref: '#/components/schemas/Role'
+            -
+              type: 'null'
+      required:
+        - id
+        - username
+        - name
+        - email
+        - avatar_url
+        - is_active
+        - role
+      additionalProperties: false
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 'Public identifier, never an authentication credential.'
+        expires_at:
+          type: string
+          format: date-time
+          description: 'Earlier of idle and absolute deadline; a valid authenticated request extends idle up to absolute.'
+        absolute_expires_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - expires_at
+        - absolute_expires_at
+      additionalProperties: false
+    IdentityResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            session:
+              $ref: '#/components/schemas/Session'
+          required:
+            - user
+            - session
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            session:
+              $ref: '#/components/schemas/Session'
+            csrf_token:
+              type: string
+          required:
+            - user
+            - session
+            - csrf_token
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    CsrfResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            csrf_token:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+          required:
+            - csrf_token
+            - expires_at
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 120
+          description: 'Trim and lowercase for account lookup; email is not a login alias.'
+        password:
+          type: string
+          minLength: 8
+          maxLength: 256
+          writeOnly: true
+      required:
+        - username
+        - password
+      additionalProperties: false
+    LogoutAllRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          writeOnly: true
+      required:
+        - current_password
+      additionalProperties: false
+    PasswordRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          writeOnly: true
+        new_password:
+          type: string
+          minLength: 15
+          maxLength: 128
+          writeOnly: true
+          description: 'Exact Unicode/spaces accepted; must differ from old password; no breach screening or composition rule.'
+      required:
+        - current_password
+        - new_password
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_JSON
+                - INVALID_CREDENTIALS
+                - UNAUTHENTICATED
+                - FORBIDDEN
+                - CSRF_INVALID
+                - PAYLOAD_TOO_LARGE
+                - UNSUPPORTED_MEDIA_TYPE
+                - VALIDATION_FAILED
+                - RATE_LIMITED
+                - SERVICE_UNAVAILABLE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+            - code
+            - message
+            - fields
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - error
+        - request_id
+      additionalProperties: false
+  responses:
+    Error400:
+      description: INVALID_JSON
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error401:
+      description: 'UNAUTHENTICATED (INVALID_CREDENTIALS for login)'
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error403:
+      description: 'CSRF_INVALID or FORBIDDEN'
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error413:
+      description: PAYLOAD_TOO_LARGE
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error415:
+      description: UNSUPPORTED_MEDIA_TYPE
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error422:
+      description: VALIDATION_FAILED
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error429:
+      description: RATE_LIMITED
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+        Retry-After:
+          description: 'Seconds until the next allowed attempt.'
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error503:
+      description: SERVICE_UNAVAILABLE
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error500:
+      description: INTERNAL_ERROR
+      headers:
+        X-Request-ID:
+          description: 'Server-generated request correlation ID.'
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+            const: no-store
+        Vary:
+          schema:
+            type: string
+          description: 'Includes Cookie.'
+        Set-Cookie:
+          schema:
+            type: string
+          description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

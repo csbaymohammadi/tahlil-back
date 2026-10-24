@@ -1,20 +1,75 @@
 <?php
 
+use App\Auth\PanelSessions;
+use App\Exceptions\PanelAuthException;
+use App\Http\Middleware\PanelEnvelope;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Predis\Connection\ConnectionException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->prepend(PanelEnvelope::class);
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (Throwable $exception) {
+            if (app()->bound('request') && request()->is('api/v1/admin/*')) {
+                Log::error('Panel request failed.', [
+                    'request_id' => request()->attributes->get('request_id'),
+                    'exception_type' => $exception::class,
+                ]);
+
+                return false;
+            }
+        });
+        $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'new_password']);
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (! $request->is('api/v1/admin/*')) {
+                return null;
+            }
+            $fields = [];
+            $retryAfter = null;
+            if ($exception instanceof PanelAuthException) {
+                [$status, $code, $message, $fields, $retryAfter] = [$exception->status, $exception->errorCode, $exception->getMessage(), $exception->fields, $exception->retryAfter];
+            } elseif ($exception instanceof ValidationException) {
+                [$status, $code, $message, $fields] = [422, 'VALIDATION_FAILED', 'Check the submitted information.', $exception->errors()];
+            } elseif ($exception instanceof QueryException || $exception instanceof PDOException || $exception instanceof LockTimeoutException || $exception instanceof DecryptException || $exception instanceof RedisException || $exception instanceof ConnectionException) {
+                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.'];
+            } elseif ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 503) {
+                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.'];
+            } elseif ($exception instanceof PostTooLargeException) {
+                [$status, $code, $message] = [413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.'];
+            } else {
+                [$status, $code, $message] = [500, 'INTERNAL_ERROR', 'An unexpected error occurred.'];
+            }
+            $response = response()->json(['error' => ['code' => $code, 'message' => $message, 'fields' => (object) $fields],
+                'request_id' => $request->attributes->get('request_id')], $status);
+            if ($retryAfter !== null) {
+                $response->headers->set('Retry-After', (string) $retryAfter);
+            }
+            if ($status === 401 && $code === 'UNAUTHENTICATED') {
+                $response->headers->clearCookie(PanelSessions::COOKIE, '/', null, config('panel.secure_cookie'), true, 'lax');
+            }
+
+            return $response;
+        });
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

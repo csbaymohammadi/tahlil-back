@@ -36,6 +36,15 @@ class UserFactory extends Factory
     /**
      * Indicate that the model's email address should be unverified.
      */
+    public function panel(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'username' => 'admin.'.fake()->unique()->numerify('########'),
+            'is_active' => true,
+            'password_changed_at' => now(),
+        ]);
+    }
+
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
