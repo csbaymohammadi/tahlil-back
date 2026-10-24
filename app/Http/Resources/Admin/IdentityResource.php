@@ -11,7 +11,7 @@ class IdentityResource extends JsonResource
     {
         return [
             'id' => $this->id, 'username' => $this->username, 'name' => $this->name,
-            'email' => $this->email, 'avatar_url' => null, 'is_active' => $this->is_active,
+            'email' => $this->email, 'avatar_url' => $this->avatar?->canonicalUrl(), 'is_active' => $this->is_active,
             'role' => $this->role ? ['id' => $this->role->id, 'name' => $this->role->name] : null,
         ];
     }

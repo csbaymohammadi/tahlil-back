@@ -6,7 +6,7 @@ This Laravel 13 backend implements cookie-based panel authentication. The author
 
 The frontend is a separate deliverable. This backend does not implement `/tahlilpanel/login`, dashboard HTML, navigation, profile forms, user CRUD, media uploads, public registration, recovery by email/SMS, OTP, MFA, remember-me, refresh tokens, or bearer-token login. The existing `/` welcome route is unchanged.
 
-**Approved deviation:** common/compromised-password screening is intentionally omitted. Passwords are never sent to a breach-check service; no local password blocklist is installed. Length, exact matching, current-password verification, difference from the old password, and Argon2id hashing remain enforced.
+**Approved deviations:** Origin/Referer restrictions are disabled and CORS accepts all origins by explicit owner request. Common/compromised-password screening is intentionally omitted. Passwords are never sent to a breach-check service; no local password blocklist is installed. Length, exact matching, current-password verification, difference from the old password, and Argon2id hashing remain enforced.
 
 Companion files:
 
@@ -21,12 +21,11 @@ Companion files:
 | Staging | `https://<staging-public-host>` — deployment input, not configured yet | Same origin + `/api/v1/admin` |
 | Production | `https://<production-public-host>` — deployment input, not configured yet | Same origin + `/api/v1/admin` |
 
-The browser must see frontend pages and this API on **one public origin**. When the frontend development server uses another port, proxy `/api/v1/admin/*` through its server and configure that public origin explicitly. Do not solve this by enabling arbitrary credentialed CORS. OpenAPI's example staging/production hosts are placeholders, not deployed services.
+Requests from any origin are accepted and credentialed CORS reflects the requesting origin; no Origin/Referer allowlist needs configuration. The existing host-only `SameSite=Lax` cookies still follow browser same-site rules: unrelated cross-site fetch may not carry them even with credentials included. Use a same-site frontend or request-scoped proxy/BFF for cookie authentication where necessary. Do not change cookie policy implicitly when enabling CORS. OpenAPI's example staging/production hosts are placeholders, not deployed services.
 
 | Setting | Meaning/default |
 | --- | --- |
-| `APP_URL` | Public website origin; also fallback origin allowlist when `PANEL_ALLOWED_ORIGINS` is absent |
-| `PANEL_ALLOWED_ORIGINS` | Comma-separated exact allowed origins, e.g. `http://localhost:8000`; no trailing slash, path, or wildcard |
+| `APP_URL` | Public backend URL for generated application locations |
 | `PANEL_SECURE_COOKIE` | `true` on production HTTPS; `false` only for local HTTP; explicitly override the local example during deployment |
 | `PANEL_TRUSTED_PROXIES` | Comma-separated trusted proxy IPs/CIDRs; empty by default; do not trust arbitrary forwarded headers |
 | `PANEL_RATE_STORE` | Shared atomic-lock-capable Laravel cache store; default `database` |
@@ -75,7 +74,7 @@ export interface Failure {
 }
 ```
 
-`avatar_url` is currently always `null` because no media module exists. `email` is contact information, never a login alias. Numeric IDs are database-generated positive integers; preserve them as numbers and keep generated identifiers within JavaScript's safe integer range. There is no password hash, verifier, security version, cookie token, or other device metadata in identity JSON.
+`avatar_url` is the saved managed avatar canonical location, or null; private avatars require the authenticated cookie/preview flow from the media service. `email` is contact information, never a login alias. Numeric IDs are database-generated positive integers; preserve them as numbers and keep generated identifiers within JavaScript's safe integer range. There is no password hash, verifier, security version, cookie token, or other device metadata in identity JSON.
 
 ### Cookies
 
@@ -90,7 +89,7 @@ Successful login clears the anonymous cookie. Logout/password change clear both 
 
 ## 4. Endpoint reference
 
-Paths below include the full API prefix. For every POST, supply an exact allowed `Origin`; if Origin is absent, the server extracts and validates the Referer origin. Requests with neither are rejected. Browser `Sec-Fetch-Site` does not bypass token checks.
+Paths below include the full API prefix. Origin/Referer are optional and unrestricted by explicit owner request. All authenticated mutations and login still require a context-bound CSRF token. Browser `Sec-Fetch-Site` does not bypass token checks.
 
 ### GET `/api/v1/admin/auth/csrf`
 
@@ -104,7 +103,7 @@ Success `200`; storage failure `503`. For authenticated sessions, this valid aut
 
 ### POST `/api/v1/admin/auth/login`
 
-Requires allowed Origin and `X-CSRF-Token` from the current anonymous/authenticated context. Only these fields are accepted:
+Requires `X-CSRF-Token` from the current anonymous/authenticated context. Only these fields are accepted:
 
 | Field | Validation |
 | --- | --- |
@@ -146,13 +145,13 @@ Missing, malformed, tampered, expired or revoked cookies and inactive/deleted ac
 
 ### POST `/api/v1/admin/auth/logout`
 
-No body. With a valid session, requires Origin and `X-CSRF-Token`; revokes only that session and returns `204`. A valid session with a missing/wrong token returns `403`.
+No body. With a valid session, requires `X-CSRF-Token`; revokes only that session and returns `204`. A valid session with a missing/wrong token returns `403`.
 
-With no session or an expired/revoked session, allowed Origin is still required, but a token from the destroyed context is not required; returns `204` and clears the cookies. Storage failure during resolution/revocation returns `503`; cookie deletion alone does not count as successful revocation.
+With no session or an expired/revoked session, neither Origin nor a token from the destroyed context is required; returns `204` and clears the cookies. Storage failure during resolution/revocation returns `503`; cookie deletion alone does not count as successful revocation.
 
 ### POST `/api/v1/admin/auth/logout-all`
 
-Requires authenticated cookie, allowed Origin, CSRF and exact current password. Only `current_password`, a non-empty string of at most 256 characters, is accepted.
+Requires authenticated cookie, CSRF and exact current password. Only `current_password`, a non-empty string of at most 256 characters, is accepted.
 
 ```json
 {"current_password":"<current-password>"}
@@ -162,7 +161,7 @@ Success `204` revokes every session for the current account and clears current c
 
 ### POST `/api/v1/admin/auth/password`
 
-Requires authenticated cookie, allowed Origin and CSRF.
+Requires authenticated cookie and CSRF.
 
 ```json
 {"current_password":"<current-password>","new_password":"<new-password>"}
@@ -187,7 +186,7 @@ Success `204` atomically changes the hash and password timestamp, increments the
 | 400 | `INVALID_JSON` | Correct malformed JSON |
 | 401 | `INVALID_CREDENTIALS` | Keep login visible; show generic rejection; do not run global redirect handling |
 | 401 | `UNAUTHENTICATED` | Clear private identity/cache and redirect protected pages to login |
-| 403 | `FORBIDDEN` | Show rejected request; check public-origin/proxy configuration |
+| 403 | `FORBIDDEN` | Reserved shared integrity failure; Origin is unrestricted |
 | 403 | `CSRF_INVALID` | Get a fresh CSRF token, then permit a deliberate user retry |
 | 413 | `PAYLOAD_TOO_LARGE` | Request exceeds 16 KiB or upstream PHP limit |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | Use JSON for request bodies |
@@ -281,7 +280,7 @@ Do not use `/dashboard` or `/sign-in` as auth destinations. Do not filter menus 
 
 Proxy the fixed API path to a trusted configured backend; never accept a client-selected upstream URL. Preserve Cookie and every separate Set-Cookie header without merging them, and keep the public host/path cookie scope. Forward public scheme/host only through trusted proxies configured by IP/CIDR. TLS terminates at the trusted proxy or application.
 
-SSR identity requests must construct a fresh request-specific Cookie header from that browser's current auth context. Use a fixed trusted identity URL and `cache: 'no-store'`; never use a global mutable HTTP client cookie jar or share cached identity across requests. Forward cleanup Set-Cookie headers to the browser when applicable. Identity/token GETs need no Origin header; mutations from a trusted BFF must preserve the browser's allowed Origin or Referer as well as cookie and CSRF context. Do not manufacture an allowed Origin for arbitrary untrusted callers.
+SSR identity requests must construct a fresh request-specific Cookie header from that browser's current auth context. Use a fixed trusted identity URL and `cache: 'no-store'`; never use a global mutable HTTP client cookie jar or share cached identity across requests. Forward cleanup Set-Cookie headers to the browser when applicable. Identity/token GETs need no Origin header; mutations from a trusted BFF must preserve the request-specific cookie and CSRF context. Origin/Referer are not required or validated by the API.
 
 Private dashboard HTML must use `Cache-Control: no-store` and `Vary: Cookie`, and CDN/shared caching must bypass private pages and this API. This backend sets API headers; the frontend host must set HTML headers.
 
@@ -311,13 +310,13 @@ Events include `login_succeeded`, `login_failed`, `login_rate_limited`, `logout`
 
 ## 8. Curl and Postman workflow
 
-The Postman collection uses `base_url`, `public_origin`, `username`, `password`, `current_password`, `new_password`, and `csrf_token` variables. All credentials are placeholders. Use its cookie jar. CSRF retrieval and login scripts update the CSRF variable; clear it after a successful logout/password change. Do not export a populated environment with real credentials/cookies. No automatic mutation retry is configured.
+The Postman collection uses `base_url`, `username`, `password`, `current_password`, `new_password`, and `csrf_token` variables. All credentials are placeholders. Use its cookie jar. CSRF retrieval and login scripts update the CSRF variable; clear it after a successful logout/password change. Do not export a populated environment with real credentials/cookies. No automatic mutation retry is configured.
 
 Equivalent requests (use placeholder JSON files; avoid putting real passwords into shell history):
 
 ```sh
 # Run in a protected local working directory; cookie jar files contain live credentials.
-# public origin and API base must refer to the same public host.
+# Origin headers below are optional examples; no origin allowlist is configured.
 curl -i -c '<protected-cookie-jar>' -b '<protected-cookie-jar>' \
   'http://localhost:8000/api/v1/admin/auth/csrf'
 
@@ -355,7 +354,7 @@ curl -i -c '<protected-cookie-jar>' -b '<protected-cookie-jar>' \
 | Account `id`, `username`, `username_normalized`, `email`, `name`, `is_active` | Same authoritative `users` fields; normalized username unique and internal |
 | `password_hash` | Internal Laravel column `users.password`; Argon2id verifier, never serialized |
 | `role_id`, `role: {id,name} \| null` | Nullable FK to `roles`, null on role deletion; no permissions |
-| `avatar_media_id`, `avatar_url` | Media module deferred: no media FK/ID yet; API `avatar_url=null` |
+| `avatar_media_id`, `avatar_url` | Nullable media FK and canonical avatar display URL; see `16-shared-media-api.md` |
 | Creation/update/password/login timestamps, deletion | `created_at`, `updated_at`, `password_changed_at`, `last_login_at`, `deleted_at` |
 | Session public `id`, verifier, user, deadlines, revocation | `panel_sessions` with separate UUID and token hash; `security_version` additionally binds account revision |
 | CSRF bound state | Encrypted framework session payload; anonymous rows share the session table with `user_id=null` |
@@ -365,21 +364,21 @@ curl -i -c '<protected-cookie-jar>' -b '<protected-cookie-jar>' \
 | Exact staging/production hosts | Not supplied; placeholders and required deployment settings provided |
 | Optional IP/User-Agent session metadata | Not collected/persisted; no metadata retention obligation beyond expiring limiter keys |
 
-Verification results are recorded after running the delivered test suite. SQLite tests prove observable request behavior, transactional rollback and deterministic account-version interleavings; they do not prove cross-process row locks, deployed TLS/proxy behavior or actual multi-instance restart durability. Production-engine concurrency/load testing and frontend/SSR/CDN acceptance must be completed against a disposable deployment with the intended engine and public origins. No production/staging service or separate disposable production-engine database was supplied.
+Verification results are recorded after running the delivered test suite. SQLite tests prove observable request behavior, transactional rollback and deterministic account-version interleavings; dedicated forked SQLite tests in the management/media modules now also exercise actual writer-lock races; tests do not prove deployed TLS/proxy behavior or actual multi-host restart durability. Production-engine concurrency/load testing and frontend/SSR/CDN acceptance must be completed against a disposable deployment with the intended engine and public origins. No production/staging service or separate disposable production-engine database was supplied.
 
 ### Executed verification (2026-10-24)
 
 | Check | Result |
 | --- | --- |
-| `php artisan test --compact tests/Feature/PanelAuthenticationTest.php` | 50 passed |
+| Authentication coverage in the final full suite | 51 passed |
 | `php artisan test --compact tests/Feature/PanelOperationsTest.php` | 10 passed |
-| `composer test` (final run) | **62 passed, 476 assertions**, including the two existing skeleton tests; SQLite `:memory:` |
+| `composer test` (final run) | **120 passed, 792 assertions**, including management/media/seed coverage and five real multiprocess races; isolated SQLite `:memory:` plus dedicated temporary SQLite files |
 | `vendor/bin/pint --dirty --format agent` | Passed after formatting |
 | `composer validate --no-check-publish` | Passed |
 | `git diff --check` | Passed |
-| `npm exec --yes --package=@redocly/cli -- redocly lint doc/1-panel-login.openapi.yaml --extends minimal --format summary` | Valid, zero errors; one expected warning for the documented localhost development server |
+| `npm exec --yes --package=@redocly/cli -- redocly lint doc/1-panel-login.openapi.yaml doc/2-panel-users-roles.openapi.yaml doc/16-shared-media.openapi.yaml --extends minimal --format summary` | All three valid, zero errors; three expected warnings for documented localhost development servers |
 | Postman JSON parsing, six method/path pairs, placeholder credentials, relative documentation links | Passed |
-| `php artisan route:list --path=api --except-vendor` | Six documented auth routes registered |
+| `php artisan route:list --path=api --except-vendor` | Twenty admin routes registered, including six auth routes |
 
 The OpenAPI validator ran from npm's temporary tooling cache; application dependencies and lockfiles were not changed. Postman was checked structurally; no real credentials or deployed service were used.
 
@@ -399,7 +398,7 @@ The OpenAPI validator ran from npm's temporary tooling cache; application depend
 | Deactivation, deletion, username/password changes, restore/reactivation invalidate old access | Automated model/API tests |
 | Stale password verification after an account reset cannot issue a session | Automated deterministic interleaving test; actual production-engine process concurrency not exercised |
 | Security update/reset and revocation roll back together on event-store failure | Automated database-trigger failure tests |
-| CSRF plus exact Origin, Referer fallback, same-origin metadata cannot bypass CSRF | Automated tests through the actual token-check path, without Laravel's usual test bypass |
+| Context-bound CSRF with arbitrary/missing Origin; credentialed CORS/preflight | Automated tests through the actual token-check path, without Laravel's usual test bypass |
 | HttpOnly/host-only/path and production Secure settings; legacy cookie deletion | Automated response-cookie tests; browser/TLS/proxy deployment not exercised |
 | Shared attempt limits, success reset rules, window expiry, Retry-After, forwarded-IP spoofing | Automated tests using database cache; cross-instance load test remains deployment work |
 | New-password lengths/difference, Argon2id, old/new credential behavior | Automated API tests; compromised-password screening intentionally omitted |
@@ -410,3 +409,16 @@ The OpenAPI validator ran from npm's temporary tooling cache; application depend
 | Protected HTML and CDN/SSR cache isolation | Frontend/proxy deployment requirement; not exercised by backend-only delivery |
 
 No development migration, production migration, production/staging configuration change, deployment, real provisioning, browser E2E run or asset build was performed. No frontend assets were changed.
+
+### Optional seed administrator
+
+`DatabaseSeeder` also calls `PanelAdministratorSeeder`. Set protected local/deployment values before running `php artisan db:seed --no-interaction`:
+
+```dotenv
+PANEL_SEED_ADMIN_USERNAME=admin
+PANEL_SEED_ADMIN_NAME="Panel Administrator"
+PANEL_SEED_ADMIN_EMAIL=<real-contact-email>
+PANEL_SEED_ADMIN_PASSWORD=<private-password-of-15-to-128-characters>
+```
+
+The email/password have no repository defaults. With either absent, the administrator seed is skipped. When configured, it creates an active login account, assigns the ordinary Administrator label if available, and records creation without printing the password. Repeated seeding preserves existing credentials/status/profile and does not restore a deleted account. Use the operational reset command for an intentional password reset. A username/email collision is never treated as permission to overwrite another account. The original inactive test fixture remains separate and is excluded from the panel-account list.

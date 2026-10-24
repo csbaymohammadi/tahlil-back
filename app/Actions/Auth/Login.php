@@ -8,6 +8,7 @@ use App\Auth\SecurityEvents;
 use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Models\User;
+use App\Support\PanelMutationLock;
 use Illuminate\Hashing\Argon2IdHasher;
 use Illuminate\Support\Facades\DB;
 
@@ -30,6 +31,7 @@ class Login
 
         try {
             return DB::transaction(function () use ($user, $version, $previousId, $anonymousId, $requestId): array {
+                PanelMutationLock::acquire();
                 $current = User::lockForUpdate()->find($user->id);
                 if (! $current || ! $current->is_active || $current->security_version !== $version) {
                     throw new PanelAuthException(401, 'INVALID_CREDENTIALS', 'The username or password is incorrect.');

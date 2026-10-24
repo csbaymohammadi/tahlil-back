@@ -8,6 +8,7 @@ use App\Exceptions\PanelAuthException;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use JsonException;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,12 +30,26 @@ class PanelRequest
 
     private function process(Request $request, Closure $next): Response
     {
-        $raw = $request->getContent();
-        if (strlen($raw) > 16384 || (int) $request->header('Content-Length', 0) > 16384) {
+        $upload = $request->routeIs('panel.media.store');
+        $raw = $upload ? '' : $request->getContent();
+        if (! $upload && (strlen($raw) > 16384 || (int) $request->header('Content-Length', 0) > 16384)) {
             throw new PanelAuthException(413, 'PAYLOAD_TOO_LARGE', 'The request body exceeds 16 KiB.');
         }
-        if (! $request->isMethod('GET')) {
-            if ($raw !== '' || ! $request->routeIs('panel.auth.logout')) {
+        if ($request->isMethod('DELETE') && $raw !== '') {
+            throw new PanelAuthException(422, 'VALIDATION_FAILED', 'DELETE requests do not accept a body.', ['body' => ['Use query parameters only where documented.']]);
+        }
+        if ($upload) {
+            if ((int) $request->header('Content-Length', 0) > 30 * 1024 * 1024 + 65536) {
+                throw new PanelAuthException(413, 'FILE_TOO_LARGE', 'The upload body is too large.');
+            }
+            if (! preg_match('/^multipart\/form-data;.*boundary=/i', $request->header('Content-Type', '')) || count($request->allFiles()) !== 1 || ! $request->file('file') instanceof UploadedFile) {
+                throw new PanelAuthException(400, 'INVALID_MULTIPART', 'Send exactly one file in a multipart request.');
+            }
+            if (in_array($request->file('file')->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                throw new PanelAuthException(413, 'FILE_TOO_LARGE', 'The upload exceeds the PHP file size limit.');
+            }
+        } elseif (! $request->isMethod('GET') && ! $request->isMethod('HEAD')) {
+            if ($raw !== '' || (! $request->routeIs('panel.auth.logout') && ! $request->isMethod('DELETE'))) {
                 if (strtolower(trim(explode(';', $request->header('Content-Type', ''))[0])) !== 'application/json') {
                     throw new PanelAuthException(415, 'UNSUPPORTED_MEDIA_TYPE', 'Use application/json.');
                 }
@@ -52,16 +67,17 @@ class PanelRequest
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'This endpoint does not accept a body.');
         }
 
-        if ($request->query->count() > 0) {
+        $allowedQuery = $request->routeIs('panel.users.index') ? ['page', 'per_page'] : ($request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy') ? ['expected_version'] : []);
+        if (array_diff(array_keys($request->query->all()), $allowedQuery) !== []) {
             $fields = [];
-            foreach (array_keys($request->query->all()) as $field) {
+            foreach (array_diff(array_keys($request->query->all()), $allowedQuery) as $field) {
                 $fields[$field] = ['Query fields are not accepted.'];
             }
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'Check the submitted information.', $fields);
         }
 
         $record = $this->sessions->resolve($request->cookie(PanelSessions::COOKIE));
-        $user = $record?->user_id ? User::with('role')->find($record->user_id) : null;
+        $user = $record?->user_id ? User::with(['role', 'avatar'])->find($record->user_id) : null;
         if (! $user || ! $user->is_active || $user->security_version !== $record?->security_version) {
             $record = null;
             $user = null;
@@ -77,7 +93,6 @@ class PanelRequest
         }
         if ($record) {
             $request->setLaravelSession($this->sessions->store($request->cookie(PanelSessions::COOKIE)));
-            $this->sessions->touch($record);
         } elseif ($request->routeIs('panel.auth.login')) {
             $anonymous = $this->sessions->resolve($request->cookie(PanelSessions::CONTEXT_COOKIE));
             if ($anonymous && $anonymous->user_id === null) {
@@ -85,11 +100,13 @@ class PanelRequest
                 $request->setLaravelSession($this->sessions->store($request->cookie(PanelSessions::CONTEXT_COOKIE)));
             }
         }
-        if (! $request->isMethod('GET')) {
-            $this->validateOrigin($request);
+        if (! $request->isMethod('GET') && ! $request->isMethod('HEAD')) {
             if (($record || $request->routeIs('panel.auth.login')) && (! $request->hasSession() || ! $this->csrf->valid($request))) {
                 throw new PanelAuthException(403, 'CSRF_INVALID', 'Retrieve a valid CSRF token before trying again.');
             }
+        }
+        if ($record) {
+            $this->sessions->touch($record);
         }
         $response = $next($request);
         if (! $record && ! $request->routeIs('panel.auth.login')) {
@@ -97,19 +114,5 @@ class PanelRequest
         }
 
         return $response;
-    }
-
-    private function validateOrigin(Request $request): void
-    {
-        $origin = $request->header('Origin');
-        if ($origin === null) {
-            $referer = $request->header('Referer', '');
-            $parts = parse_url($referer);
-            $origin = is_array($parts) && isset($parts['scheme'], $parts['host']) && ! isset($parts['user'], $parts['pass'])
-                ? $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '') : null;
-        }
-        if (! is_string($origin) || ! in_array($origin, config('panel.allowed_origins'), true)) {
-            throw new PanelAuthException(403, 'FORBIDDEN', 'The request origin is not allowed.');
-        }
     }
 }

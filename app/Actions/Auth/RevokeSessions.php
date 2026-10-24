@@ -7,6 +7,7 @@ use App\Auth\SecurityEvents;
 use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Models\User;
+use App\Support\PanelMutationLock;
 use Illuminate\Hashing\Argon2IdHasher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,7 @@ class RevokeSessions
 
     public function currentUser(PanelSession $session): User
     {
+        PanelMutationLock::acquire();
         $user = User::lockForUpdate()->find($session->user_id);
         $live = PanelSession::whereKey($session->id)->whereNull('revoked_at')
             ->where('absolute_expires_at', '>', now())->where('idle_expires_at', '>', now())->first();

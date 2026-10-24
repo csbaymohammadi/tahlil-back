@@ -2,17 +2,12 @@
   "info": {
     "name": "Tahlil Panel Authentication",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Use cookie jar and same-origin public API. Credentials are placeholders. Obtain CSRF before login/mutations. No automatic retries; 204 clears private client state. Logout-all and password change are independent flows requiring separate fresh logins."
+    "description": "Cookie-jar panel authentication. Origin/Referer are optional and unrestricted. Obtain context-bound CSRF before mutations. Existing SameSite=Lax cookie behavior remains unchanged. Credentials are placeholders."
   },
   "variable": [
     {
       "key": "base_url",
       "value": "http://localhost:8000/api/v1/admin",
-      "type": "string"
-    },
-    {
-      "key": "public_origin",
-      "value": "http://localhost:8000",
       "type": "string"
     },
     {
@@ -79,10 +74,6 @@
             "value": "application/json"
           },
           {
-            "key": "Origin",
-            "value": "{{public_origin}}"
-          },
-          {
             "key": "X-CSRF-Token",
             "value": "{{csrf_token}}"
           },
@@ -141,10 +132,6 @@
             "value": "application/json"
           },
           {
-            "key": "Origin",
-            "value": "{{public_origin}}"
-          },
-          {
             "key": "X-CSRF-Token",
             "value": "{{csrf_token}}"
           }
@@ -172,10 +159,6 @@
           {
             "key": "Accept",
             "value": "application/json"
-          },
-          {
-            "key": "Origin",
-            "value": "{{public_origin}}"
           },
           {
             "key": "X-CSRF-Token",
@@ -218,10 +201,6 @@
           {
             "key": "Accept",
             "value": "application/json"
-          },
-          {
-            "key": "Origin",
-            "value": "{{public_origin}}"
           },
           {
             "key": "X-CSRF-Token",

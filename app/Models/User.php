@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Auth\PanelSessions;
 use App\Exceptions\PanelAuthException;
+use App\Support\PanelMutationLock;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -23,7 +24,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
 
-    protected $attributes = ['security_version' => 1, 'is_active' => false];
+    protected $attributes = ['security_version' => 1, 'version' => 1, 'is_active' => false];
 
     protected ?string $securityRequestId = null;
 
@@ -45,43 +46,75 @@ class User extends Authenticatable
     public function save(array $options = []): bool
     {
         if ($this->isDirty('username')) {
-            $this->username_normalized = $this->username === null ? null : Str::lower(trim($this->username));
             $this->username = $this->username === null ? null : trim($this->username);
+            $this->username_normalized = $this->username === null ? null : Str::lower($this->username);
         }
-        if (! $this->exists || ! $this->isDirty(['username', 'password', 'is_active', 'deleted_at'])) {
+        if ($this->isDirty('email')) {
+            $this->email = mb_strtolower(trim($this->email));
+        }
+        $editable = ['username', 'name', 'email', 'password', 'role_id', 'is_active', 'avatar_media_id', 'deleted_at'];
+        if ($this->exists && ! $this->isDirty($editable)) {
             return parent::save($options);
         }
 
         return DB::transaction(function () use ($options): bool {
-            $current = static::withTrashed()->lockForUpdate()->findOrFail($this->id);
-            if ($current->security_version !== (int) $this->getOriginal('security_version')) {
-                throw new PanelAuthException(401, 'UNAUTHENTICATED', 'Account security state changed. Sign in again.');
+            PanelMutationLock::acquire();
+            if ($this->exists) {
+                $current = static::withTrashed()->lockForUpdate()->findOrFail($this->id);
+                if ($current->security_version !== (int) $this->getOriginal('security_version')) {
+                    throw new PanelAuthException(401, 'UNAUTHENTICATED', 'Account security state changed. Sign in again.');
+                }
+                if ($current->version !== (int) $this->getOriginal('version')) {
+                    throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The record has changed. Fetch it before retrying.');
+                }
+                $this->version = $current->version + 1;
+                if ($this->isDirty(['username', 'password', 'is_active', 'deleted_at'])) {
+                    $reason = $this->isDirty('password') ? 'password_changed' : ($this->isDirty('username') ? 'username_changed' : ($this->is_active ? 'admin_enabled' : 'admin_disabled'));
+                    $this->security_version = $current->security_version + 1;
+                    if ($this->isDirty('password')) {
+                        $this->password_changed_at = now();
+                    }
+                    (new PanelSessions)->revoke($this->id, null, $reason, $this->securityRequestId ?? 'account-update-'.Str::uuid());
+                }
             }
-            $reason = $this->isDirty('password') ? 'password_changed' : ($this->isDirty('username') ? 'username_changed' : ($this->is_active ? 'admin_enabled' : 'admin_disabled'));
-            $this->security_version = $current->security_version + 1;
-            if ($this->isDirty('password')) {
-                $this->password_changed_at = now();
-            }
-            $saved = parent::save($options);
-            (new PanelSessions)->revoke($this->id, null, $reason, $this->securityRequestId ?? 'account-update-'.Str::uuid());
 
-            return $saved;
+            return parent::save($options);
         });
     }
 
     public function delete(): ?bool
     {
         return DB::transaction(function (): ?bool {
+            PanelMutationLock::acquire();
             if ($this->exists) {
                 $current = static::withTrashed()->whereKey($this->id)->lockForUpdate()->firstOrFail();
                 $this->security_version = $current->security_version + 1;
-                static::withTrashed()->whereKey($this->id)->update(['security_version' => $this->security_version]);
-                $this->syncOriginalAttribute('security_version');
-                (new PanelSessions)->revoke($this->id, null, 'admin_deleted', 'account-delete-'.Str::uuid());
+                $this->version = $current->version + 1;
+                $this->is_active = false;
+                static::withTrashed()->whereKey($this->id)->update([
+                    'security_version' => $this->security_version, 'version' => $this->version, 'is_active' => false,
+                ]);
+                $this->syncOriginalAttributes(['security_version', 'version', 'is_active']);
+                (new PanelSessions)->revoke($this->id, null, 'admin_deleted', $this->securityRequestId ?? 'account-delete-'.Str::uuid());
             }
 
             return parent::delete();
         });
+    }
+
+    public function avatar(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'avatar_media_id');
+    }
+
+    public function deleteWithSecurityContext(string $requestId): ?bool
+    {
+        $this->securityRequestId = $requestId;
+        try {
+            return $this->delete();
+        } finally {
+            $this->securityRequestId = null;
+        }
     }
 
     /**
@@ -96,6 +129,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'security_version' => 'integer',
+            'version' => 'integer',
             'password_changed_at' => 'immutable_datetime',
             'last_login_at' => 'immutable_datetime',
         ];

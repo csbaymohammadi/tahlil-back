@@ -1,0 +1,141 @@
+{
+  "info": {
+    "name": "Tahlil Shared Prepared Media",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Use auth collection first and the cookie jar. No origin configuration. Credentials and files are placeholders; never export live cookies/passwords."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "csrf_token",
+      "value": "<csrf-token>",
+      "type": "string"
+    },
+    {
+      "key": "media_id",
+      "value": "<media-id>",
+      "type": "string"
+    },
+    {
+      "key": "canonical_name",
+      "value": "<generated-name>",
+      "type": "string"
+    },
+    {
+      "key": "idempotency_key",
+      "value": "<uuid>",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Upload prepared file",
+      "request": {
+        "method": "POST",
+        "url": "{{base_url}}/api/v1/admin/media",
+        "header": [
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotency_key}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "purpose",
+              "value": "avatar",
+              "type": "text"
+            },
+            {
+              "key": "file",
+              "type": "file",
+              "src": "<prepared-file>"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              " const a = pm.response.json().data;",
+              " pm.collectionVariables.set(\"media_id\", a.id);",
+              " pm.collectionVariables.set(\"canonical_name\", a.url.split(\"/\").pop());",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get metadata",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/v1/admin/media/{{media_id}}",
+        "header": []
+      }
+    },
+    {
+      "name": "Private preview",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/v1/admin/media/{{media_id}}/preview",
+        "header": []
+      }
+    },
+    {
+      "name": "Canonical GET",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/media/{{media_id}}/{{canonical_name}}",
+        "header": []
+      }
+    },
+    {
+      "name": "Canonical HEAD",
+      "request": {
+        "method": "HEAD",
+        "url": "{{base_url}}/media/{{media_id}}/{{canonical_name}}",
+        "header": []
+      }
+    },
+    {
+      "name": "Discard owned pending file",
+      "request": {
+        "method": "DELETE",
+        "url": "{{base_url}}/api/v1/admin/media/{{media_id}}",
+        "header": [
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrf_token}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Video range example",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/media/{{media_id}}/{{canonical_name}}",
+        "header": [
+          {
+            "key": "Range",
+            "value": "bytes=0-1023"
+          }
+        ]
+      }
+    }
+  ]
+}

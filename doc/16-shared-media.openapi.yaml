@@ -1,0 +1,893 @@
+openapi: 3.1.0
+info:
+  title: 'Tahlil Shared Prepared Media'
+  version: 1.0.0
+  description: 'Prepared-file storage/access service. All origins permitted with reflected credentialed CORS; current SameSite=Lax cookies unchanged. Frontend prepares files. Canonical anonymous delivery requires a real public consumer resolver; current panel avatars are private.'
+servers:
+  -
+    url: 'http://localhost:8000'
+    description: Development
+  -
+    url: 'https://{public_host}'
+    variables:
+      public_host:
+        default: replace-with-public-host.example
+    description: 'Replace deployment placeholder.'
+paths:
+  /api/v1/admin/media:
+    post:
+      operationId: uploadMedia
+      summary: 'Validate and persist prepared binary; idempotent for 24 hours'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                purpose:
+                  type: string
+                  enum:
+                    - avatar
+                    - logo
+                    - cover
+                    - banner
+                    - editor-image
+                    - editor-video
+              required:
+                - file
+                - purpose
+              additionalProperties: false
+      description: 'Exactly file and purpose. All image purposes except video accept JPEG/PNG/GIF/WebP/AVIF, <=5 MiB; video <=30 MiB. Raw SVG/HEIC rejected. Avatar must be still 512x512. No server transformation/metadata stripping/malware scanning. Same key and original bytes/purpose replays success; changed bytes conflict.'
+  '/api/v1/admin/media/{id}':
+    get:
+      operationId: getMedia
+      summary: 'Get accessible ready metadata'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+    delete:
+      operationId: discardMedia
+      summary: 'Discard own unattached asset; repeated owned tombstone is safe'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 'Success; no body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+  '/api/v1/admin/media/{id}/preview':
+    get:
+      operationId: previewMedia
+      summary: 'Authenticated private preview'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^bytes=[0-9]*-[0-9]*$'
+          description: 'Single video range; ignored for images.'
+      responses:
+        '200':
+          description: 'Binary body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '206':
+          description: 'Partial video body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+            Content-Range:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '416':
+          description: 'Unsatisfiable/unsupported video range; empty body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+            Content-Range:
+              schema:
+                type: string
+              description: 'bytes */<size>'
+  '/media/{id}/{name}':
+    get:
+      operationId: deliverMedia
+      summary: 'Canonical binary with eligibility check'
+      security:
+        - {  }
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9.-]+$'
+        -
+          name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            pattern: '^bytes=[0-9]*-[0-9]*$'
+          description: 'Single video range; ignored for images.'
+      responses:
+        '200':
+          description: 'Binary body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '206':
+          description: 'Partial video body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+            Content-Range:
+              schema:
+                type: string
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '416':
+          description: 'Unsatisfiable/unsupported video range; empty body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+            Content-Range:
+              schema:
+                type: string
+              description: 'bytes */<size>'
+    head:
+      operationId: headMedia
+      summary: 'Canonical binary with eligibility check'
+      security:
+        - {  }
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9.-]+$'
+      responses:
+        '200':
+          description: 'Binary headers only for HEAD.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Content-Type:
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+            Content-Length:
+              schema:
+                type: integer
+                minimum: 0
+            X-Content-Type-Options:
+              schema:
+                const: nosniff
+            Accept-Ranges:
+              schema:
+                const: bytes
+        '404':
+          $ref: '#/components/responses/Error404'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+components:
+  securitySchemes:
+    PanelCookie:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+            - code
+            - message
+            - fields
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - error
+        - request_id
+      additionalProperties: false
+    MediaAsset:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        purpose:
+          type: string
+          enum:
+            - avatar
+            - logo
+            - cover
+            - banner
+            - editor-image
+            - editor-video
+        kind:
+          type: string
+          enum:
+            - image
+            - video
+        status:
+          const: ready
+        original_name:
+          type: string
+          maxLength: 180
+        mime_type:
+          type: string
+        size_bytes:
+          type: integer
+          minimum: 1
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        duration_seconds:
+          anyOf:
+            -
+              type: number
+              exclusiveMinimum: 0
+            -
+              type: 'null'
+        is_animated:
+          type: boolean
+        url:
+          type: string
+        preview_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - purpose
+        - kind
+        - status
+        - original_name
+        - mime_type
+        - size_bytes
+        - width
+        - height
+        - duration_seconds
+        - is_animated
+        - url
+        - preview_path
+        - created_at
+      additionalProperties: false
+    MediaResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/MediaAsset'
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+  responses:
+    Error400:
+      description: 'INVALID_JSON / INVALID_MULTIPART'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error401:
+      description: UNAUTHENTICATED
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error403:
+      description: CSRF_INVALID
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error404:
+      description: 'USER_NOT_FOUND / ROLE_NOT_FOUND / MEDIA_NOT_FOUND'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error409:
+      description: 'VERSION_CONFLICT / uniqueness / account-integrity / media conflict'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: 'Present for rate limits and UPLOAD_IN_PROGRESS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error413:
+      description: 'PAYLOAD_TOO_LARGE / FILE_TOO_LARGE / STORAGE_QUOTA_EXCEEDED'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error415:
+      description: UNSUPPORTED_MEDIA_TYPE
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error422:
+      description: 'VALIDATION_FAILED / SELF_PASSWORD_CHANGE_REQUIRED / INVALID_MEDIA'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error429:
+      description: RATE_LIMITED
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: 'Present for rate limits and UPLOAD_IN_PROGRESS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error503:
+      description: 'SERVICE_UNAVAILABLE / MEDIA_SERVICE_UNAVAILABLE'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error500:
+      description: INTERNAL_ERROR
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

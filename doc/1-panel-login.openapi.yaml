@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: 'Tahlil Panel Authentication'
   version: 1.0.0
-  description: 'Same-origin cookie authentication. No RBAC, bearer tokens, public registration, password recovery or compromised-password screening. Frontend is external; see 1-panel-login-api.md.'
+  description: 'Cookie panel authentication. All origins are permitted with reflected credentialed CORS; existing SameSite=Lax cookies and context-bound CSRF remain enforced. No Origin allowlist configuration. No RBAC or compromised-password screening.'
 servers:
   -
     url: 'http://localhost:8000/api/v1/admin'
@@ -27,7 +27,7 @@ paths:
         -
           AnonymousContext: []
       responses:
-        200:
+        '200':
           description: Success
           headers:
             X-Request-ID:
@@ -50,13 +50,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CsrfResponse'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       description: 'No body/query. Stable token for an authenticated session or a 15-minute anonymous context; creates context cookie when needed. Does not prove authentication.'
   /auth/login:
@@ -71,7 +71,7 @@ paths:
         -
           PanelCookie: []
       responses:
-        200:
+        '200':
           description: Success
           headers:
             X-Request-ID:
@@ -94,32 +94,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
-        400:
+        '400':
           $ref: '#/components/responses/Error400'
-        401:
+        '401':
           $ref: '#/components/responses/Error401'
-        403:
+        '403':
           $ref: '#/components/responses/Error403'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        415:
+        '415':
           $ref: '#/components/responses/Error415'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        429:
+        '429':
           $ref: '#/components/responses/Error429'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       parameters:
-        -
-          name: Origin
-          in: header
-          required: false
-          schema:
-            type: string
-          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
         -
           name: X-CSRF-Token
           in: header
@@ -127,7 +120,7 @@ paths:
           schema:
             type: string
           description: 'Synchronizer token from GET /auth/csrf or successful login.'
-      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Requires session-bound or anonymous context cookie and CSRF. Username failures are generic. Issues tahlil-panel-session-v2 and clears anonymous cookie. 5 failed pair attempts / 50 total IP attempts per 15 minutes.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Context-bound CSRF is checked; Origin is unrestricted; no automatic mutation replay. Requires session-bound or anonymous context cookie and CSRF. Username failures are generic. Issues tahlil-panel-session-v2 and clears anonymous cookie. 5 failed pair attempts / 50 total IP attempts per 15 minutes.'
       requestBody:
         required: true
         content:
@@ -144,7 +137,7 @@ paths:
         -
           PanelCookie: []
       responses:
-        200:
+        '200':
           description: Success
           headers:
             X-Request-ID:
@@ -167,15 +160,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResponse'
-        401:
+        '401':
           $ref: '#/components/responses/Error401'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       description: 'No body/query. Authoritative active/non-deleted account and session-version check; role is optional descriptive data.'
   /auth/logout:
@@ -189,7 +182,7 @@ paths:
         -
           PanelCookie: []
       responses:
-        204:
+        '204':
           description: 'Success, empty body; sign in again for protected access.'
           headers:
             X-Request-ID:
@@ -208,28 +201,21 @@ paths:
               schema:
                 type: string
               description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
-        403:
+        '403':
           $ref: '#/components/responses/Error403'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        415:
+        '415':
           $ref: '#/components/responses/Error415'
-        400:
+        '400':
           $ref: '#/components/responses/Error400'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       parameters:
-        -
-          name: Origin
-          in: header
-          required: false
-          schema:
-            type: string
-          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
         -
           name: X-CSRF-Token
           in: header
@@ -237,7 +223,7 @@ paths:
           schema:
             type: string
           description: 'Synchronizer token from GET /auth/csrf or successful login.'
-      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. No body. Authenticated session requires CSRF; missing/expired/revoked sessions still require Origin but no CSRF and return 204. Revocation infrastructure failure returns 503.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Context-bound CSRF is checked; Origin is unrestricted; no automatic mutation replay. No body. Authenticated session requires CSRF; missing/expired/revoked sessions require no Origin or CSRF and return 204. Revocation infrastructure failure returns 503.'
   /auth/logout-all:
     post:
       operationId: logoutAll
@@ -248,7 +234,7 @@ paths:
         -
           PanelCookie: []
       responses:
-        204:
+        '204':
           description: 'Success, empty body; sign in again for protected access.'
           headers:
             X-Request-ID:
@@ -267,32 +253,25 @@ paths:
               schema:
                 type: string
               description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
-        400:
+        '400':
           $ref: '#/components/responses/Error400'
-        401:
+        '401':
           $ref: '#/components/responses/Error401'
-        403:
+        '403':
           $ref: '#/components/responses/Error403'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        415:
+        '415':
           $ref: '#/components/responses/Error415'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        429:
+        '429':
           $ref: '#/components/responses/Error429'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       parameters:
-        -
-          name: Origin
-          in: header
-          required: false
-          schema:
-            type: string
-          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
         -
           name: X-CSRF-Token
           in: header
@@ -300,7 +279,7 @@ paths:
           schema:
             type: string
           description: 'Synchronizer token from GET /auth/csrf or successful login.'
-      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Context-bound CSRF is checked; Origin is unrestricted; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
       requestBody:
         required: true
         content:
@@ -317,7 +296,7 @@ paths:
         -
           PanelCookie: []
       responses:
-        204:
+        '204':
           description: 'Success, empty body; sign in again for protected access.'
           headers:
             X-Request-ID:
@@ -336,32 +315,25 @@ paths:
               schema:
                 type: string
               description: 'May occur multiple times; retain every header. Host-only; Path=/; HttpOnly; SameSite=Lax; Secure on production HTTPS. Cookies cleared on logout; legacy cookie at Path=/tahlilpanel expired.'
-        400:
+        '400':
           $ref: '#/components/responses/Error400'
-        401:
+        '401':
           $ref: '#/components/responses/Error401'
-        403:
+        '403':
           $ref: '#/components/responses/Error403'
-        413:
+        '413':
           $ref: '#/components/responses/Error413'
-        415:
+        '415':
           $ref: '#/components/responses/Error415'
-        422:
+        '422':
           $ref: '#/components/responses/Error422'
-        429:
+        '429':
           $ref: '#/components/responses/Error429'
-        503:
+        '503':
           $ref: '#/components/responses/Error503'
-        500:
+        '500':
           $ref: '#/components/responses/Error500'
       parameters:
-        -
-          name: Origin
-          in: header
-          required: false
-          schema:
-            type: string
-          description: 'Required allowed exact origin on mutations unless a valid Referer origin is available. Never trust arbitrary client forwarding.'
         -
           name: X-CSRF-Token
           in: header
@@ -369,7 +341,7 @@ paths:
           schema:
             type: string
           description: 'Synchronizer token from GET /auth/csrf or successful login.'
-      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Origin and CSRF are both checked; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
+      description: 'Maximum JSON body size 16 KiB. Unknown fields rejected. Context-bound CSRF is checked; Origin is unrestricted; no automatic mutation replay. Current-password failures share a 5-per-account/15-minute counter. Success clears cookies and revokes all sessions. No replacement authenticated session.'
       requestBody:
         required: true
         content:

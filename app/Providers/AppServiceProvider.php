@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Media\MediaConsumers;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(MediaConsumers::class);
     }
 
     /**

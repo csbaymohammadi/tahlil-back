@@ -10,6 +10,6 @@ class RoleFactory extends Factory
 {
     public function definition(): array
     {
-        return ['name' => fake()->jobTitle()];
+        return ['name' => fake()->unique()->jobTitle()];
     }
 }

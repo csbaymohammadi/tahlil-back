@@ -24,7 +24,7 @@ class PanelAuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['panel.allowed_origins' => ['http://localhost'], 'panel.rate_store' => 'database']);
+        config(['panel.rate_store' => 'database']);
         $this->withCredentials()->withHeader('Origin', 'http://localhost');
     }
 
@@ -144,17 +144,25 @@ class PanelAuthenticationTest extends TestCase
         $this->login(password: $password)->assertOk();
     }
 
-    public function test_foreign_or_missing_origin_is_rejected_but_referer_is_accepted(): void
+    public function test_arbitrary_or_missing_origin_is_accepted_with_valid_csrf(): void
     {
         $this->administrator();
-        $this->csrf();
-        $this->withHeader('Origin', 'https://attacker.example');
-        $this->postJson(self::BASE.'/login', ['username' => 'editor.demo', 'password' => self::PASSWORD])
-            ->assertForbidden()->assertJsonPath('error.code', 'FORBIDDEN');
+        $this->withHeader('Origin', 'https://frontend.example');
+        $this->login()->assertOk()->assertHeader('Access-Control-Allow-Origin', 'https://frontend.example')
+            ->assertHeader('Access-Control-Allow-Credentials', 'true');
         $this->withoutHeader('Origin');
-        $this->post(self::BASE.'/logout')->assertForbidden();
-        $this->withHeader('Referer', 'http://localhost/tahlilpanel/login');
-        $this->postJson(self::BASE.'/login', ['username' => 'editor.demo', 'password' => self::PASSWORD])->assertOk();
+        $this->login()->assertOk();
+    }
+
+    public function test_cors_preflight_accepts_any_domain_and_custom_headers_without_authentication(): void
+    {
+        $this->options('/api/v1/admin/media', [], [
+            'Origin' => 'https://another-frontend.example',
+            'Access-Control-Request-Method' => 'POST',
+            'Access-Control-Request-Headers' => 'content-type,x-csrf-token,idempotency-key',
+        ])->assertNoContent()->assertHeader('Access-Control-Allow-Origin', 'https://another-frontend.example')
+            ->assertHeader('Access-Control-Allow-Credentials', 'true');
+        $this->assertDatabaseCount('panel_sessions', 0);
     }
 
     public function test_login_fields_are_allowlisted_and_roles_cannot_be_submitted(): void

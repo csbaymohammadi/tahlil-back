@@ -1,7 +1,12 @@
 <?php
 
 return [
-    'allowed_origins' => array_filter(explode(',', env('PANEL_ALLOWED_ORIGINS', env('APP_URL', 'http://localhost:8000')))),
+    'seed_administrator' => [
+        'username' => env('PANEL_SEED_ADMIN_USERNAME', 'admin'),
+        'name' => env('PANEL_SEED_ADMIN_NAME', 'Panel Administrator'),
+        'email' => env('PANEL_SEED_ADMIN_EMAIL'),
+        'password' => env('PANEL_SEED_ADMIN_PASSWORD'),
+    ],
     'trusted_proxies' => array_filter(explode(',', env('PANEL_TRUSTED_PROXIES', ''))),
     'secure_cookie' => env('PANEL_SECURE_COOKIE', env('APP_ENV') === 'production'),
     'absolute_seconds' => 604800,

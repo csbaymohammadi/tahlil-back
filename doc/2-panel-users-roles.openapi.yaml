@@ -1,0 +1,1222 @@
+openapi: 3.1.0
+info:
+  title: 'Tahlil Users and Roles'
+  version: 1.0.0
+  description: 'All active panel accounts have equal access. Context-bound CSRF required on mutations; Origin optional/unrestricted with credentialed reflected CORS. Host-only SameSite=Lax cookie rules still apply. Password breach screening intentionally omitted.'
+servers:
+  -
+    url: 'http://localhost:8000/api/v1/admin'
+    description: Development
+  -
+    url: 'https://{public_host}/api/v1/admin'
+    variables:
+      public_host:
+        default: replace-with-public-host.example
+    description: 'Replace deployment placeholder.'
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      summary: 'List panel accounts, including inactive, excluding legacy/deleted'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+            default: 1
+        -
+          name: per_page
+          in: query
+          schema:
+            type: integer
+            enum:
+              - 10
+              - 20
+              - 50
+            default: 10
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+    post:
+      operationId: createUser
+      summary: 'Create a panel account without authenticating it'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUser'
+  '/users/{id}':
+    get:
+      operationId: getUser
+      summary: 'Get current editable user record'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+    patch:
+      operationId: updateUser
+      summary: 'Atomically update changed fields using expected_version'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchUser'
+    delete:
+      operationId: deleteUser
+      summary: 'Soft-delete and deactivate; revoke target sessions'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: expected_version
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          description: 'Positive decimal integer; stale values return VERSION_CONFLICT.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 'Success; no body.'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /roles:
+    get:
+      operationId: listRoles
+      summary: 'List all role labels, without pagination'
+      security:
+        -
+          PanelCookie: []
+      parameters: []
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RolesResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+    post:
+      operationId: createRole
+      summary: 'Create a descriptive role name only'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRole'
+  '/roles/{id}':
+    get:
+      operationId: getRole
+      summary: 'Get current role/count/version'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+    patch:
+      operationId: updateRole
+      summary: 'Rename without revoking sessions'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchRole'
+    delete:
+      operationId: deleteRole
+      summary: 'Delete any label and clear assignments atomically'
+      security:
+        -
+          PanelCookie: []
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+        -
+          name: expected_version
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          description: 'Positive decimal integer; stale values return VERSION_CONFLICT.'
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: 'no-store; binary private responses additionally include private.'
+            Vary:
+              schema:
+                type: string
+              description: 'Cookie, plus Origin for reflected credentialed CORS.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDeletedResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '500':
+          $ref: '#/components/responses/Error500'
+components:
+  securitySchemes:
+    PanelCookie:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+            - code
+            - message
+            - fields
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - error
+        - request_id
+      additionalProperties: false
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        username:
+          type: string
+          minLength: 3
+          maxLength: 120
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        avatar_media_id:
+          anyOf:
+            -
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            -
+              type: 'null'
+        avatar_url:
+          anyOf:
+            -
+              type: string
+            -
+              type: 'null'
+        role_id:
+          anyOf:
+            -
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            -
+              type: 'null'
+        role:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        is_active:
+          type: boolean
+        last_login_at:
+          anyOf:
+            -
+              type: string
+              format: date-time
+            -
+              type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - id
+        - username
+        - name
+        - email
+        - avatar_media_id
+        - avatar_url
+        - role_id
+        - role
+        - is_active
+        - last_login_at
+        - created_at
+        - updated_at
+        - version
+      additionalProperties: false
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        users_count:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - users_count
+        - version
+        - created_at
+        - updated_at
+      additionalProperties: false
+    CreateUser:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: '^[A-Za-z0-9._-]+$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 15
+          maxLength: 128
+          writeOnly: true
+        role_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        is_active:
+          type: boolean
+        avatar_media_id:
+          anyOf:
+            -
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            -
+              type: 'null'
+      required:
+        - username
+        - name
+        - email
+        - password
+        - role_id
+        - is_active
+      additionalProperties: false
+    PatchUser:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 120
+          pattern: '^[A-Za-z0-9._-]+$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          anyOf:
+            -
+              type: string
+              minLength: 15
+              maxLength: 128
+              writeOnly: true
+            -
+              const: ''
+          description: 'Omit or exact empty string preserves password. Nonempty own-password replacement is rejected.'
+        role_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        is_active:
+          type: boolean
+        avatar_media_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - expected_version
+      additionalProperties: false
+      minProperties: 2
+    CreateRole:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+        - name
+      additionalProperties: false
+    PatchRole:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+        - expected_version
+        - name
+      additionalProperties: false
+    UserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    RoleResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Role'
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    RolesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+    UsersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            per_page:
+              type: integer
+              enum:
+                - 10
+                - 20
+                - 50
+            total:
+              type: integer
+              minimum: 0
+            total_pages:
+              type: integer
+              minimum: 0
+          required:
+            - page
+            - per_page
+            - total
+            - total_pages
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - data
+        - meta
+        - request_id
+      additionalProperties: false
+    RoleDeletedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted_role_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            affected_users_count:
+              type: integer
+              minimum: 0
+          required:
+            - deleted_role_id
+            - affected_users_count
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - data
+        - request_id
+      additionalProperties: false
+  responses:
+    Error400:
+      description: 'INVALID_JSON / INVALID_MULTIPART'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error401:
+      description: UNAUTHENTICATED
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error403:
+      description: CSRF_INVALID
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error404:
+      description: 'USER_NOT_FOUND / ROLE_NOT_FOUND / MEDIA_NOT_FOUND'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error409:
+      description: 'VERSION_CONFLICT / uniqueness / account-integrity / media conflict'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: 'Present for rate limits and UPLOAD_IN_PROGRESS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error413:
+      description: 'PAYLOAD_TOO_LARGE / FILE_TOO_LARGE / STORAGE_QUOTA_EXCEEDED'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error415:
+      description: UNSUPPORTED_MEDIA_TYPE
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error422:
+      description: 'VALIDATION_FAILED / SELF_PASSWORD_CHANGE_REQUIRED / INVALID_MEDIA'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error429:
+      description: RATE_LIMITED
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: 'Present for rate limits and UPLOAD_IN_PROGRESS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error503:
+      description: 'SERVICE_UNAVAILABLE / MEDIA_SERVICE_UNAVAILABLE'
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error500:
+      description: INTERNAL_ERROR
+      headers:
+        X-Request-ID:
+          schema:
+            type: string
+        Cache-Control:
+          schema:
+            type: string
+          description: 'no-store; binary private responses additionally include private.'
+        Vary:
+          schema:
+            type: string
+          description: 'Cookie, plus Origin for reflected credentialed CORS.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
