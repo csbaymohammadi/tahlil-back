@@ -31,9 +31,10 @@ class PanelRequest
     private function process(Request $request, Closure $next): Response
     {
         $mediaUpload = $request->routeIs('panel.media.store');
-        $blogImport = $request->routeIs('panel.blog.imports.store');
-        $multipart = $mediaUpload || $blogImport;
-        $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') ? 2 * 1024 * 1024 : 16384;
+        $contentImport = $request->routeIs('panel.content-imports.store');
+        $newsItemMutation = $request->routeIs('panel.news.items.store', 'panel.news.items.update');
+        $multipart = $mediaUpload || $contentImport;
+        $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') || $newsItemMutation ? 2 * 1024 * 1024 : 16384;
         $raw = $multipart ? '' : $request->getContent();
         if (! $multipart && (strlen($raw) > $bodyLimit || (int) $request->header('Content-Length', 0) > $bodyLimit)) {
             throw new PanelAuthException(413, 'PAYLOAD_TOO_LARGE', 'The request body exceeds the endpoint size limit.');
@@ -42,14 +43,14 @@ class PanelRequest
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'DELETE requests do not accept a body.', ['body' => ['Use query parameters only where documented.']]);
         }
         if ($multipart) {
-            $maximum = $blogImport ? config('blog.import_max_bytes') + 65536 : 30 * 1024 * 1024 + 65536;
+            $maximum = $contentImport ? config('blog.import_max_bytes') + 65536 : 30 * 1024 * 1024 + 65536;
             if ((int) $request->header('Content-Length', 0) > $maximum) {
                 throw new PanelAuthException(413, 'FILE_TOO_LARGE', 'The upload body is too large.');
             }
             if (! preg_match('/^multipart\/form-data;.*boundary=/i', $request->header('Content-Type', '')) || count($request->allFiles()) !== 1 || ! $request->file('file') instanceof UploadedFile) {
                 throw new PanelAuthException(400, 'INVALID_MULTIPART', 'Send exactly one file in a multipart request.');
             }
-            if ($blogImport && array_diff(array_keys($request->except('file')), ['content_type']) !== []) {
+            if ($contentImport && array_diff(array_keys($request->except('file')), ['content_type']) !== []) {
                 throw new PanelAuthException(422, 'VALIDATION_FAILED', 'Check the submitted information.', ['body' => ['Only content_type and file are accepted.']]);
             }
             if (in_array($request->file('file')->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
@@ -78,7 +79,9 @@ class PanelRequest
             $request->routeIs('panel.users.index') => ['page', 'per_page'],
             $request->routeIs('panel.blog.articles.index') => ['page', 'per_page', 'q'],
             $request->routeIs('panel.blog.categories.index') => ['q'],
-            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy') => ['expected_version'],
+            $request->routeIs('panel.news.items.index') => ['page', 'per_page', 'q'],
+            $request->routeIs('panel.news.categories.index') => ['q'],
+            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy') => ['expected_version'],
             default => [],
         };
         if (array_diff(array_keys($request->query->all()), $allowedQuery) !== []) {

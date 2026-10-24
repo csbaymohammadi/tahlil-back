@@ -32,8 +32,11 @@ class WordDocumentParser
     private string $imageNamePrefix = '';
 
     /** @return array{fields: array<string, mixed>, images: array<string, array{token: string, bytes: string, mime: string, name: string, width: int, height: int, animated: bool}>} */
-    public function parse(string $path): array
+    public function parse(string $path, string $contentType = 'blog'): array
     {
+        if (! in_array($contentType, ['blog', 'news'], true)) {
+            throw new \InvalidArgumentException('Unsupported content import module.');
+        }
         $this->relationships = [];
         $this->imageTokens = [];
         $this->images = [];
@@ -71,7 +74,7 @@ class WordDocumentParser
             $blocks = $this->children($body);
             $markerLocations = $this->markerLocations($blocks);
             $version = 'TAHLIL_CONTENT_IMPORT_V1';
-            $module = 'content_type: blog';
+            $module = 'content_type: '.$contentType;
             $cover = '[cover_image]';
             $content = '[content]';
             foreach ([$version, $module, $cover, $content] as $marker) {
@@ -101,7 +104,7 @@ class WordDocumentParser
             foreach ($coverNodes as $node) {
                 if ($this->is($node, 'p')) {
                     $text = trim($this->text($node));
-                    if ($text !== '' && ! in_array($text, ['[[cover_image]]', 'تصویر روی جلد', 'در صورت نیاز، تصویر را در این بخش قرار دهید. برای بدون جلد ماندن مقاله، جای‌نگهدار را حذف کنید.', 'متن مقاله'], true)) {
+                    if ($text !== '' && ! in_array($text, ['[[cover_image]]', 'تصویر روی جلد', 'در صورت نیاز، تصویر را در این بخش قرار دهید. برای بدون جلد ماندن مقاله، جای‌نگهدار را حذف کنید.', 'در صورت نیاز، تصویر را در این بخش قرار دهید. برای بدون جلد ماندن خبر، جای‌نگهدار را حذف کنید.', 'متن مقاله', 'متن خبر'], true)) {
                         $coverText[] = $text;
                     }
                 } elseif (! $this->is($node, 'tbl')) {
@@ -263,7 +266,7 @@ class WordDocumentParser
     private function markerLocations(array $blocks): array
     {
         $locations = [];
-        $known = ['TAHLIL_CONTENT_IMPORT_V1', 'content_type: blog', '[cover_image]', '[content]'];
+        $known = ['TAHLIL_CONTENT_IMPORT_V1', 'content_type: blog', 'content_type: news', '[cover_image]', '[content]'];
         foreach ($blocks as $index => $block) {
             if (! $this->is($block, 'p')) {
                 continue;

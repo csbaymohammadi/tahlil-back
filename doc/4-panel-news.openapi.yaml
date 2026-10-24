@@ -1,0 +1,491 @@
+openapi: 3.1.0
+info:
+  title: Tahlil panel news API
+  version: 1.0.0
+  description: >-
+    Authenticated news administration API, durable scheduling, and shared blog/news Word import.
+    Public news HTTP routes and a cache consumer are not included.
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development
+  - url: https://service.tahlilex.com/api/v1/admin
+    description: Production backend origin; remote deployment not verified
+  - url: https://<staging-host>/api/v1/admin
+    description: Staging placeholder
+tags:
+  - name: News items
+    description: Create, edit, schedule, list, and soft-delete news items.
+  - name: News categories
+    description: Manage news-only categories and merge or remove assignments.
+  - name: Shared Word import
+    description: Import Blog or News documents with module-scoped categories and idempotency.
+security:
+  - PanelSession: []
+paths:
+  /news/items:
+    get:
+      operationId: listNewsItems
+      tags: [News items]
+      summary: List and search news items
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Paginated Draft, Scheduled, and Published records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, request_id]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/NewsListItem' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createNewsItem
+      tags: [News items]
+      summary: Create a news item
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewsCreate' }
+      responses:
+        '201':
+          description: Created canonical detail
+          headers:
+            Location: { schema: { type: string } }
+            X-Request-ID: { $ref: '#/components/headers/RequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsResponse' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /news/items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getNewsItem
+      tags: [News items]
+      summary: Get a private news item detail
+      responses:
+        '200':
+          description: Draft, Scheduled, or Published detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateNewsItem
+      tags: [News items]
+      summary: Update a news item with optimistic version checking
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewsPatch' }
+      responses:
+        '200':
+          description: Updated canonical detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteNewsItem
+      tags: [News items]
+      summary: Soft-delete a news item
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+      responses:
+        '204': { description: Deleted; no body }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /news/categories:
+    get:
+      operationId: listNewsCategories
+      tags: [News categories]
+      summary: List and search news categories
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Complete live category list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/NewsCategory' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createNewsCategory
+      tags: [News categories]
+      summary: Create a news category
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryCreate' }
+      responses:
+        '201':
+          description: Created News category
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /news/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getNewsCategory
+      tags: [News categories]
+      summary: Get a news category
+      responses:
+        '200':
+          description: Live category and version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteNewsCategory
+      tags: [News categories]
+      summary: Delete a news category and clear item assignments
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Category soft-deleted and assigned items uncategorized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [deleted_category_id, affected_news_count]
+                    properties:
+                      deleted_category_id: { type: integer }
+                      affected_news_count: { type: integer, minimum: 0 }
+                  request_id: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /news/categories/{id}/merge:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: mergeNewsCategory
+      tags: [News categories]
+      summary: Merge a news category into another category
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryMerge' }
+      responses:
+        '200':
+          description: Source category merged into target
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [source_category_id, target_category_id, moved_news_count]
+                    properties:
+                      source_category_id: { type: integer }
+                      target_category_id: { type: integer }
+                      moved_news_count: { type: integer, minimum: 0 }
+                  request_id: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /content-imports:
+    post:
+      operationId: importNewsFromWord
+      tags: [Shared Word import]
+      summary: Import a Word document as a Draft
+      description: Accepts content_type=blog or news; template marker and category scope must match the selected module. DOC requires sandboxed conversion prerequisites.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content_type, file]
+              properties:
+                content_type: { type: string, enum: [blog, news] }
+                file: { type: string, format: binary, description: One .doc or .docx file up to 20 MiB }
+      responses:
+        '201':
+          description: Complete canonical Draft; matching retries replay the result
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [content_type, record]
+                    properties:
+                      content_type: { type: string, enum: [blog, news] }
+                      record: { $ref: '#/components/schemas/NewsDetail' }
+                  request_id: { type: string }
+        '409':
+          description: Idempotency conflict or active processing lease
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '422':
+          description: Validation issues and optional private report metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportError' }
+        '429':
+          description: Import attempt limit exceeded
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /content-imports/reports/{report_id}:
+    get:
+      operationId: downloadNewsWordImportReport
+      tags: [Shared Word import]
+      summary: Download a private Word import error report
+      parameters:
+        - name: report_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Private owner-bound report; filename depends on content_type
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    PanelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, enum: [10, 20, 50], default: 10 }
+  headers:
+    RequestId:
+      schema: { type: string }
+  responses:
+    Error:
+      description: Standard private API error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    NewsListItem:
+      $ref: '#/components/schemas/NewsBase'
+    NewsDetail:
+      allOf:
+        - $ref: '#/components/schemas/NewsBase'
+        - type: object
+          required: [content, meta_description]
+          properties:
+            content: { type: string, maxLength: 1048576 }
+            meta_description: { type: string, maxLength: 500 }
+    NewsBase:
+      type: object
+      required: [id, title, slug, description, cover_image, reading_minutes, status, scheduled_for, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        cover_image: { type: string, maxLength: 2048 }
+        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+        author: { oneOf: [{ $ref: '#/components/schemas/Author' }, { type: 'null' }] }
+        category_id: { type: [integer, 'null'] }
+        category: { oneOf: [{ $ref: '#/components/schemas/CategorySummary' }, { type: 'null' }] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        public_path: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+    NewsCreate:
+      type: object
+      additionalProperties: false
+      required: [title, slug, content, category_id, reading_minutes, status]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
+        description: { type: string, maxLength: 2000, default: '' }
+        cover_image: { type: string, maxLength: 2048, default: '' }
+        content: { type: string, maxLength: 1048576 }
+        category_id: { type: [integer, 'null'] }
+        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        meta_description: { type: string, maxLength: 500, default: '' }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+    NewsPatch:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties:
+        expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        cover_image: { type: string, maxLength: 2048 }
+        content: { type: string, maxLength: 1048576 }
+        category_id: { type: [integer, 'null'] }
+        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        meta_description: { type: string, maxLength: 500 }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+    NewsResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/NewsDetail' }
+        request_id: { type: string }
+    Author:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    CategorySummary:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    NewsCategory:
+      allOf:
+        - $ref: '#/components/schemas/CategorySummary'
+        - type: object
+          required: [news_count, created_at, updated_at, version]
+          properties:
+            news_count: { type: integer, minimum: 0 }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            version: { type: integer, minimum: 1 }
+    CategoryCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+    CategoryResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/NewsCategory' }
+        request_id: { type: string }
+    CategoryMerge:
+      type: object
+      additionalProperties: false
+      required: [expected_version, target_category_id, target_expected_version]
+      properties:
+        expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+        target_category_id: { type: integer, minimum: 1, maximum: 9007199254740991 }
+        target_expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+    Pagination:
+      type: object
+      required: [page, per_page, total, total_pages]
+      properties:
+        page: { type: integer }
+        per_page: { type: integer, enum: [10, 20, 50] }
+        total: { type: integer }
+        total_pages: { type: integer }
+    Error:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        request_id: { type: string }
+    ImportError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+      description: Error envelope whose error may additionally contain issues and report metadata.

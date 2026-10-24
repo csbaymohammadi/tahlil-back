@@ -103,6 +103,23 @@ class User extends Authenticatable
                         'created_at' => now(),
                     ]);
                 }
+                DB::table('news_items')->where('author_id', $this->id)->update([
+                    'author_name_normalized' => BlogText::normalize($this->name),
+                ]);
+                if (DB::table('news_items')->where('author_id', $this->id)->where('status', 'published')->whereNull('deleted_at')->exists()) {
+                    DB::table('news_outbox')->insert([
+                        'news_item_id' => null,
+                        'event' => 'news_author_changed',
+                        'payload' => json_encode([
+                            'user_id' => $this->id,
+                            'request_id' => $this->securityRequestId ?? 'user-profile-update-'.Str::uuid(),
+                            'occurred_at' => now()->utc()->toISOString(),
+                        ], JSON_THROW_ON_ERROR),
+                        'attempts' => 0,
+                        'available_at' => now(),
+                        'created_at' => now(),
+                    ]);
+                }
             }
 
             return $saved;

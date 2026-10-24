@@ -33,7 +33,11 @@ class ContentImportController extends Controller
             'request_id' => $request->attributes->get('request_id'),
         ], $result['status'])->header('Cache-Control', 'private, no-store');
 
-        return $response->header('Location', route('panel.blog.articles.show', ['id' => $result['article_id']], false));
+        $location = $result['content_type'] === 'news'
+            ? route('panel.news.items.show', ['id' => $result['record_id']], false)
+            : route('panel.blog.articles.show', ['id' => $result['record_id']], false);
+
+        return $response->header('Location', $location);
     }
 
     public function report(Request $request, string $id): StreamedResponse
@@ -53,7 +57,8 @@ class ContentImportController extends Controller
         if (! is_resource($stream)) {
             throw new PanelAuthException(503, 'SERVICE_UNAVAILABLE', 'The import report is temporarily unavailable.');
         }
-        $filename = 'blog-import-errors.docx';
+        $contentType = DB::table('blog_content_imports')->where('id', $report->import_id)->value('content_type');
+        $filename = $contentType === 'news' ? 'news-import-errors.docx' : 'blog-import-errors.docx';
         $response = response()->streamDownload(static function () use ($stream): void {
             try {
                 fpassthru($stream);

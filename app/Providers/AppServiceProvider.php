@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Media\MediaConsumers;
 use App\Models\BlogArticle;
+use App\Models\NewsItem;
 use App\Models\User;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
@@ -31,6 +32,11 @@ class AppServiceProvider extends ServiceProvider
             'blog-article',
             static fn (int $id, User $actor): bool => BlogArticle::query()->whereKey($id)->exists(),
             static fn (int $id): bool => BlogArticle::public()->whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register(
+            'news-item',
+            static fn (int $id, User $actor): bool => NewsItem::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => NewsItem::public()->whereKey($id)->exists(),
         );
     }
 }

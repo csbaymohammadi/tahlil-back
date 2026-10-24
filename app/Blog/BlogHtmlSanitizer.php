@@ -19,7 +19,8 @@ class BlogHtmlSanitizer
 
     private const DANGEROUS_TAGS = ['script', 'style', 'form', 'object', 'embed', 'svg', 'math', 'base', 'meta', 'link', 'template', 'input', 'button', 'textarea'];
 
-    public function sanitize(string $html): string
+    /** @param list<string>|null $trustedHosts */
+    public function sanitize(string $html, ?array $trustedHosts = null): string
     {
         if (strlen($html) > 1_048_576 || ! preg_match('//u', $html)) {
             $this->invalid('The article content exceeds its size or encoding limit.');
@@ -53,7 +54,7 @@ class BlogHtmlSanitizer
 
         $counts = ['nodes' => 0, 'cells' => 0];
         foreach ($root->childNodes as $child) {
-            $this->inspect($child, 0, $counts);
+            $this->inspect($child, 0, $counts, $trustedHosts ?? config('blog.trusted_media_hosts', []));
         }
 
         $config = (new HtmlSanitizerConfig)
@@ -79,7 +80,10 @@ class BlogHtmlSanitizer
     }
 
     /** @param array{nodes: int, cells: int} $counts */
-    private function inspect(DOMNode $node, int $depth, array &$counts): void
+    /** @param array{nodes: int, cells: int} $counts
+     * @param  list<string>  $trustedHosts
+     */
+    private function inspect(DOMNode $node, int $depth, array &$counts, array $trustedHosts): void
     {
         if ($depth > 32) {
             $this->invalid('The article content is nested too deeply.');
@@ -97,7 +101,7 @@ class BlogHtmlSanitizer
                 $this->normalizeYoutube($node);
             }
             if ($tag === 'img' || $tag === 'video') {
-                $this->validateMediaSource($node->getAttribute('src'));
+                $this->validateMediaSource($node->getAttribute('src'), $trustedHosts);
             }
             if ($tag === 'a' && $node->hasAttribute('href')) {
                 $this->validateLink($node->getAttribute('href'));
@@ -157,7 +161,7 @@ class BlogHtmlSanitizer
         }
 
         foreach ($node->childNodes as $child) {
-            $this->inspect($child, $depth + 1, $counts);
+            $this->inspect($child, $depth + 1, $counts, $trustedHosts);
         }
     }
 
@@ -188,7 +192,8 @@ class BlogHtmlSanitizer
         $iframe->setAttribute('src', 'https://www.youtube-nocookie.com/embed/'.$match[1].($query ? '?'.http_build_query($query) : ''));
     }
 
-    private function validateMediaSource(string $source): void
+    /** @param list<string> $trustedHosts */
+    private function validateMediaSource(string $source, array $trustedHosts): void
     {
         if ($source === '') {
             $this->invalid('Every image or video needs a supported source.');
@@ -199,7 +204,7 @@ class BlogHtmlSanitizer
         $parts = parse_url($source);
         $host = strtolower($parts['host'] ?? '');
         if (! is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https' || isset($parts['user']) || isset($parts['pass']) ||
-            (isset($parts['port']) && (int) $parts['port'] !== 443) || ! in_array($host, config('blog.trusted_media_hosts', []), true)) {
+            (isset($parts['port']) && (int) $parts['port'] !== 443) || ! in_array($host, $trustedHosts, true)) {
             $this->invalid('The image or video must use an approved HTTPS media location.');
         }
     }

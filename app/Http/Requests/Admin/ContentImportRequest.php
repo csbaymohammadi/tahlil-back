@@ -31,9 +31,6 @@ class ContentImportRequest extends FormRequest
             if (! is_string($key) || ! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD', $key)) {
                 $validator->errors()->add('idempotency_key', 'Supply a UUID Idempotency-Key header.');
             }
-            if ($this->input('content_type') === 'news') {
-                $validator->errors()->add('content_type', 'News import is unavailable until the news module is implemented.');
-            }
         }];
     }
 }

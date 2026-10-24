@@ -15,3 +15,7 @@ Schedule::command('media:prune')->hourly()->withoutOverlapping();
 Schedule::command('blog:publish-due')->everyTenSeconds()->runInBackground()->withoutOverlapping();
 
 Schedule::command('blog:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('news:publish-due')->everyTenSeconds()->runInBackground()->withoutOverlapping();
+
+Schedule::command('news:prune')->hourly()->withoutOverlapping();

@@ -3,6 +3,7 @@
 namespace App\Actions\Blog;
 
 use App\Actions\Auth\RevokeSessions;
+use App\Actions\News\SaveNewsItem;
 use App\Auth\SecurityEvents;
 use App\Blog\WordDocumentConverter;
 use App\Blog\WordDocumentParser;
@@ -14,6 +15,8 @@ use App\Media\MediaInspector;
 use App\Models\BlogArticle;
 use App\Models\BlogCategory;
 use App\Models\Media;
+use App\Models\NewsCategory;
+use App\Models\NewsItem;
 use App\Models\PanelSession;
 use App\Support\BlogText;
 use Illuminate\Cache\RateLimiter;
@@ -34,15 +37,16 @@ class ImportWordDocument
         private WordImageNormalizer $images,
         private MediaInspector $mediaInspector,
         private SaveArticle $saveArticle,
+        private SaveNewsItem $saveNewsItem,
         private WordErrorReportWriter $reports,
         private SecurityEvents $events,
     ) {}
 
-    /** @return array{status: int, content_type: string, article_id?: int, snapshot?: array<string, mixed>, body?: array<string, mixed>, replayed: bool} */
+    /** @return array{status: int, content_type: string, record_id?: int, article_id?: int, news_item_id?: int, snapshot?: array<string, mixed>, body?: array<string, mixed>, replayed: bool} */
     public function handle(PanelSession $session, UploadedFile $file, string $contentType, string $idempotencyKey, string $requestId): array
     {
-        if ($contentType !== 'blog') {
-            throw ValidationException::withMessages(['content_type' => ['Only blog content imports are currently available.']]);
+        if (! in_array($contentType, ['blog', 'news'], true)) {
+            throw ValidationException::withMessages(['content_type' => ['Choose blog or news content.']]);
         }
         if (! $file->isValid()) {
             throw new PanelAuthException(422, 'INVALID_WORD_FILE', 'The uploaded Word file could not be read.', ['file' => ['Choose the file again.']]);
@@ -63,7 +67,7 @@ class ImportWordDocument
         $checksum = hash_file('sha256', $file->getPathname());
         $claim = $this->claim($session, $idempotencyKey, $contentType, $checksum, $requestId);
         if ($claim['kind'] === 'success_replay') {
-            return ['status' => 201, 'content_type' => $contentType, 'article_id' => $claim['article_id'], 'snapshot' => $claim['snapshot'], 'replayed' => true];
+            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $claim['record_id'], ...($contentType === 'blog' ? ['article_id' => $claim['record_id']] : ['news_item_id' => $claim['record_id']]), 'snapshot' => $claim['snapshot'], 'replayed' => true];
         }
         if ($claim['kind'] === 'error_replay') {
             return ['status' => 422, 'content_type' => $contentType, 'body' => ['error' => $claim['error'], 'request_id' => $requestId], 'replayed' => true];
@@ -85,7 +89,7 @@ class ImportWordDocument
                 $documentPath = $converted['path'];
                 $convertedDirectory = $converted['directory'];
             }
-            $parsed = $this->parser->parse($documentPath);
+            $parsed = $this->parser->parse($documentPath, $contentType);
             $this->assertWithinDeadline($startedAt);
             $mediaUrls = [];
             $index = 0;
@@ -114,7 +118,7 @@ class ImportWordDocument
             foreach ($mediaUrls as $token => $url) {
                 $values['content'] = str_replace($token, $url, $values['content']);
             }
-            $values['category_id'] = $this->categoryId($values['category_name']);
+            $values['category_id'] = $this->categoryId($values['category_name'], $contentType);
             $minutes = $values['reading_minutes'];
             if (! preg_match('/^[1-9][0-9]{0,3}$/D', $minutes) || (int) $minutes > 1440) {
                 throw $this->fieldIssue('reading_minutes', 'INVALID_READING_TIME', 'زمان مطالعه باید عدد صحیحی بین ۱ تا ۱۴۴۰ باشد.', 'ردیف reading_minutes جدول اطلاعات');
@@ -125,21 +129,24 @@ class ImportWordDocument
             $values['scheduled_for'] = null;
             $this->assertWithinDeadline($startedAt);
 
-            $article = DB::transaction(function () use ($session, $values, $requestId, $claim): BlogArticle {
-                $article = $this->saveArticle->handle($session, null, $values, $requestId)->load(['author', 'category']);
-                $snapshot = $this->snapshot($article);
+            $record = DB::transaction(function () use ($session, $values, $requestId, $claim, $contentType): BlogArticle|NewsItem {
+                $record = $contentType === 'blog'
+                    ? $this->saveArticle->handle($session, null, $values, $requestId)->load(['author', 'category'])
+                    : $this->saveNewsItem->handle($session, null, $values, $requestId)->load(['author', 'category']);
+                $snapshot = $this->snapshot($record);
                 $this->sessions->currentUser($session);
                 DB::table('blog_content_imports')->where('id', $claim['import_id'])->where('status', 'processing')->update([
-                    'status' => 'succeeded', 'article_id' => $article->id,
+                    'status' => 'succeeded', 'article_id' => $contentType === 'blog' ? $record->id : null,
+                    'news_item_id' => $contentType === 'news' ? $record->id : null,
                     'response' => json_encode(['record' => $snapshot], JSON_THROW_ON_ERROR),
                     'lease_until' => null, 'updated_at' => now(),
                 ]);
-                $this->events->management('blog_content_imported', $requestId, $article->author_id, 'article', $article->id, ['content_type', 'template_version']);
+                $this->events->management($contentType.'_content_imported', $requestId, $record->author_id, $contentType === 'blog' ? 'article' : 'news_item', $record->id, ['content_type', 'template_version']);
 
-                return $article;
+                return $record;
             });
 
-            return ['status' => 201, 'content_type' => $contentType, 'article_id' => $article->id, 'snapshot' => $this->snapshot($article), 'replayed' => false];
+            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $record->id, ...($contentType === 'blog' ? ['article_id' => $record->id] : ['news_item_id' => $record->id]), 'snapshot' => $this->snapshot($record), 'replayed' => false];
         } catch (WordImportValidationException $exception) {
             $this->cleanupMedia($session, $stagedMedia);
 
@@ -191,7 +198,7 @@ class ImportWordDocument
         }
     }
 
-    /** @return array{kind: string, import_id: int, article_id?: int, snapshot?: array<string, mixed>, error?: array<string, mixed>} */
+    /** @return array{kind: string, import_id: int, record_id?: int, snapshot?: array<string, mixed>, error?: array<string, mixed>} */
     private function claim(PanelSession $session, string $key, string $contentType, string $checksum, string $requestId): array
     {
         return DB::transaction(function () use ($session, $key, $contentType, $checksum): array {
@@ -202,13 +209,16 @@ class ImportWordDocument
                     throw new PanelAuthException(409, 'IDEMPOTENCY_CONFLICT', 'This key was already used for another document or module.');
                 }
                 if ($existing->status === 'succeeded') {
-                    $article = BlogArticle::withTrashed()->find($existing->article_id);
-                    if (! $article || $article->deleted_at !== null) {
-                        throw new PanelAuthException(404, 'IMPORT_RESULT_NOT_FOUND', 'The imported article was deleted.');
+                    $recordId = $contentType === 'blog' ? $existing->article_id : $existing->news_item_id;
+                    $record = $contentType === 'blog'
+                        ? BlogArticle::withTrashed()->find($recordId)
+                        : NewsItem::withTrashed()->find($recordId);
+                    if (! $record || $record->deleted_at !== null) {
+                        throw new PanelAuthException(404, 'IMPORT_RESULT_NOT_FOUND', 'The imported content was deleted.');
                     }
                     $stored = json_decode((string) $existing->response, true);
 
-                    return ['kind' => 'success_replay', 'import_id' => (int) $existing->id, 'article_id' => (int) $article->id, 'snapshot' => $stored['record'] ?? $this->snapshot($article->load(['author', 'category']))];
+                    return ['kind' => 'success_replay', 'import_id' => (int) $existing->id, 'record_id' => (int) $record->id, 'snapshot' => $stored['record'] ?? $this->snapshot($record->load(['author', 'category']))];
                 }
                 if ($existing->status === 'invalid') {
                     $stored = json_decode((string) $existing->response, true);
@@ -239,7 +249,7 @@ class ImportWordDocument
 
             $values = [
                 'checksum' => $checksum, 'content_type' => $contentType, 'status' => 'processing',
-                'article_id' => null, 'response' => null, 'lease_until' => now()->addSeconds(config('blog.import_lease_seconds')),
+                'article_id' => null, 'news_item_id' => null, 'response' => null, 'lease_until' => now()->addSeconds(config('blog.import_lease_seconds')),
                 'expires_at' => now()->addDay(), 'updated_at' => now(),
             ];
             if ($existing) {
@@ -255,14 +265,16 @@ class ImportWordDocument
         });
     }
 
-    private function categoryId(string $name): ?int
+    private function categoryId(string $name, string $contentType): ?int
     {
         if (trim($name) === '') {
             return null;
         }
-        $matches = BlogCategory::query()->where('name_normalized', BlogText::normalize($name))->get();
+        $category = $contentType === 'blog' ? BlogCategory::class : NewsCategory::class;
+        $matches = $category::query()->where('name_normalized', BlogText::normalize($name))->get();
         if ($matches->count() !== 1) {
-            throw $this->fieldIssue('category_name', 'CATEGORY_NOT_FOUND', 'دسته‌بندی واردشده در وبلاگ پیدا نشد؛ آن را ایجاد کنید یا بخش را خالی بگذارید.', 'ردیف category_name جدول اطلاعات');
+            $module = $contentType === 'blog' ? 'وبلاگ' : 'خبر';
+            throw $this->fieldIssue('category_name', 'CATEGORY_NOT_FOUND', 'دسته‌بندی واردشده در '.$module.' پیدا نشد؛ آن را ایجاد کنید یا بخش را خالی بگذارید.', 'ردیف category_name جدول اطلاعات');
         }
 
         return (int) $matches->first()->id;
@@ -380,7 +392,7 @@ class ImportWordDocument
                     fclose($stream);
                 }
             }
-            $report = ['id' => $reportId, 'filename' => 'blog-import-errors.docx', 'expires_at' => now()->addDay()->utc()->toISOString()];
+            $report = ['id' => $reportId, 'filename' => $contentType === 'news' ? 'news-import-errors.docx' : 'blog-import-errors.docx', 'expires_at' => now()->addDay()->utc()->toISOString()];
             $reportStorageKey = $key;
         } catch (Throwable) {
             $issues[] = $this->issueForField('file', 'REPORT_UNAVAILABLE', 'گزارش Word در دسترس نیست؛ خطاهای همین پاسخ JSON را نگه دارید.', 'گزارش خطا');
@@ -486,7 +498,7 @@ class ImportWordDocument
     }
 
     /** @return array<string, mixed> */
-    private function snapshot(BlogArticle $article): array
+    private function snapshot(BlogArticle|NewsItem $article): array
     {
         $author = $article->author;
         $category = $article->category;

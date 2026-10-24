@@ -1,0 +1,369 @@
+{
+  "info": {
+    "_postman_id": "9a3670c1-25fb-4f16-9aa7-2e3ea1ed132a",
+    "name": "Tahlil Panel News API",
+    "description": "News item/category management, scheduling, and the shared Word importer. Use content_type=news.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiRoot",
+      "value": "{{baseUrl}}/api/v1/admin",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newsItemId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "newsItemVersion",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "categoryVersion",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "targetCategoryId",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "targetCategoryVersion",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "reportId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "importKey",
+      "value": "d2c8b59b-879a-4cc5-b9b5-81d2ee388d65",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Articles",
+      "item": [
+        {
+          "name": "List news items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiRoot}}/news/items?page=1&per_page=10&q="
+          }
+        },
+        {
+          "name": "Get news item detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiRoot}}/news/items/{{newsItemId}}"
+          }
+        },
+        {
+          "name": "Create news item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Understanding Market Price References\",\n  \"slug\": \"understanding-market-price-references\",\n  \"description\": \"An introduction to price references.\",\n  \"cover_image\": \"\",\n  \"content\": \"<h2>Price references</h2><p>An introductory explanation.</p>\",\n  \"category_id\": null,\n  \"reading_minutes\": 5,\n  \"meta_description\": \"A guide to reading price labels.\",\n  \"status\": \"draft\",\n  \"scheduled_for\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiRoot}}/news/items"
+          }
+        },
+        {
+          "name": "Update news item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expected_version\": {{newsItemVersion}},\n  \"description\": \"Updated article summary.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiRoot}}/news/items/{{newsItemId}}"
+          }
+        },
+        {
+          "name": "Delete news item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{apiRoot}}/news/items/{{newsItemId}}?expected_version={{newsItemVersion}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiRoot}}/news/categories?q="
+          }
+        },
+        {
+          "name": "Get category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiRoot}}/news/categories/{{categoryId}}"
+          }
+        },
+        {
+          "name": "Create category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Exchange Guides\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiRoot}}/news/categories"
+          }
+        },
+        {
+          "name": "Delete category and uncategorize news items",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{apiRoot}}/news/categories/{{categoryId}}?expected_version={{categoryVersion}}"
+          }
+        },
+        {
+          "name": "Merge category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expected_version\": {{categoryVersion}},\n  \"target_category_id\": {{targetCategoryId}},\n  \"target_expected_version\": {{targetCategoryVersion}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiRoot}}/news/categories/{{categoryId}}/merge"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Word import",
+      "item": [
+        {
+          "name": "Import news DOC or DOCX",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{importKey}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content_type",
+                  "value": "news",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{apiRoot}}/content-imports",
+            "description": "Choose one .doc or .docx file. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes."
+          }
+        },
+        {
+          "name": "Download validation report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              }
+            ],
+            "url": "{{apiRoot}}/content-imports/reports/{{reportId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Session helper",
+      "item": [
+        {
+          "name": "Get CSRF token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{apiRoot}}/auth/csrf"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('csrfToken', pm.response.json().data.csrf_token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

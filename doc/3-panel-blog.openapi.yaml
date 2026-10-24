@@ -260,7 +260,7 @@ paths:
       tags: [Word import]
       summary: Import one Word file as a new Draft
       description: >-
-        Current implementation accepts content_type=blog. News is rejected until its module is implemented.
+        The shared importer accepts content_type=blog or content_type=news. This handoff documents the Blog target; see the News handoff for its module-specific contract.
         DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
       security:
         - PanelSession: []
@@ -279,7 +279,7 @@ paths:
               additionalProperties: false
               required: [content_type, file]
               properties:
-                content_type: { type: string, enum: [blog] }
+                content_type: { type: string, enum: [blog, news] }
                 file:
                   type: string
                   format: binary
@@ -296,7 +296,7 @@ paths:
                   data:
                     type: object
                     properties:
-                      content_type: { type: string, const: blog }
+                      content_type: { type: string, enum: [blog, news] }
                       record: { $ref: '#/components/schemas/Article' }
                   request_id: { type: string }
         '409':

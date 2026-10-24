@@ -16,7 +16,7 @@ class BlogArticleResource extends JsonResource
     {
         $author = $this->resource->author;
         $category = $this->resource->category;
-        $detail = $request->routeIs('panel.blog.articles.show', 'panel.blog.articles.store', 'panel.blog.articles.update', 'panel.blog.imports.store');
+        $detail = $request->routeIs('panel.blog.articles.show', 'panel.blog.articles.store', 'panel.blog.articles.update', 'panel.content-imports.store');
 
         return [
             'id' => (int) $this->id,
