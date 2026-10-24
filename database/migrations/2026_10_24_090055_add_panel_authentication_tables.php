@@ -54,6 +54,7 @@ return new class extends Migration
         Schema::dropIfExists('panel_sessions');
         Schema::table('users', function (Blueprint $table): void {
             $table->dropConstrainedForeignId('role_id');
+            $table->dropUnique('users_username_normalized_unique');
             $table->dropColumn(['username', 'username_normalized', 'is_active', 'security_version', 'password_changed_at', 'last_login_at', 'deleted_at']);
         });
         Schema::dropIfExists('roles');

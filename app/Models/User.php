@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Auth\PanelSessions;
 use App\Exceptions\PanelAuthException;
+use App\Support\BlogText;
 use App\Support\PanelMutationLock;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -52,12 +53,17 @@ class User extends Authenticatable
         if ($this->isDirty('email')) {
             $this->email = mb_strtolower(trim($this->email));
         }
+        if ($this->isDirty('name')) {
+            $this->blog_name_normalized = BlogText::normalize($this->name);
+        }
         $editable = ['username', 'name', 'email', 'password', 'role_id', 'is_active', 'avatar_media_id', 'deleted_at'];
         if ($this->exists && ! $this->isDirty($editable)) {
             return parent::save($options);
         }
 
-        return DB::transaction(function () use ($options): bool {
+        $nameChanged = $this->isDirty('name');
+
+        return DB::transaction(function () use ($options, $nameChanged): bool {
             PanelMutationLock::acquire();
             if ($this->exists) {
                 $current = static::withTrashed()->lockForUpdate()->findOrFail($this->id);
@@ -78,7 +84,28 @@ class User extends Authenticatable
                 }
             }
 
-            return parent::save($options);
+            $saved = parent::save($options);
+            if ($saved && $nameChanged) {
+                DB::table('blog_articles')->where('author_id', $this->id)->update([
+                    'author_name_normalized' => BlogText::normalize($this->name),
+                ]);
+                if (DB::table('blog_articles')->where('author_id', $this->id)->where('status', 'published')->whereNull('deleted_at')->exists()) {
+                    DB::table('blog_outbox')->insert([
+                        'article_id' => null,
+                        'event' => 'blog_author_changed',
+                        'payload' => json_encode([
+                            'user_id' => $this->id,
+                            'request_id' => $this->securityRequestId ?? 'user-profile-update-'.Str::uuid(),
+                            'occurred_at' => now()->utc()->toISOString(),
+                        ], JSON_THROW_ON_ERROR),
+                        'attempts' => 0,
+                        'available_at' => now(),
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+
+            return $saved;
         });
     }
 

@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('panel:auth-prune')->daily()->withoutOverlapping();
 
 Schedule::command('media:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('blog:publish-due')->everyTenSeconds()->runInBackground()->withoutOverlapping();
+
+Schedule::command('blog:prune')->hourly()->withoutOverlapping();

@@ -56,6 +56,7 @@ return new class extends Migration
             $table->dropColumn(['actor_id', 'target_type', 'target_id', 'changed_fields', 'affected_users_count', 'purpose', 'size_bytes']);
         });
         Schema::table('roles', function (Blueprint $table): void {
+            $table->dropUnique('roles_name_normalized_unique');
             $table->dropColumn(['name_normalized', 'version', 'deleted_at']);
         });
         Schema::table('users', fn (Blueprint $table) => $table->dropColumn('version'));

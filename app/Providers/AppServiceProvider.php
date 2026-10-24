@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Media\MediaConsumers;
+use App\Models\BlogArticle;
+use App\Models\User;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,5 +27,10 @@ class AppServiceProvider extends ServiceProvider
     {
         TrustProxies::at(config('panel.trusted_proxies'));
         Auth::viaRequest('panel-session', fn (Request $request) => $request->attributes->get('panel_user'));
+        $this->app->make(MediaConsumers::class)->register(
+            'blog-article',
+            static fn (int $id, User $actor): bool => BlogArticle::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => BlogArticle::public()->whereKey($id)->exists(),
+        );
     }
 }

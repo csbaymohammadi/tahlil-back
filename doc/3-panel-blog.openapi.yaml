@@ -1,0 +1,536 @@
+openapi: 3.1.0
+info:
+  title: Tahlil panel blog API
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+  description: >-
+    Authenticated blog article, category, publication and Word import API.
+    All active administrators have identical access. Public blog/cache endpoints are not included.
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development
+  - url: https://service.tahlilex.com/api/v1/admin
+    description: Production backend origin; deployment must be verified
+  - url: https://<staging-host>/api/v1/admin
+    description: Staging placeholder
+tags:
+  - name: Articles
+    description: Create, search, edit, schedule, and remove panel blog articles.
+  - name: Categories
+    description: Manage blog categories and merge or remove their assignments.
+  - name: Word import
+    description: Import a Word document as a Draft and retrieve private validation reports.
+security:
+  - PanelSession: []
+paths:
+  /blog/articles:
+    get:
+      operationId: listBlogArticles
+      tags: [Articles]
+      summary: List articles
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Paginated live article records
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, request_id]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ArticleListItem' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createBlogArticle
+      tags: [Articles]
+      summary: Create an article
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArticleCreate' }
+      responses:
+        '201':
+          description: Created article
+          headers:
+            Location: { schema: { type: string } }
+            X-Request-ID: { $ref: '#/components/headers/RequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleResponse' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /blog/articles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getBlogArticle
+      tags: [Articles]
+      summary: Get article detail
+      responses:
+        '200':
+          description: Article detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateBlogArticle
+      tags: [Articles]
+      summary: Update an article with optimistic version checking
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArticlePatch' }
+      responses:
+        '200':
+          description: Updated article detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArticleResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteBlogArticle
+      tags: [Articles]
+      summary: Soft-delete an article
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '204':
+          description: Deleted; no response body
+          headers:
+            X-Request-ID: { $ref: '#/components/headers/RequestId' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /blog/categories:
+    get:
+      operationId: listBlogCategories
+      tags: [Categories]
+      summary: List all live categories
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Complete category list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: createBlogCategory
+      tags: [Categories]
+      summary: Create a category
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        '201':
+          description: Created category
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /blog/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      operationId: getBlogCategory
+      tags: [Categories]
+      summary: Get a live category
+      responses:
+        '200':
+          description: Category detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteBlogCategory
+      tags: [Categories]
+      summary: Delete category and uncategorize live articles
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Category deletion and actual affected count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted_category_id: { type: integer }
+                      affected_articles_count: { type: integer }
+                  request_id: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /blog/categories/{id}/merge:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      operationId: mergeBlogCategories
+      tags: [Categories]
+      summary: Move live articles into another category and delete the source
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, target_category_id, target_expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                target_category_id: { type: integer, minimum: 1 }
+                target_expected_version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Merge outcome and moved count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      source_category_id: { type: integer }
+                      target_category_id: { type: integer }
+                      moved_articles_count: { type: integer }
+                  request_id: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /content-imports:
+    post:
+      operationId: importBlogArticleFromWord
+      tags: [Word import]
+      summary: Import one Word file as a new Draft
+      description: >-
+        Current implementation accepts content_type=blog. News is rejected until its module is implemented.
+        DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
+      security:
+        - PanelSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content_type, file]
+              properties:
+                content_type: { type: string, enum: [blog] }
+                file:
+                  type: string
+                  format: binary
+                  description: One .doc or .docx, maximum 20 MiB; browser creates multipart boundary.
+      responses:
+        '201':
+          description: Complete canonical Draft detail; exact result may be replayed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      content_type: { type: string, const: blog }
+                      record: { $ref: '#/components/schemas/Article' }
+                  request_id: { type: string }
+        '409':
+          description: Idempotency conflict or active processing lease
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '422':
+          description: Document issues and optional private DOCX report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportError' }
+        '429':
+          description: Import attempt limit exceeded
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /content-imports/reports/{report_id}:
+    get:
+      operationId: downloadWordImportReport
+      tags: [Word import]
+      summary: Download a private validation report
+      parameters:
+        - name: report_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Owner-bound DOCX validation report
+          headers:
+            Cache-Control: { schema: { type: string, const: 'private, no-store, max-age=0' } }
+            Content-Disposition: { schema: { type: string } }
+            X-Request-ID: { $ref: '#/components/headers/RequestId' }
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    PanelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+      description: Host-only HttpOnly cookie established by panel login.
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+      description: Token returned by GET /auth/csrf; required for mutations in addition to the session cookie.
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, enum: [10, 20, 50], default: 10 }
+  headers:
+    RequestId:
+      description: Request correlation identifier
+      schema: { type: string }
+  responses:
+    Error:
+      description: Standard panel API error
+      headers:
+        X-Request-ID: { $ref: '#/components/headers/RequestId' }
+        Cache-Control: { schema: { type: string } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    ArticleCreate:
+      type: object
+      additionalProperties: false
+      required: [title, slug, content, category_id, reading_minutes, status]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, minLength: 1, maxLength: 200, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string, maxLength: 2000, default: '' }
+        cover_image: { type: string, maxLength: 2048, default: '' }
+        content: { type: string, maxLength: 1048576 }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        meta_description: { type: string, maxLength: 500, default: '' }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+    ArticlePatch:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, minLength: 1, maxLength: 200, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string, maxLength: 2000 }
+        cover_image: { type: string, maxLength: 2048 }
+        content: { type: string, maxLength: 1048576 }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        meta_description: { type: string, maxLength: 500 }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+    ArticleListItem:
+      $ref: '#/components/schemas/ArticleBase'
+    Article:
+      allOf:
+        - $ref: '#/components/schemas/ArticleBase'
+        - type: object
+          required: [content, meta_description]
+          properties:
+            content: { type: string }
+            meta_description: { type: string }
+    ArticleBase:
+      type: object
+      required: [id, title, slug, description, cover_image, reading_minutes, status, scheduled_for, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer, minimum: 1 }
+        title: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        cover_image: { type: string }
+        reading_minutes: { type: integer }
+        status: { type: string, enum: [draft, published, scheduled] }
+        scheduled_for: { type: [string, 'null'], format: date-time }
+        author:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            - type: 'null'
+        category_id: { type: [integer, 'null'] }
+        category:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            - type: 'null'
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        public_path: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+    ArticleResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/Article' }
+        request_id: { type: string }
+    Category:
+      type: object
+      required: [id, name, articles_count, created_at, updated_at, version]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        articles_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer }
+    CategoryResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/Category' }
+        request_id: { type: string }
+    Pagination:
+      type: object
+      required: [page, per_page, total, total_pages]
+      properties:
+        page: { type: integer }
+        per_page: { type: integer, enum: [10, 20, 50] }
+        total: { type: integer }
+        total_pages: { type: integer }
+    Error:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        request_id: { type: string }
+    ImportIssue:
+      type: object
+      required: [code, field, label, location, message]
+      properties:
+        code: { type: string }
+        field: { type: string }
+        label: { type: string }
+        location: { type: string }
+        message: { type: string }
+    ImportError:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields, issues, report]
+          properties:
+            code: { type: string, const: IMPORT_VALIDATION_FAILED }
+            message: { type: string }
+            fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
+            issues:
+              type: array
+              items: { $ref: '#/components/schemas/ImportIssue' }
+            report:
+              oneOf:
+                - type: object
+                  required: [id, filename, expires_at]
+                  properties:
+                    id: { type: string, format: uuid }
+                    filename: { type: string, const: blog-import-errors.docx }
+                    expires_at: { type: string, format: date-time }
+                - type: 'null'
+        request_id: { type: string }

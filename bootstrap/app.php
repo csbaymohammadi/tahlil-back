@@ -61,6 +61,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     [$code, $field] = ['EMAIL_TAKEN', 'email'];
                 } elseif (str_contains($detail, 'name_normalized')) {
                     [$code, $field] = ['ROLE_NAME_TAKEN', 'name'];
+                } elseif (str_contains($detail, 'blog_slug_ownership.slug')) {
+                    [$code, $field] = ['SLUG_TAKEN', 'slug'];
+                } elseif (str_contains($detail, 'blog_categories.name_normalized')) {
+                    [$code, $field] = ['CATEGORY_NAME_TAKEN', 'name'];
                 } else {
                     [$code, $field] = ['VERSION_CONFLICT', null];
                 }
