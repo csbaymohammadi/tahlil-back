@@ -19,3 +19,5 @@ Schedule::command('blog:prune')->hourly()->withoutOverlapping();
 Schedule::command('news:publish-due')->everyTenSeconds()->runInBackground()->withoutOverlapping();
 
 Schedule::command('news:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('exchanges:prune')->hourly()->withoutOverlapping();

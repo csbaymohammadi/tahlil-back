@@ -1,6 +1,7 @@
 <?php
 
 use App\Auth\PanelSessions;
+use App\Blog\BlogApiErrorPresenter;
 use App\Exceptions\PanelAuthException;
 use App\Http\Middleware\PanelEnvelope;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -69,6 +70,10 @@ return Application::configure(basePath: dirname(__DIR__))
                     [$code, $field] = ['SLUG_TAKEN', 'slug'];
                 } elseif (str_contains($detail, 'news_categories.name_normalized')) {
                     [$code, $field] = ['CATEGORY_NAME_TAKEN', 'name'];
+                } elseif (str_contains($detail, 'exchange_slug_ownership.slug') || str_contains($detail, 'exchanges.slug')) {
+                    [$code, $field] = ['SLUG_TAKEN', 'slug'];
+                } elseif (str_contains($detail, 'exchange_categories.name_normalized') || str_contains($detail, 'exchange_categories.key')) {
+                    [$code, $field] = ['CATEGORY_NAME_TAKEN', 'name'];
                 } else {
                     [$code, $field] = ['VERSION_CONFLICT', null];
                 }
@@ -84,6 +89,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 [$status, $code, $message] = [$exception->getStatusCode(), 'NOT_FOUND', 'The endpoint was not found.'];
             } else {
                 [$status, $code, $message] = [500, 'INTERNAL_ERROR', 'An unexpected error occurred.'];
+            }
+            if ($request->routeIs('panel.blog.articles.*', 'panel.content-imports.store', 'panel.content-imports.report')) {
+                $presented = app(BlogApiErrorPresenter::class)->present($code, $message, $fields);
+                $message = $presented['message'];
+                $fields = $presented['fields'];
             }
             $response = response()->json(['error' => ['code' => $code, 'message' => $message, 'fields' => (object) $fields],
                 'request_id' => $request->attributes->get('request_id')], $status);

@@ -46,26 +46,68 @@ class BlogManagementTest extends PanelTestCase
         $this->get(self::BASE.'/articles/'.$id)->assertNotFound()->assertJsonPath('error.code', 'ARTICLE_NOT_FOUND');
     }
 
-    public function test_unsafe_and_empty_content_are_rejected_without_saving(): void
+    public function test_unsafe_content_is_rejected_but_empty_optional_content_is_saved(): void
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
         $payload = [
             'title' => 'Safe title', 'slug' => 'safe-title', 'content' => '<script>alert(1)</script>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'draft',
+            'status' => 'draft',
         ];
-        $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable()->assertJsonPath('error.fields.content.0', 'The article contains an unsupported active element.');
+        $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable()
+            ->assertJsonPath('error.message', 'ساختار درخواست یا محتوای مقاله با الزامات امنیتی سازگار نیست.')
+            ->assertJsonPath('error.fields.content.0', 'مقدار «محتوا» قابل‌استفاده نیست.');
         $this->assertDatabaseCount('blog_articles', 0);
 
         $payload['content'] = '<p>&nbsp;</p><table><tbody><tr><td></td></tr></tbody></table>';
-        $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable();
+        $this->postJson(self::BASE.'/articles', $payload)->assertCreated()->assertJsonPath('data.content', '');
         $payload['content'] = '<p class="unsafe">Visible copy</p>';
         $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable();
         $payload['content'] = '<img src="https://user@service.tahlilex.com/image.png" alt="cover">';
         $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable();
         $payload['content'] = '<p>Visible copy</p></main><script>alert(1)</script><main>';
         $this->postJson(self::BASE.'/articles', $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('blog_articles', 1);
+    }
+
+    public function test_only_titles_are_required_and_unusable_optional_values_return_persian_warnings(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+
+        $minimal = $this->postJson(self::BASE.'/articles', ['title' => 'پیش‌نویس خالی', 'slug' => 'empty-draft'])
+            ->assertCreated()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.content', '')
+            ->assertJsonPath('data.reading_minutes', null)->assertJsonPath('warnings', []);
+        $this->assertDatabaseHas('blog_articles', ['id' => $minimal->json('data.id'), 'reading_minutes' => null]);
+
+        $response = $this->postJson(self::BASE.'/articles', [
+            'title' => 'مقاله با بخش‌های اختیاری', 'slug' => 'optional-fields-article',
+            'description' => ['نامعتبر'], 'meta_description' => str_repeat('م', 600),
+            'cover_image' => 'javascript:alert(1)', 'content' => null,
+            'category_id' => 'دسته ناشناخته', 'reading_minutes' => 'نامشخص',
+        ])->assertCreated()->assertJsonPath('data.content', '')->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.reading_minutes', null)->assertJsonPath('data.description', '');
+        $warnings = $response->json('warnings');
+        $this->assertCount(4, $warnings);
+        $this->assertSame(['description', 'category_id', 'reading_minutes', 'cover_image'], array_column($warnings, 'field'));
+        foreach ($warnings as $warning) {
+            $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $warning['message']);
+        }
+        $this->assertSame(str_repeat('م', 600), BlogArticle::findOrFail($response->json('data.id'))->meta_description);
+    }
+
+    public function test_title_and_english_title_are_the_only_required_article_fields(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+
+        $response = $this->postJson(self::BASE.'/articles', ['title' => '', 'slug' => 'Upper Case'])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.fields.title.0', 'عنوان مقاله الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.')
+            ->assertJsonPath('error.fields.slug.0', 'عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید؛ طول آن حداکثر ۲۰۰ نویسه باشد.')
+            ->assertJsonPath('error.message', 'عنوان و عنوان انگلیسی را بررسی کنید؛ سایر بخش‌ها اختیاری هستند.');
         $this->assertDatabaseCount('blog_articles', 0);
+        $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $response->json('error.message'));
     }
 
     public function test_category_names_are_normalized_and_delete_uncategorizes_articles(): void

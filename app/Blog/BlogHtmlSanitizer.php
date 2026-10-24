@@ -19,8 +19,11 @@ class BlogHtmlSanitizer
 
     private const DANGEROUS_TAGS = ['script', 'style', 'form', 'object', 'embed', 'svg', 'math', 'base', 'meta', 'link', 'template', 'input', 'button', 'textarea'];
 
-    /** @param list<string>|null $trustedHosts */
-    public function sanitize(string $html, ?array $trustedHosts = null): string
+    /**
+     * @param  list<string>|null  $trustedHosts
+     * @param  list<string>  $rootAssetPrefixes
+     */
+    public function sanitize(string $html, ?array $trustedHosts = null, bool $strictLinks = false, array $rootAssetPrefixes = ['/images/'], bool $allowEmpty = false): string
     {
         if (strlen($html) > 1_048_576 || ! preg_match('//u', $html)) {
             $this->invalid('The article content exceeds its size or encoding limit.');
@@ -54,7 +57,7 @@ class BlogHtmlSanitizer
 
         $counts = ['nodes' => 0, 'cells' => 0];
         foreach ($root->childNodes as $child) {
-            $this->inspect($child, 0, $counts, $trustedHosts ?? config('blog.trusted_media_hosts', []));
+            $this->inspect($child, 0, $counts, $trustedHosts ?? config('blog.trusted_media_hosts', []), $strictLinks, $rootAssetPrefixes);
         }
 
         $config = (new HtmlSanitizerConfig)
@@ -72,18 +75,19 @@ class BlogHtmlSanitizer
         }
         $sanitized = (new SymfonyHtmlSanitizer($config))->sanitize($canonicalInput);
 
-        if (! $this->isMeaningful($sanitized)) {
+        if (! $this->isMeaningful($sanitized) && ! $allowEmpty) {
             $this->invalid('Add visible text or a supported image, video, or table block.');
         }
 
-        return $sanitized;
+        return $this->isMeaningful($sanitized) ? $sanitized : '';
     }
 
     /** @param array{nodes: int, cells: int} $counts */
     /** @param array{nodes: int, cells: int} $counts
      * @param  list<string>  $trustedHosts
+     * @param  list<string>  $rootAssetPrefixes
      */
-    private function inspect(DOMNode $node, int $depth, array &$counts, array $trustedHosts): void
+    private function inspect(DOMNode $node, int $depth, array &$counts, array $trustedHosts, bool $strictLinks, array $rootAssetPrefixes): void
     {
         if ($depth > 32) {
             $this->invalid('The article content is nested too deeply.');
@@ -101,10 +105,10 @@ class BlogHtmlSanitizer
                 $this->normalizeYoutube($node);
             }
             if ($tag === 'img' || $tag === 'video') {
-                $this->validateMediaSource($node->getAttribute('src'), $trustedHosts);
+                $this->validateMediaSource($node->getAttribute('src'), $trustedHosts, $rootAssetPrefixes);
             }
             if ($tag === 'a' && $node->hasAttribute('href')) {
-                $this->validateLink($node->getAttribute('href'));
+                $this->validateLink($node->getAttribute('href'), $strictLinks, $rootAssetPrefixes);
                 if ($node->getAttribute('target') === '_blank') {
                     $node->setAttribute('rel', 'noopener noreferrer');
                 } elseif ($node->hasAttribute('target') && $node->getAttribute('target') !== '_self') {
@@ -161,7 +165,7 @@ class BlogHtmlSanitizer
         }
 
         foreach ($node->childNodes as $child) {
-            $this->inspect($child, $depth + 1, $counts, $trustedHosts);
+            $this->inspect($child, $depth + 1, $counts, $trustedHosts, $strictLinks, $rootAssetPrefixes);
         }
     }
 
@@ -193,12 +197,12 @@ class BlogHtmlSanitizer
     }
 
     /** @param list<string> $trustedHosts */
-    private function validateMediaSource(string $source, array $trustedHosts): void
+    private function validateMediaSource(string $source, array $trustedHosts, array $rootAssetPrefixes): void
     {
         if ($source === '') {
             $this->invalid('Every image or video needs a supported source.');
         }
-        if ($this->isSafeRootAsset($source) || $this->isManagedMediaUrl($source)) {
+        if ($this->isSafeRootAsset($source, $rootAssetPrefixes) || $this->isManagedMediaUrl($source)) {
             return;
         }
         $parts = parse_url($source);
@@ -209,23 +213,28 @@ class BlogHtmlSanitizer
         }
     }
 
-    private function validateLink(string $url): void
+    private function validateLink(string $url, bool $strictLinks, array $rootAssetPrefixes): void
     {
         if (str_starts_with($url, '#')) {
             return;
         }
-        if (str_starts_with($url, '/') && $this->isSafeRootAsset($url)) {
+        if (! $strictLinks && str_starts_with($url, '/') && $this->isSafeRootAsset($url, $rootAssetPrefixes)) {
             return;
         }
         $parts = parse_url($url);
-        if (! is_array($parts) || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https', 'mailto', 'tel'], true) || isset($parts['user']) || isset($parts['pass'])) {
-            $this->invalid('Links must use HTTP, HTTPS, mailto, tel, or a same-document fragment.');
+        $schemes = $strictLinks ? ['http', 'https'] : ['http', 'https', 'mailto', 'tel'];
+        if (! is_array($parts) || ! in_array(strtolower($parts['scheme'] ?? ''), $schemes, true) || isset($parts['user']) || isset($parts['pass']) || preg_match('/[\x00-\x20\x7f]/', $url)) {
+            $this->invalid($strictLinks ? 'Links must use HTTP, HTTPS, or a same-document fragment.' : 'Links must use HTTP, HTTPS, mailto, tel, or a same-document fragment.');
         }
     }
 
-    private function isSafeRootAsset(string $url): bool
+    /** @param list<string> $rootAssetPrefixes */
+    private function isSafeRootAsset(string $url, array $rootAssetPrefixes): bool
     {
-        if (! str_starts_with($url, '/images/') || str_starts_with($url, '//') || str_contains($url, '\\') || preg_match('/[?#]/', $url)) {
+        if (str_starts_with($url, '//') || str_contains($url, '\\') || preg_match('/[%?#\x00-\x20\x7f]/', $url)) {
+            return false;
+        }
+        if (! collect($rootAssetPrefixes)->contains(fn (string $prefix): bool => str_starts_with($url, $prefix))) {
             return false;
         }
         foreach (explode('/', $url) as $segment) {

@@ -4,6 +4,8 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BlogArticleController;
 use App\Http\Controllers\Admin\BlogCategoryController;
 use App\Http\Controllers\Admin\ContentImportController;
+use App\Http\Controllers\Admin\ExchangeCategoryController;
+use App\Http\Controllers\Admin\ExchangeItemController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\NewsCategoryController;
 use App\Http\Controllers\Admin\NewsItemController;
@@ -59,6 +61,19 @@ Route::prefix('v1/admin/news')->name('panel.news.')->middleware(PanelRequest::cl
     Route::post('categories', [NewsCategoryController::class, 'store'])->name('categories.store');
     Route::delete('categories/{id}', [NewsCategoryController::class, 'destroy'])->name('categories.destroy');
     Route::post('categories/{id}/merge', [NewsCategoryController::class, 'merge'])->name('categories.merge');
+});
+
+Route::prefix('v1/admin/exchanges')->name('panel.exchanges.')->middleware(PanelRequest::class)->group(function (): void {
+    Route::get('items', [ExchangeItemController::class, 'index'])->name('items.index');
+    Route::get('items/{id}', [ExchangeItemController::class, 'show'])->name('items.show');
+    Route::post('items', [ExchangeItemController::class, 'store'])->name('items.store');
+    Route::patch('items/{id}', [ExchangeItemController::class, 'update'])->name('items.update');
+    Route::delete('items/{id}', [ExchangeItemController::class, 'destroy'])->name('items.destroy');
+    Route::get('categories', [ExchangeCategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{id}', [ExchangeCategoryController::class, 'show'])->name('categories.show');
+    Route::post('categories', [ExchangeCategoryController::class, 'store'])->name('categories.store');
+    Route::delete('categories/{id}', [ExchangeCategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('categories/{id}/merge', [ExchangeCategoryController::class, 'merge'])->name('categories.merge');
 });
 
 Route::prefix('v1/admin')->name('panel.content-imports.')->middleware(PanelRequest::class)->group(function (): void {

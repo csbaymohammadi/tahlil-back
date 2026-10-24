@@ -3,6 +3,7 @@
 namespace App\Actions\Blog;
 
 use App\Actions\Auth\RevokeSessions;
+use App\Blog\BlogArticleSaveResult;
 use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
@@ -21,11 +22,14 @@ class SaveArticle
     public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media) {}
 
     /** @param array<string, mixed> $input */
-    public function handle(PanelSession $session, ?int $id, array $input, string $requestId): BlogArticle
+    public function handle(PanelSession $session, ?int $id, array $input, string $requestId): BlogArticleSaveResult
     {
-        $content = isset($input['content']) ? $this->html->sanitize($input['content']) : null;
+        $inputWarnings = [];
+        $input = $this->normalizeOptionalInput($input, $inputWarnings);
+        $content = array_key_exists('content', $input) ? $this->html->sanitize($input['content'], allowEmpty: true) : null;
 
-        return DB::transaction(function () use ($session, $id, $input, $requestId, $content): BlogArticle {
+        return DB::transaction(function () use ($session, $id, $input, $requestId, $content, $inputWarnings): BlogArticleSaveResult {
+            $warnings = $inputWarnings;
             $actor = $this->sessions->currentUser($session);
             $creating = $id === null;
             $article = $creating ? new BlogArticle : BlogArticle::query()->lockForUpdate()->find($id);
@@ -39,10 +43,15 @@ class SaveArticle
             $old = $creating ? [] : $article->only(['title', 'title_normalized', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status', 'scheduled_for']);
             $values = $this->values($input, $old, $creating, $content);
             $this->validateResult($values);
-            if ($values['category_id'] !== null && ! BlogCategory::query()->lockForUpdate()->whereKey($values['category_id'])->exists()) {
-                throw ValidationException::withMessages(['category_id' => ['Choose a live blog category or null.']]);
+            if ($values['category_id'] !== null && (! is_int($values['category_id']) || $values['category_id'] < 1 || ! BlogCategory::query()->lockForUpdate()->whereKey($values['category_id'])->exists())) {
+                $values['category_id'] = null;
+                $this->warn($warnings, 'category_id', 'CATEGORY_IGNORED', 'دسته‌بندی قابل‌استفاده نیست و مقاله بدون دسته‌بندی ذخیره شد.');
             }
-            $this->validateCoverAndMedia($values['cover_image'], $values['content'], $actor);
+            if ($values['reading_minutes'] !== null && (! is_int($values['reading_minutes']) || $values['reading_minutes'] < 1 || $values['reading_minutes'] > 1440)) {
+                $values['reading_minutes'] = null;
+                $this->warn($warnings, 'reading_minutes', 'READING_TIME_IGNORED', 'زمان مطالعه قابل‌استفاده نیست و خالی ذخیره شد.');
+            }
+            $this->validateCoverAndMedia($values['cover_image'], $values['content'], $actor, $warnings);
 
             $changed = [];
             foreach (array_keys($values) as $field) {
@@ -51,7 +60,7 @@ class SaveArticle
                 }
             }
             if (! $creating && $changed === []) {
-                return $article->fresh(['author', 'category']);
+                return new BlogArticleSaveResult($article->fresh(['author', 'category']), $warnings);
             }
 
             $previousStatus = $creating ? null : $article->status;
@@ -138,8 +147,29 @@ class SaveArticle
                 ]);
             }
 
-            return $article->fresh(['author', 'category']);
+            return new BlogArticleSaveResult($article->fresh(['author', 'category']), $warnings);
         });
+    }
+
+    /** @param array<string, mixed> $input
+     * @param  list<array{field: string, code: string, message: string}>  $warnings
+     * @return array<string, mixed>
+     */
+    private function normalizeOptionalInput(array $input, array &$warnings): array
+    {
+        foreach (['description', 'cover_image', 'content', 'meta_description'] as $field) {
+            if (! array_key_exists($field, $input)) {
+                continue;
+            }
+            if ($input[$field] === null) {
+                $input[$field] = '';
+            } elseif (! is_string($input[$field])) {
+                $input[$field] = '';
+                $this->warn($warnings, $field, 'OPTIONAL_VALUE_IGNORED', 'مقدار این بخش قابل‌استفاده نبود و خالی ماند.');
+            }
+        }
+
+        return $input;
     }
 
     /** @param array<string, mixed> $input
@@ -174,7 +204,7 @@ class SaveArticle
             'cover_image' => trim((string) $value('cover_image', '')),
             'content' => $content ?? (string) $value('content', ''),
             'category_id' => $value('category_id'),
-            'reading_minutes' => $value('reading_minutes', 0),
+            'reading_minutes' => $value('reading_minutes'),
             'meta_description' => trim((string) $value('meta_description', '')),
             'status' => $status,
             'scheduled_for' => $scheduled,
@@ -191,17 +221,15 @@ class SaveArticle
     /** @param array<string, mixed> $values */
     private function validateResult(array $values): void
     {
+        $errors = [];
         if ($values['title'] === '' || mb_strlen($values['title']) > 200) {
-            throw ValidationException::withMessages(['title' => ['Enter a title between 1 and 200 characters.']]);
+            $errors['title'] = ['عنوان مقاله الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.'];
         }
         if (! preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $values['slug']) || strlen($values['slug']) > 200) {
-            throw ValidationException::withMessages(['slug' => ['Use lowercase English letters, digits, and single hyphens.']]);
+            $errors['slug'] = ['عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید؛ طول آن حداکثر ۲۰۰ نویسه باشد.'];
         }
-        if (mb_strlen($values['description']) > 2000 || mb_strlen($values['meta_description']) > 500) {
-            throw ValidationException::withMessages(['description' => ['Optional text is too long.']]);
-        }
-        if (! is_int($values['reading_minutes']) || $values['reading_minutes'] < 1 || $values['reading_minutes'] > 1440) {
-            throw ValidationException::withMessages(['reading_minutes' => ['Use a whole number from 1 through 1440.']]);
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
         }
         if (! in_array($values['status'], ['draft', 'published', 'scheduled'], true)) {
             throw ValidationException::withMessages(['status' => ['Choose a supported publication status.']]);
@@ -209,24 +237,10 @@ class SaveArticle
         if ($values['scheduled_for'] !== null && $values['scheduled_for']->lessThanOrEqualTo(now())) {
             throw ValidationException::withMessages(['scheduled_for' => ['Choose a time later than now.']]);
         }
-        if ($values['category_id'] !== null && (! is_int($values['category_id']) || $values['category_id'] < 1)) {
-            throw ValidationException::withMessages(['category_id' => ['Choose an existing blog category or null.']]);
+        if (strlen($values['content']) > 1_048_576) {
+            throw ValidationException::withMessages(['content' => ['حجم محتوا از سقف یک مگابایت بیشتر است.']]);
         }
-        if ($values['cover_image'] !== '') {
-            $parts = parse_url($values['cover_image']);
-            $host = is_array($parts) ? strtolower($parts['host'] ?? '') : '';
-            $path = is_array($parts) ? ($parts['path'] ?? '') : '';
-            $safeAsset = str_starts_with($values['cover_image'], '/images/') && ! str_starts_with($values['cover_image'], '//') && ! str_contains($values['cover_image'], '..') && ! preg_match('/[?#\\\\]/', $values['cover_image']);
-            $managed = preg_match('~^/media/[1-9][0-9]{0,15}/[a-z0-9.-]+$~D', $values['cover_image']) === 1;
-            $trusted = is_array($parts) && strtolower($parts['scheme'] ?? '') === 'https' && ! isset($parts['user']) && ! isset($parts['pass']) && in_array($host, config('blog.trusted_media_hosts', []), true);
-            if (! $safeAsset && ! $managed && ! $trusted) {
-                throw ValidationException::withMessages(['cover_image' => ['Use an approved HTTPS media host, managed media URL, or root-relative /images asset.']]);
-            }
-            unset($path);
-        }
-        if (strlen($values['content']) > 1_048_576 || ! $this->html->sanitize($values['content'])) {
-            throw ValidationException::withMessages(['content' => ['Add supported article content.']]);
-        }
+        $this->html->sanitize($values['content'], allowEmpty: true);
     }
 
     private function assertSlugAvailable(string $slug, ?int $articleId): void
@@ -237,10 +251,32 @@ class SaveArticle
         }
     }
 
-    private function validateCoverAndMedia(string $cover, string $content, User $actor): void
+    private function validateCoverAndMedia(string &$cover, string $content, User $actor, array &$warnings): void
     {
+        if ($cover !== '') {
+            $parts = parse_url($cover);
+            $host = is_array($parts) ? strtolower($parts['host'] ?? '') : '';
+            $safeAsset = str_starts_with($cover, '/images/') && ! str_starts_with($cover, '//') && ! str_contains($cover, '..') && ! preg_match('/[?#\\\\]/', $cover);
+            $managed = preg_match('~^/media/[1-9][0-9]{0,15}/[a-z0-9.-]+$~D', $cover) === 1;
+            $trusted = is_array($parts) && strtolower($parts['scheme'] ?? '') === 'https' && ! isset($parts['user']) && ! isset($parts['pass']) && in_array($host, config('blog.trusted_media_hosts', []), true);
+            if (! $safeAsset && ! $managed && ! $trusted) {
+                $cover = '';
+                $this->warn($warnings, 'cover_image', 'COVER_IMAGE_IGNORED', 'تصویر جلد قابل‌استفاده نیست و مقاله بدون تصویر جلد ذخیره شد.');
+            }
+        }
         if (preg_match('~^/media/([1-9][0-9]{0,15})/([a-z0-9.-]+)$~D', $cover, $match)) {
-            $this->media->resolveCanonical($cover, $actor, 'image');
+            try {
+                $this->media->resolveCanonical($cover, $actor, 'image');
+            } catch (PanelAuthException $exception) {
+                if ($exception->errorCode !== 'MEDIA_NOT_FOUND') {
+                    throw $exception;
+                }
+                $cover = '';
+                $this->warn($warnings, 'cover_image', 'COVER_IMAGE_IGNORED', 'تصویر جلد در دسترس نیست و مقاله بدون تصویر جلد ذخیره شد.');
+            } catch (ValidationException) {
+                $cover = '';
+                $this->warn($warnings, 'cover_image', 'COVER_IMAGE_IGNORED', 'تصویر جلد با مقاله سازگار نیست و مقاله بدون تصویر جلد ذخیره شد.');
+            }
         }
         if (preg_match_all('~(?:src)=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\']~i', $content, $matches)) {
             foreach (array_unique($matches[1]) as $url) {
@@ -248,6 +284,12 @@ class SaveArticle
                 $this->media->resolveCanonical($url, $actor, $isVideo ? 'video' : 'image');
             }
         }
+    }
+
+    /** @param list<array{field: string, code: string, message: string}> $warnings */
+    private function warn(array &$warnings, string $field, string $code, string $message): void
+    {
+        $warnings[] = ['field' => $field, 'code' => $code, 'message' => $message];
     }
 
     /** @return list<int> */

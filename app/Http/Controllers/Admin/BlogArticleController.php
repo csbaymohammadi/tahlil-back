@@ -49,7 +49,7 @@ class BlogArticleController extends Controller
     {
         $article = BlogArticle::query()->with(['author', 'category'])->find(PanelIds::parse($id));
         if (! $article) {
-            return response()->json(['error' => ['code' => 'ARTICLE_NOT_FOUND', 'message' => 'The article was not found.', 'fields' => (object) []], 'request_id' => $request->attributes->get('request_id')], 404);
+            return response()->json(['error' => ['code' => 'ARTICLE_NOT_FOUND', 'message' => 'مقاله پیدا نشد یا حذف شده است.', 'fields' => (object) []], 'request_id' => $request->attributes->get('request_id')], 404);
         }
 
         return response()->json(['data' => (new BlogArticleResource($article))->resolve($request), 'request_id' => $request->attributes->get('request_id')]);
@@ -57,17 +57,19 @@ class BlogArticleController extends Controller
 
     public function store(BlogArticleRequest $request, SaveArticle $save): JsonResponse
     {
-        $article = $save->handle($request->attributes->get('panel_session'), null, $request->validated(), $request->attributes->get('request_id'));
+        $result = $save->handle($request->attributes->get('panel_session'), null, $request->validated(), $request->attributes->get('request_id'));
+        $article = $result->article;
 
-        return response()->json(['data' => (new BlogArticleResource($article))->resolve($request), 'request_id' => $request->attributes->get('request_id')], 201)
+        return response()->json(['data' => (new BlogArticleResource($article))->resolve($request), 'warnings' => $result->warnings, 'request_id' => $request->attributes->get('request_id')], 201)
             ->header('Location', route('panel.blog.articles.show', ['id' => $article->id], false));
     }
 
     public function update(BlogArticleRequest $request, string $id, SaveArticle $save): JsonResponse
     {
-        $article = $save->handle($request->attributes->get('panel_session'), PanelIds::parse($id), $request->validated(), $request->attributes->get('request_id'));
+        $result = $save->handle($request->attributes->get('panel_session'), PanelIds::parse($id), $request->validated(), $request->attributes->get('request_id'));
+        $article = $result->article;
 
-        return response()->json(['data' => (new BlogArticleResource($article))->resolve($request), 'request_id' => $request->attributes->get('request_id')]);
+        return response()->json(['data' => (new BlogArticleResource($article))->resolve($request), 'warnings' => $result->warnings, 'request_id' => $request->attributes->get('request_id')]);
     }
 
     public function destroy(Request $request, string $id, DeleteArticle $delete): Response

@@ -24,7 +24,7 @@ class BlogArticleResource extends JsonResource
             'slug' => $this->slug,
             'description' => $this->description,
             'cover_image' => $this->cover_image,
-            'reading_minutes' => (int) $this->reading_minutes,
+            'reading_minutes' => $this->reading_minutes === null ? null : (int) $this->reading_minutes,
             'status' => $this->status,
             'scheduled_for' => $this->scheduled_for?->utc()->toISOString(),
             'author' => $author ? ['id' => (int) $author->id, 'name' => $author->name] : null,

@@ -27,11 +27,14 @@ class WordDocumentParser
     /** @var array<string, string> */
     private array $listTypes = [];
 
+    /** @var list<array{field: string, code: string, message: string}> */
+    private array $warnings = [];
+
     private int $pixelTotal = 0;
 
     private string $imageNamePrefix = '';
 
-    /** @return array{fields: array<string, mixed>, images: array<string, array{token: string, bytes: string, mime: string, name: string, width: int, height: int, animated: bool}>} */
+    /** @return array{fields: array<string, mixed>, images: array<string, array{token: string, bytes: string, mime: string, name: string, width: int, height: int, animated: bool}>, warnings: list<array{field: string, code: string, message: string}>} */
     public function parse(string $path, string $contentType = 'blog'): array
     {
         if (! in_array($contentType, ['blog', 'news'], true)) {
@@ -41,6 +44,7 @@ class WordDocumentParser
         $this->imageTokens = [];
         $this->images = [];
         $this->listTypes = [];
+        $this->warnings = [];
         $this->pixelTotal = 0;
         $this->imageNamePrefix = bin2hex(random_bytes(8));
         if (! extension_loaded('zip') || ! extension_loaded('dom')) {
@@ -72,6 +76,11 @@ class WordDocumentParser
             $this->checkUnsupportedDocumentNodes($document);
 
             $blocks = $this->children($body);
+            $this->loadListTypes($zip);
+            if ($contentType === 'blog' && ! $this->hasLegacyTemplateMarker($blocks) && $this->hasPersianBlogSections($blocks)) {
+                return ['fields' => $this->parsePersianBlogSections($blocks, $zip), 'images' => $this->images, 'warnings' => $this->warnings];
+            }
+
             $markerLocations = $this->markerLocations($blocks);
             $version = 'TAHLIL_CONTENT_IMPORT_V1';
             $module = 'content_type: '.$contentType;
@@ -97,8 +106,6 @@ class WordDocumentParser
                 $this->fail('METADATA_TABLE_INVALID', 'template', 'جدول ثابت اطلاعات مقاله پیدا نشد یا بیش از یک جدول وجود دارد.', 'جدول اطلاعات مقاله');
             }
             $fields = $this->metadata($metadataTables[0]);
-            $this->loadListTypes($zip);
-
             $coverNodes = array_slice($blocks, $positions[2] + 1, $positions[3] - $positions[2] - 1);
             $coverText = [];
             foreach ($coverNodes as $node) {
@@ -128,7 +135,7 @@ class WordDocumentParser
             $fields['cover_image'] = $coverToken;
             $fields['content'] = $html;
 
-            return ['fields' => $fields, 'images' => $this->images];
+            return ['fields' => $fields, 'images' => $this->images, 'warnings' => $this->warnings];
         } finally {
             $zip->close();
             $this->activeZip = null;
@@ -278,6 +285,145 @@ class WordDocumentParser
         }
 
         return $locations;
+    }
+
+    /** @param list<DOMNode> $blocks */
+    private function hasPersianBlogSections(array $blocks): bool
+    {
+        $known = ['عنوان', 'عنوان انگلیسی', 'توضیحات', 'تصویر', 'محتوا', 'توضیحات متا', 'دسته‌بندی', 'زمان مطالعه'];
+        foreach ($blocks as $block) {
+            if ($this->is($block, 'p') && in_array(trim($this->text($block)), $known, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<DOMNode> $blocks */
+    private function hasLegacyTemplateMarker(array $blocks): bool
+    {
+        foreach ($blocks as $block) {
+            if ($this->is($block, 'p') && trim($this->text($block)) === 'TAHLIL_CONTENT_IMPORT_V1') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<DOMNode> $blocks
+     * @return array{title: string, slug: string, description: string, category_name: string, reading_minutes: string, cover_image: string, content: string, meta_description: string}
+     */
+    private function parsePersianBlogSections(array $blocks, ZipArchive $zip): array
+    {
+        $labels = [
+            'title' => 'عنوان',
+            'slug' => 'عنوان انگلیسی',
+            'description' => 'توضیحات',
+            'cover_image' => 'تصویر',
+            'content' => 'محتوا',
+            'meta_description' => 'توضیحات متا',
+            'category_name' => 'دسته‌بندی',
+            'reading_minutes' => 'زمان مطالعه',
+        ];
+        $requiredFields = ['title', 'slug', 'description', 'cover_image', 'content', 'meta_description'];
+        $locations = [];
+        foreach ($blocks as $index => $block) {
+            if (! $this->is($block, 'p')) {
+                continue;
+            }
+            $label = trim($this->text($block));
+            $field = array_search($label, $labels, true);
+            if (is_string($field)) {
+                $locations[$field][] = $index;
+            }
+        }
+
+        foreach ($requiredFields as $field) {
+            if (count($locations[$field] ?? []) !== 1) {
+                $this->fail('TEMPLATE_SECTIONS_INVALID', 'template', 'بخش «'.$labels[$field].'» در جای درست پیدا نشد یا بیش از یک‌بار آمده است.', 'بخش '.$labels[$field]);
+            }
+        }
+        foreach (['category_name', 'reading_minutes'] as $field) {
+            if (count($locations[$field] ?? []) > 1) {
+                $this->fail('TEMPLATE_SECTIONS_INVALID', 'template', 'بخش اختیاری در سند بیش از یک‌بار آمده است.', $labels[$field]);
+            }
+        }
+
+        $requiredPositions = array_map(static fn (string $field): int => $locations[$field][0], $requiredFields);
+        if (count(array_unique($requiredPositions)) !== count($requiredPositions)) {
+            $this->fail('TEMPLATE_SECTIONS_INVALID', 'template', 'ترتیب بخش‌های اصلی سند معتبر نیست.', 'بخش‌های سند');
+        }
+        for ($index = 1; $index < count($requiredPositions); $index++) {
+            if ($requiredPositions[$index - 1] >= $requiredPositions[$index]) {
+                $this->fail('TEMPLATE_SECTIONS_INVALID', 'template', 'ترتیب بخش‌های اصلی سند معتبر نیست.', 'بخش‌های سند');
+            }
+        }
+        $metaPosition = $locations['meta_description'][0];
+        foreach (['category_name', 'reading_minutes'] as $field) {
+            if (isset($locations[$field]) && $locations[$field][0] <= $metaPosition) {
+                $this->fail('TEMPLATE_SECTIONS_INVALID', 'template', 'بخش‌های اختیاری باید پس از توضیحات متا قرار بگیرند.', $labels[$field]);
+            }
+        }
+
+        $allFields = array_values(array_filter(array_keys($labels), static fn (string $field): bool => isset($locations[$field])));
+        usort($allFields, static fn (string $left, string $right): int => $locations[$left][0] <=> $locations[$right][0]);
+        $values = [
+            'title' => '', 'slug' => '', 'description' => '', 'category_name' => '', 'reading_minutes' => '',
+            'cover_image' => '', 'content' => '', 'meta_description' => '',
+        ];
+        foreach ($allFields as $fieldIndex => $field) {
+            $start = $locations[$field][0] + 1;
+            $end = $fieldIndex + 1 < count($allFields) ? $locations[$allFields[$fieldIndex + 1]][0] : count($blocks);
+            $nodes = array_slice($blocks, $start, $end - $start);
+
+            if ($field === 'cover_image') {
+                $references = $this->imageReferences($nodes);
+                if (trim($this->sectionText($nodes)) !== '') {
+                    $this->warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_TEXT_IGNORED', 'message' => 'بخش تصویر باید تصویر داشته باشد؛ متن این بخش نادیده گرفته شد.'];
+                }
+                if (count($references) > 1) {
+                    $this->warnings[] = ['field' => 'cover_image', 'code' => 'EXTRA_COVER_IMAGES_IGNORED', 'message' => 'فقط تصویر اول بخش تصویر به‌عنوان جلد استفاده شد.'];
+                }
+                if ($references !== []) {
+                    $pixelsBefore = $this->pixelTotal;
+                    try {
+                        $values['cover_image'] = $this->image($zip, $references[0]);
+                    } catch (WordImportValidationException) {
+                        $this->pixelTotal = $pixelsBefore;
+                        $this->warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_IGNORED', 'message' => 'تصویر جلد قابل‌استفاده نبود و مقاله بدون تصویر جلد ذخیره می‌شود.'];
+                    }
+                }
+            } elseif ($field === 'content') {
+                $values['content'] = $this->renderBlocks($nodes);
+                if (strlen($values['content']) > 1_048_576) {
+                    $this->fail('CONTENT_TOO_LARGE', 'content', 'متن مقاله از سقف یک مگابایت بیشتر است.', 'محتوا');
+                }
+            } else {
+                $text = $this->sectionText($nodes);
+                $values[$field] = in_array($field, ['title', 'slug'], true) ? preg_replace('/\s+/u', ' ', trim($text)) ?? trim($text) : trim($text);
+            }
+        }
+
+        $values['reading_minutes'] = strtr($values['reading_minutes'], ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9', '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9']);
+
+        return $values;
+    }
+
+    /** @param list<DOMNode> $nodes */
+    private function sectionText(array $nodes): string
+    {
+        $paragraphs = [];
+        foreach ($nodes as $node) {
+            if ($this->is($node, 'p')) {
+                $paragraphs[] = trim($this->text($node));
+            } elseif ($this->is($node, 'tbl')) {
+                $paragraphs[] = trim($this->text($node));
+            }
+        }
+
+        return implode("\n", array_filter($paragraphs, static fn (string $paragraph): bool => $paragraph !== ''));
     }
 
     /** @return array{title: string, slug: string, description: string, category_name: string, reading_minutes: string, meta_description: string} */

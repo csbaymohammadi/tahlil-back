@@ -6,7 +6,7 @@ return [
         explode(',', env('BLOG_TRUSTED_MEDIA_HOSTS', 'service.tahlilex.com')),
     ))),
     'fallback_cover' => env('BLOG_FALLBACK_COVER', ''),
-    'template_path' => public_path('tahlilpanel/templates/blog-import-v1.docx'),
+    'template_path' => public_path('tahlilpanel/templates/blog-import-v2.docx'),
     'import_max_bytes' => 20 * 1024 * 1024,
     'import_max_entries' => 2000,
     'import_max_uncompressed_bytes' => 128 * 1024 * 1024,

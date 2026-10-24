@@ -21,7 +21,7 @@ tags:
   - name: Categories
     description: Manage blog categories and merge or remove their assignments.
   - name: Word import
-    description: Import a Word document as a Draft and retrieve private validation reports.
+    description: Import a Word document as a Draft. Blog errors are Persian JSON and do not create report files.
 security:
   - PanelSession: []
 paths:
@@ -71,7 +71,7 @@ paths:
             X-Request-ID: { $ref: '#/components/headers/RequestId' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ArticleResponse' }
+              schema: { $ref: '#/components/schemas/ArticleWriteResponse' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /blog/articles/{id}:
@@ -104,7 +104,7 @@ paths:
           description: Updated article detail
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ArticleResponse' }
+              schema: { $ref: '#/components/schemas/ArticleWriteResponse' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
@@ -260,8 +260,7 @@ paths:
       tags: [Word import]
       summary: Import one Word file as a new Draft
       description: >-
-        The shared importer accepts content_type=blog or content_type=news. This handoff documents the Blog target; see the News handoff for its module-specific contract.
-        DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
+        The shared importer accepts content_type=blog or content_type=news. Blog uses the Persian v2 template with optional content sections; only title and English title are required. Blog errors are Persian JSON without report metadata or files. DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
       security:
         - PanelSession: []
       parameters:
@@ -291,13 +290,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data, request_id]
+                required: [data, warnings, request_id]
                 properties:
                   data:
                     type: object
                     properties:
                       content_type: { type: string, enum: [blog, news] }
                       record: { $ref: '#/components/schemas/Article' }
+                  warnings:
+                    type: array
+                    items: { $ref: '#/components/schemas/OptionalValueWarning' }
                   request_id: { type: string }
         '409':
           description: Idempotency conflict or active processing lease
@@ -308,7 +310,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '422':
-          description: Document issues and optional private DOCX report
+          description: Persian validation issues. Blog errors never include a report; News and legacy records may include report metadata.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportError' }
@@ -324,7 +326,7 @@ paths:
     get:
       operationId: downloadWordImportReport
       tags: [Word import]
-      summary: Download a private validation report
+      summary: Download a private News or legacy validation report
       parameters:
         - name: report_id
           in: path
@@ -386,17 +388,17 @@ components:
     ArticleCreate:
       type: object
       additionalProperties: false
-      required: [title, slug, content, category_id, reading_minutes, status]
+      required: [title, slug]
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
         slug: { type: string, minLength: 1, maxLength: 200, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
-        description: { type: string, maxLength: 2000, default: '' }
-        cover_image: { type: string, maxLength: 2048, default: '' }
-        content: { type: string, maxLength: 1048576 }
+        description: { type: [string, 'null'], description: Optional plain-text description; null or omission stores an empty value on create. }
+        cover_image: { type: [string, 'null'], description: Optional approved media URL; unsafe or unusable values are ignored with a Persian warning. }
+        content: { type: [string, 'null'], maxLength: 1048576, description: Optional sanitized HTML. Empty content is accepted; unsafe markup and the 1 MiB safety limit still apply. }
         category_id: { type: [integer, 'null'], minimum: 1 }
-        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
-        meta_description: { type: string, maxLength: 500, default: '' }
-        status: { type: string, enum: [draft, published, scheduled] }
+        reading_minutes: { type: [integer, 'null'], description: Invalid or omitted reading time is stored as null; no default is fabricated. }
+        meta_description: { type: [string, 'null'], description: Optional text without a form-level length limit. }
+        status: { type: string, enum: [draft, published, scheduled], default: draft }
         scheduled_for: { type: [string, 'null'], format: date-time }
     ArticlePatch:
       type: object
@@ -407,12 +409,12 @@ components:
         expected_version: { type: integer, minimum: 1 }
         title: { type: string, minLength: 1, maxLength: 200 }
         slug: { type: string, minLength: 1, maxLength: 200, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
-        description: { type: string, maxLength: 2000 }
-        cover_image: { type: string, maxLength: 2048 }
-        content: { type: string, maxLength: 1048576 }
+        description: { type: [string, 'null'], description: Optional plain text; unusable types are ignored with a Persian warning. }
+        cover_image: { type: [string, 'null'], description: Optional approved media URL; unusable values are stored empty with a Persian warning. }
+        content: { type: [string, 'null'], maxLength: 1048576, description: Optional sanitized HTML. Empty content is accepted; unsafe markup and the 1 MiB safety limit still apply. }
         category_id: { type: [integer, 'null'], minimum: 1 }
-        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
-        meta_description: { type: string, maxLength: 500 }
+        reading_minutes: { type: [integer, 'null'], description: Invalid values are stored as null with a Persian warning. }
+        meta_description: { type: [string, 'null'], description: Optional text without a form-level length limit. }
         status: { type: string, enum: [draft, published, scheduled] }
         scheduled_for: { type: [string, 'null'], format: date-time }
     ArticleListItem:
@@ -434,7 +436,7 @@ components:
         slug: { type: string }
         description: { type: string }
         cover_image: { type: string }
-        reading_minutes: { type: integer }
+        reading_minutes: { type: [integer, 'null'] }
         status: { type: string, enum: [draft, published, scheduled] }
         scheduled_for: { type: [string, 'null'], format: date-time }
         author:
@@ -465,6 +467,22 @@ components:
       properties:
         data: { $ref: '#/components/schemas/Article' }
         request_id: { type: string }
+    ArticleWriteResponse:
+      type: object
+      required: [data, warnings, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/Article' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/OptionalValueWarning' }
+        request_id: { type: string }
+    OptionalValueWarning:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string, description: Stable field key; human-readable message is Persian. }
+        code: { type: string, description: Stable machine code for frontend handling. }
+        message: { type: string, description: Persian explanation; warnings do not mean the save failed. }
     Category:
       type: object
       required: [id, name, articles_count, created_at, updated_at, version]
@@ -516,7 +534,7 @@ components:
       properties:
         error:
           type: object
-          required: [code, message, fields, issues, report]
+          required: [code, message, fields, issues]
           properties:
             code: { type: string, const: IMPORT_VALIDATION_FAILED }
             message: { type: string }
@@ -525,12 +543,13 @@ components:
               type: array
               items: { $ref: '#/components/schemas/ImportIssue' }
             report:
+              description: Present only for News and legacy error records; omitted for new Blog errors.
               oneOf:
                 - type: object
                   required: [id, filename, expires_at]
                   properties:
                     id: { type: string, format: uuid }
-                    filename: { type: string, const: blog-import-errors.docx }
+                    filename: { type: string }
                     expires_at: { type: string, format: date-time }
                 - type: 'null'
         request_id: { type: string }

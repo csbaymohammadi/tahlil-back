@@ -1,0 +1,480 @@
+openapi: 3.1.0
+info:
+  title: Tahlil Panel Exchanges API
+  version: 1.0.0
+  description: Private admin API for exchange records and their categories. All mutations require the panel session cookie and X-CSRF-Token.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development
+  - url: https://{stagingHost}/api/v1/admin
+    description: Staging
+    variables:
+      stagingHost:
+        default: staging.example.test
+  - url: https://service.tahlilex.com/api/v1/admin
+    description: Production
+security:
+  - PanelSession: []
+tags:
+  - name: Exchanges
+    description: Exchange profile administration.
+  - name: Categories
+    description: Exchange category administration.
+paths:
+  /exchanges/items:
+    get:
+      tags: [Exchanges]
+      operationId: listExchangeItems
+      summary: List exchanges
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, enum: [10, 20, 50], default: 10 }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Paginated non-deleted exchanges, including drafts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, request_id]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/ExchangeListItem' } }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      tags: [Exchanges]
+      operationId: createExchangeItem
+      summary: Create an exchange
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExchangeCreate' }
+      responses:
+        '201':
+          description: Created exchange detail.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeDetailEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /exchanges/items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Exchanges]
+      operationId: getExchangeItem
+      summary: Get an exchange editor detail
+      responses:
+        '200':
+          description: Detail with content, metadata, and all specification keys.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeDetailEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/ExchangeNotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    patch:
+      tags: [Exchanges]
+      operationId: updateExchangeItem
+      summary: Update an exchange with optimistic version checking
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExchangePatch' }
+      responses:
+        '200':
+          description: Updated canonical detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExchangeDetailEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/ExchangeNotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Exchanges]
+      operationId: deleteExchangeItem
+      summary: Soft-delete an exchange
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+      responses:
+        '204': { description: Exchange was soft-deleted; no response body. }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/ExchangeNotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /exchanges/categories:
+    get:
+      tags: [Categories]
+      operationId: listExchangeCategories
+      summary: List all exchange categories
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Complete live list; no pagination.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/ExchangeCategory' } }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      tags: [Categories]
+      operationId: createExchangeCategory
+      summary: Create a category with a server-assigned key
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        '201':
+          description: Created category.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /exchanges/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Categories]
+      operationId: getExchangeCategory
+      summary: Get a category for a confirmation dialog
+      responses:
+        '200':
+          description: Current category and version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/CategoryNotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [Categories]
+      operationId: deleteExchangeCategory
+      summary: Soft-delete a category and uncategorize its live exchanges
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+      responses:
+        '200':
+          description: Category was deleted and exchanges were uncategorized atomically.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryDeleteEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/CategoryNotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /exchanges/categories/{id}/merge:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Categories]
+      operationId: mergeExchangeCategory
+      summary: Move all live exchanges to a target category and delete the source
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, target_category_id, target_expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+                target_category_id: { type: integer, minimum: 1, maximum: 9007199254740991 }
+                target_expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+      responses:
+        '200':
+          description: Source category was merged atomically.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryMergeEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/CategoryNotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+components:
+  securitySchemes:
+    PanelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+  schemas:
+    ExchangeSpecifications:
+      type: object
+      additionalProperties: false
+      properties:
+        established_at: { type: string, maxLength: 1500, default: '' }
+        head_office_address: { type: string, maxLength: 1500, default: '' }
+        physical_branch_count: { type: string, maxLength: 1500, default: '' }
+        years_active: { type: string, maxLength: 1500, default: '' }
+        minimum_purchase: { type: string, maxLength: 1500, default: '' }
+        maximum_purchase: { type: string, maxLength: 1500, default: '' }
+        minimum_sale: { type: string, maxLength: 1500, default: '' }
+        maximum_sale: { type: string, maxLength: 1500, default: '' }
+        in_person_visit: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        address_transparency: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        active_social_media: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        around_the_clock_support: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        support_availability: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        spot_trading: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        futures_trading: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        identity_documents: { type: string, maxLength: 1500, default: '' }
+        dedicated_app: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        deposit_methods: { type: string, maxLength: 1500, default: '' }
+        withdrawal_conditions: { type: string, maxLength: 1500, default: '' }
+        trading_fee: { type: string, maxLength: 1500, default: '' }
+        registration_fee: { type: string, maxLength: 1500, default: '' }
+        inamad: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        virtual_business_union: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+        computer_trade_organization: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], default: '' }
+    ExchangeEditableFields:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        english_name: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, minLength: 1, maxLength: 200, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string, maxLength: 2000, default: '' }
+        logo: { type: string, minLength: 1, maxLength: 2048 }
+        website_url: { type: string, format: uri, maxLength: 2048, pattern: '^https?://' }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$', default: '' }
+        platform_type: { type: string, maxLength: 1500, default: '' }
+        markets: { type: string, maxLength: 1500, default: '' }
+        access: { type: string, maxLength: 1500, default: '' }
+        support: { type: string, maxLength: 1500, default: '' }
+        specifications: { $ref: '#/components/schemas/ExchangeSpecifications' }
+        category_id: { oneOf: [{ type: integer, minimum: 1, maximum: 9007199254740991 }, { type: 'null' }] }
+        content: { type: string, maxLength: 1048576, description: 'Canonical rich-text HTML, sanitized on save.' }
+        meta_description: { type: string, maxLength: 500, default: '' }
+        status: { type: string, enum: [draft, published] }
+    ExchangeCreate:
+      allOf:
+        - $ref: '#/components/schemas/ExchangeEditableFields'
+        - type: object
+          required: [title, english_name, slug, logo, website_url, category_id, content, status]
+          unevaluatedProperties: false
+    ExchangePatch:
+      allOf:
+        - $ref: '#/components/schemas/ExchangeEditableFields'
+        - type: object
+          required: [expected_version]
+          properties:
+            expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
+          unevaluatedProperties: false
+      description: At least one editable field is required. Omitted fields are preserved. category_id alone accepts null. specifications merges supplied keys, and an empty object is a no-op.
+    ExchangeListItem:
+      type: object
+      required: [id, title, english_name, slug, description, logo, website_url, founded_year, platform_type, markets, access, support, status, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        english_name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        logo: { type: string }
+        website_url: { type: string }
+        founded_year: { type: string }
+        platform_type: { type: string }
+        markets: { type: string }
+        access: { type: string }
+        support: { type: string }
+        status: { type: string, enum: [draft, published] }
+        author: { oneOf: [{ $ref: '#/components/schemas/Author' }, { type: 'null' }] }
+        category_id: { oneOf: [{ type: integer }, { type: 'null' }] }
+        category: { oneOf: [{ $ref: '#/components/schemas/CategorySummary' }, { type: 'null' }] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        public_path: { oneOf: [{ type: string }, { type: 'null' }] }
+        version: { type: integer, minimum: 1 }
+    ExchangeDetail:
+      allOf:
+        - $ref: '#/components/schemas/ExchangeListItem'
+        - type: object
+          required: [content, meta_description, specifications]
+          properties:
+            content: { type: string }
+            meta_description: { type: string }
+            specifications: { $ref: '#/components/schemas/CompleteExchangeSpecifications' }
+    CompleteExchangeSpecifications:
+      allOf:
+        - $ref: '#/components/schemas/ExchangeSpecifications'
+        - type: object
+          required: [established_at, head_office_address, physical_branch_count, years_active, minimum_purchase, maximum_purchase, minimum_sale, maximum_sale, in_person_visit, address_transparency, active_social_media, around_the_clock_support, support_availability, spot_trading, futures_trading, identity_documents, dedicated_app, deposit_methods, withdrawal_conditions, trading_fee, registration_fee, inamad, virtual_business_union, computer_trade_organization]
+    ExchangeDetailEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/ExchangeDetail' }
+        request_id: { type: string }
+    Author:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    CategorySummary:
+      type: object
+      required: [id, name, key]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        key: { type: string }
+    ExchangeCategory:
+      type: object
+      required: [id, name, key, exchange_count, created_at, updated_at, version]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 80 }
+        key: { type: string }
+        exchange_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    CategoryEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/ExchangeCategory' }
+        request_id: { type: string }
+    PaginationMeta:
+      type: object
+      required: [page, per_page, total, total_pages]
+      properties:
+        page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
+        total_pages: { type: integer }
+    CategoryDeleteEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [deleted_category_id, affected_exchange_count]
+          properties:
+            deleted_category_id: { type: integer }
+            affected_exchange_count: { type: integer }
+        request_id: { type: string }
+    CategoryMergeEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: object
+          required: [source_category_id, target_category_id, moved_exchange_count]
+          properties:
+            source_category_id: { type: integer }
+            target_category_id: { type: integer }
+            moved_exchange_count: { type: integer }
+        request_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        request_id: { type: string }
+  responses:
+    Unauthenticated:
+      description: Missing or expired panel session.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Forbidden:
+      description: CSRF validation or management guard failure.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    ValidationFailed:
+      description: Invalid JSON fields, unknown fields, unsafe content, or unsupported query parameter.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    Conflict:
+      description: Version, slug, or category-name conflict.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    ExchangeNotFound:
+      description: Exchange is missing or soft-deleted.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    CategoryNotFound:
+      description: Category is missing or soft-deleted.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }
+    PayloadTooLarge:
+      description: Request body exceeds the endpoint limit.
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } }

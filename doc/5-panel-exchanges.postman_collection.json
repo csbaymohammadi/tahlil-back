@@ -1,0 +1,183 @@
+{
+  "info": {
+    "_postman_id": "a634e5a8-d3dc-48bb-b348-7b6196f8221c",
+    "name": "Tahlil Panel Exchanges API",
+    "description": "Admin exchange and category APIs. Set sessionCookie to the full tahlil-panel-session-v2 cookie value and csrfToken from the shared auth CSRF endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api/v1/admin" },
+    { "key": "sessionCookie", "value": "tahlil-panel-session-v2=<session-token>" },
+    { "key": "csrfToken", "value": "<csrf-token>" },
+    { "key": "exchangeId", "value": "1" },
+    { "key": "exchangeVersion", "value": "1" },
+    { "key": "categoryId", "value": "1" },
+    { "key": "categoryVersion", "value": "1" },
+    { "key": "targetCategoryId", "value": "2" },
+    { "key": "targetCategoryVersion", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Exchanges",
+      "item": [
+        {
+          "name": "List exchanges",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/items?page=1&per_page=10&q="
+          }
+        },
+        {
+          "name": "Exchange detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/items/{{exchangeId}}"
+          }
+        },
+        {
+          "name": "Create exchange",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  pm.collectionVariables.set('exchangeId', body.data.id);",
+              "  pm.collectionVariables.set('exchangeVersion', body.data.version);",
+              "}"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Example Exchange\",\n  \"english_name\": \"Example Exchange\",\n  \"slug\": \"example-exchange\",\n  \"description\": \"An overview of this platform and its services.\",\n  \"logo\": \"/images/exchanges/example.png\",\n  \"website_url\": \"https://exchange.example/\",\n  \"founded_year\": \"2022\",\n  \"platform_type\": \"Centralized exchange\",\n  \"markets\": \"Spot and futures\",\n  \"access\": \"Web and mobile application\",\n  \"support\": \"Online support\",\n  \"specifications\": {\n    \"established_at\": \"2022\",\n    \"spot_trading\": \"yes\",\n    \"futures_trading\": \"yes\",\n    \"dedicated_app\": \"yes\"\n  },\n  \"category_id\": null,\n  \"content\": \"<h2>Overview</h2><p>A review of this exchange.</p>\",\n  \"meta_description\": \"An overview of this exchange and its services.\",\n  \"status\": \"draft\"\n}" },
+            "url": "{{baseUrl}}/exchanges/items"
+          }
+        },
+        {
+          "name": "Update exchange",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('exchangeVersion', pm.response.json().data.version);",
+              "}"
+            ] }
+          }],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"expected_version\": {{exchangeVersion}},\n  \"support\": \"Online support\",\n  \"specifications\": {\n    \"around_the_clock_support\": \"yes\"\n  }\n}" },
+            "url": "{{baseUrl}}/exchanges/items/{{exchangeId}}"
+          }
+        },
+        {
+          "name": "Delete exchange",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/items/{{exchangeId}}?expected_version={{exchangeVersion}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/categories?q="
+          }
+        },
+        {
+          "name": "Category detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/categories/{{categoryId}}"
+          }
+        },
+        {
+          "name": "Create category",
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  pm.collectionVariables.set('categoryId', body.data.id);",
+              "  pm.collectionVariables.set('categoryVersion', body.data.version);",
+              "}"
+            ] }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Example Exchanges\"\n}" },
+            "url": "{{baseUrl}}/exchanges/categories"
+          }
+        },
+        {
+          "name": "Delete category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "url": "{{baseUrl}}/exchanges/categories/{{categoryId}}?expected_version={{categoryVersion}}"
+          }
+        },
+        {
+          "name": "Merge category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "{{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"expected_version\": {{categoryVersion}},\n  \"target_category_id\": {{targetCategoryId}},\n  \"target_expected_version\": {{targetCategoryVersion}}\n}" },
+            "url": "{{baseUrl}}/exchanges/categories/{{categoryId}}/merge"
+          }
+        }
+      ]
+    }
+  ]
+}

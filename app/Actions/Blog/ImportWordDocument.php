@@ -5,6 +5,7 @@ namespace App\Actions\Blog;
 use App\Actions\Auth\RevokeSessions;
 use App\Actions\News\SaveNewsItem;
 use App\Auth\SecurityEvents;
+use App\Blog\BlogApiErrorPresenter;
 use App\Blog\WordDocumentConverter;
 use App\Blog\WordDocumentParser;
 use App\Blog\WordErrorReportWriter;
@@ -40,9 +41,10 @@ class ImportWordDocument
         private SaveNewsItem $saveNewsItem,
         private WordErrorReportWriter $reports,
         private SecurityEvents $events,
+        private BlogApiErrorPresenter $errorPresenter,
     ) {}
 
-    /** @return array{status: int, content_type: string, record_id?: int, article_id?: int, news_item_id?: int, snapshot?: array<string, mixed>, body?: array<string, mixed>, replayed: bool} */
+    /** @return array{status: int, content_type: string, record_id?: int, article_id?: int, news_item_id?: int, snapshot?: array<string, mixed>, warnings?: list<array{field: string, code: string, message: string}>, body?: array<string, mixed>, replayed: bool} */
     public function handle(PanelSession $session, UploadedFile $file, string $contentType, string $idempotencyKey, string $requestId): array
     {
         if (! in_array($contentType, ['blog', 'news'], true)) {
@@ -67,10 +69,12 @@ class ImportWordDocument
         $checksum = hash_file('sha256', $file->getPathname());
         $claim = $this->claim($session, $idempotencyKey, $contentType, $checksum, $requestId);
         if ($claim['kind'] === 'success_replay') {
-            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $claim['record_id'], ...($contentType === 'blog' ? ['article_id' => $claim['record_id']] : ['news_item_id' => $claim['record_id']]), 'snapshot' => $claim['snapshot'], 'replayed' => true];
+            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $claim['record_id'], ...($contentType === 'blog' ? ['article_id' => $claim['record_id']] : ['news_item_id' => $claim['record_id']]), 'snapshot' => $claim['snapshot'], 'warnings' => $claim['warnings'] ?? [], 'replayed' => true];
         }
         if ($claim['kind'] === 'error_replay') {
-            return ['status' => 422, 'content_type' => $contentType, 'body' => ['error' => $claim['error'], 'request_id' => $requestId], 'replayed' => true];
+            $error = $contentType === 'blog' ? $this->errorPresenter->presentImportError($claim['error']) : $claim['error'];
+
+            return ['status' => 422, 'content_type' => $contentType, 'body' => ['error' => $error, 'request_id' => $requestId], 'replayed' => true];
         }
 
         $startedAt = microtime(true);
@@ -81,7 +85,8 @@ class ImportWordDocument
         }
         $convertedDirectory = null;
         $stagedMedia = [];
-        $reportStorageKey = null;
+        $warnings = [];
+        $ignoredImageTokens = [];
         try {
             $documentPath = $file->getPathname();
             if ($extension === 'doc') {
@@ -90,17 +95,37 @@ class ImportWordDocument
                 $convertedDirectory = $converted['directory'];
             }
             $parsed = $this->parser->parse($documentPath, $contentType);
+            $warnings = $parsed['warnings'] ?? [];
             $this->assertWithinDeadline($startedAt);
             $mediaUrls = [];
             $index = 0;
             foreach ($parsed['images'] as $token => $image) {
                 $this->assertWithinDeadline($startedAt);
-                $normalized = $this->images->normalize($image, $workingDirectory, ++$index);
-                $uploaded = new UploadedFile($normalized['path'], $normalized['name'], $normalized['mime'], UPLOAD_ERR_OK, true);
+                $coverImage = $contentType === 'blog' && $token === ($parsed['fields']['cover_image'] ?? null);
+                $index++;
                 try {
+                    $normalized = $this->images->normalize($image, $workingDirectory, $index);
+                    $uploaded = new UploadedFile($normalized['path'], $normalized['name'], $normalized['mime'], UPLOAD_ERR_OK, true);
                     $media = $this->stageMedia($session, $uploaded, $requestId);
+                } catch (WordImportValidationException) {
+                    if (! $coverImage) {
+                        throw new WordImportValidationException([[
+                            'code' => 'WORD_IMAGE_CONVERSION_FAILED', 'field' => 'content', 'label' => 'محتوا',
+                            'location' => 'تصویر شمارهٔ '.$index, 'message' => 'یکی از تصاویر متن مقاله قابل‌پردازش نیست.',
+                        ]], ['content' => ['یکی از تصاویر متن مقاله قابل‌پردازش نیست.']]);
+                    }
+                    $ignoredImageTokens[] = $token;
+                    $warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_IGNORED', 'message' => 'تصویر جلد قابل‌پردازش نبود و مقاله بدون تصویر جلد ذخیره شد.'];
+
+                    continue;
                 } catch (PanelAuthException $exception) {
                     if (in_array($exception->errorCode, ['INVALID_MEDIA', 'UNSUPPORTED_MEDIA_TYPE', 'FILE_TOO_LARGE'], true)) {
+                        if ($coverImage) {
+                            $ignoredImageTokens[] = $token;
+                            $warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_IGNORED', 'message' => 'تصویر جلد با محدودیت‌های فایل سازگار نبود و مقاله بدون تصویر جلد ذخیره شد.'];
+
+                            continue;
+                        }
                         throw $this->imageIssue($index, 'WORD_IMAGE_INVALID', 'یکی از تصاویر سند نامعتبر یا بزرگ‌تر از ۵ مگابایت است.');
                     }
                     throw $exception;
@@ -118,27 +143,44 @@ class ImportWordDocument
             foreach ($mediaUrls as $token => $url) {
                 $values['content'] = str_replace($token, $url, $values['content']);
             }
-            $values['category_id'] = $this->categoryId($values['category_name'], $contentType);
-            $minutes = $values['reading_minutes'];
-            if (! preg_match('/^[1-9][0-9]{0,3}$/D', $minutes) || (int) $minutes > 1440) {
-                throw $this->fieldIssue('reading_minutes', 'INVALID_READING_TIME', 'زمان مطالعه باید عدد صحیحی بین ۱ تا ۱۴۴۰ باشد.', 'ردیف reading_minutes جدول اطلاعات');
+            foreach ($ignoredImageTokens as $token) {
+                $values['content'] = str_replace($token, '', $values['content']);
             }
-            $values['reading_minutes'] = (int) $minutes;
+            $values['category_id'] = $this->categoryId($values['category_name'], $contentType, $warnings);
+            $minutes = $values['reading_minutes'];
+            if ($contentType === 'blog') {
+                if (trim((string) $minutes) === '') {
+                    $values['reading_minutes'] = null;
+                } elseif (! preg_match('/^[1-9][0-9]{0,3}$/D', (string) $minutes) || (int) $minutes > 1440) {
+                    $values['reading_minutes'] = null;
+                    $warnings[] = ['field' => 'reading_minutes', 'code' => 'READING_TIME_IGNORED', 'message' => 'زمان مطالعه معتبر نبود و خالی ذخیره شد.'];
+                } else {
+                    $values['reading_minutes'] = (int) $minutes;
+                }
+            } elseif (! preg_match('/^[1-9][0-9]{0,3}$/D', (string) $minutes) || (int) $minutes > 1440) {
+                throw $this->fieldIssue('reading_minutes', 'INVALID_READING_TIME', 'زمان مطالعه باید عدد صحیحی بین ۱ تا ۱۴۴۰ باشد.', 'بخش زمان مطالعه');
+            } else {
+                $values['reading_minutes'] = (int) $minutes;
+            }
             unset($values['category_name']);
             $values['status'] = 'draft';
             $values['scheduled_for'] = null;
             $this->assertWithinDeadline($startedAt);
 
-            $record = DB::transaction(function () use ($session, $values, $requestId, $claim, $contentType): BlogArticle|NewsItem {
-                $record = $contentType === 'blog'
-                    ? $this->saveArticle->handle($session, null, $values, $requestId)->load(['author', 'category'])
-                    : $this->saveNewsItem->handle($session, null, $values, $requestId)->load(['author', 'category']);
+            $record = DB::transaction(function () use ($session, $values, $requestId, $claim, $contentType, &$warnings): BlogArticle|NewsItem {
+                if ($contentType === 'blog') {
+                    $saveResult = $this->saveArticle->handle($session, null, $values, $requestId);
+                    $record = $saveResult->article->load(['author', 'category']);
+                    $warnings = [...$warnings, ...$saveResult->warnings];
+                } else {
+                    $record = $this->saveNewsItem->handle($session, null, $values, $requestId)->load(['author', 'category']);
+                }
                 $snapshot = $this->snapshot($record);
                 $this->sessions->currentUser($session);
                 DB::table('blog_content_imports')->where('id', $claim['import_id'])->where('status', 'processing')->update([
                     'status' => 'succeeded', 'article_id' => $contentType === 'blog' ? $record->id : null,
                     'news_item_id' => $contentType === 'news' ? $record->id : null,
-                    'response' => json_encode(['record' => $snapshot], JSON_THROW_ON_ERROR),
+                    'response' => json_encode(['record' => $snapshot, 'warnings' => $warnings], JSON_THROW_ON_ERROR),
                     'lease_until' => null, 'updated_at' => now(),
                 ]);
                 $this->events->management($contentType.'_content_imported', $requestId, $record->author_id, $contentType === 'blog' ? 'article' : 'news_item', $record->id, ['content_type', 'template_version']);
@@ -146,7 +188,7 @@ class ImportWordDocument
                 return $record;
             });
 
-            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $record->id, ...($contentType === 'blog' ? ['article_id' => $record->id] : ['news_item_id' => $record->id]), 'snapshot' => $this->snapshot($record), 'replayed' => false];
+            return ['status' => 201, 'content_type' => $contentType, 'record_id' => $record->id, ...($contentType === 'blog' ? ['article_id' => $record->id] : ['news_item_id' => $record->id]), 'snapshot' => $this->snapshot($record), 'warnings' => $warnings, 'replayed' => false];
         } catch (WordImportValidationException $exception) {
             $this->cleanupMedia($session, $stagedMedia);
 
@@ -198,7 +240,7 @@ class ImportWordDocument
         }
     }
 
-    /** @return array{kind: string, import_id: int, record_id?: int, snapshot?: array<string, mixed>, error?: array<string, mixed>} */
+    /** @return array{kind: string, import_id: int, record_id?: int, snapshot?: array<string, mixed>, warnings?: list<array{field: string, code: string, message: string}>, error?: array<string, mixed>} */
     private function claim(PanelSession $session, string $key, string $contentType, string $checksum, string $requestId): array
     {
         return DB::transaction(function () use ($session, $key, $contentType, $checksum): array {
@@ -218,13 +260,13 @@ class ImportWordDocument
                     }
                     $stored = json_decode((string) $existing->response, true);
 
-                    return ['kind' => 'success_replay', 'import_id' => (int) $existing->id, 'record_id' => (int) $record->id, 'snapshot' => $stored['record'] ?? $this->snapshot($record->load(['author', 'category']))];
+                    return ['kind' => 'success_replay', 'import_id' => (int) $existing->id, 'record_id' => (int) $record->id, 'snapshot' => $stored['record'] ?? $this->snapshot($record->load(['author', 'category'])), 'warnings' => $stored['warnings'] ?? []];
                 }
                 if ($existing->status === 'invalid') {
                     $stored = json_decode((string) $existing->response, true);
-                    $error = $stored['error'] ?? ['code' => 'IMPORT_VALIDATION_FAILED', 'message' => 'Please correct the document fields.', 'fields' => (object) [], 'issues' => [], 'report' => null];
+                    $error = $stored['error'] ?? ['code' => 'IMPORT_VALIDATION_FAILED', 'message' => 'عنوان و عنوان انگلیسی سند را بررسی و اصلاح کنید.', 'fields' => (object) [], 'issues' => [], 'report' => null];
                     $report = $error['report'] ?? null;
-                    if (is_array($report) && (! DB::table('blog_import_reports')->where('id', $report['id'])->where('expires_at', '>', now())->exists() || ! Storage::disk(config('media.disk'))->exists('blog-import-reports/'.$report['id'].'.docx'))) {
+                    if ($contentType === 'news' && is_array($report) && (! DB::table('blog_import_reports')->where('id', $report['id'])->where('expires_at', '>', now())->exists() || ! Storage::disk(config('media.disk'))->exists('blog-import-reports/'.$report['id'].'.docx'))) {
                         $error['report'] = null;
                     }
 
@@ -265,7 +307,8 @@ class ImportWordDocument
         });
     }
 
-    private function categoryId(string $name, string $contentType): ?int
+    /** @param list<array{field: string, code: string, message: string}> $warnings */
+    private function categoryId(string $name, string $contentType, array &$warnings): ?int
     {
         if (trim($name) === '') {
             return null;
@@ -273,6 +316,11 @@ class ImportWordDocument
         $category = $contentType === 'blog' ? BlogCategory::class : NewsCategory::class;
         $matches = $category::query()->where('name_normalized', BlogText::normalize($name))->get();
         if ($matches->count() !== 1) {
+            if ($contentType === 'blog') {
+                $warnings[] = ['field' => 'category_id', 'code' => 'CATEGORY_IGNORED', 'message' => 'دسته‌بندی پیدا نشد و پیش‌نویس بدون دسته‌بندی ذخیره شد.'];
+
+                return null;
+            }
             $module = $contentType === 'blog' ? 'وبلاگ' : 'خبر';
             throw $this->fieldIssue('category_name', 'CATEGORY_NOT_FOUND', 'دسته‌بندی واردشده در '.$module.' پیدا نشد؛ آن را ایجاد کنید یا بخش را خالی بگذارید.', 'ردیف category_name جدول اطلاعات');
         }
@@ -374,49 +422,56 @@ class ImportWordDocument
         $issues = $exception->issues;
         $report = null;
         $reportPath = null;
-        $reportId = (string) Str::uuid();
-        $safeFilename = $this->safeFilename($originalFilename);
-        try {
-            $reportPath = $this->reports->create($safeFilename, $requestId, $contentType, $issues);
-            if (filesize($reportPath) > config('blog.report_max_bytes')) {
-                throw new \RuntimeException('The generated Word report exceeds the size limit.');
-            }
-            $key = 'blog-import-reports/'.$reportId.'.docx';
-            $stream = fopen($reportPath, 'rb');
+        $reportStorageKey = null;
+        $safeFilename = null;
+        if ($contentType === 'news') {
+            $reportId = (string) Str::uuid();
+            $safeFilename = $this->safeFilename($originalFilename);
             try {
-                if (! Storage::disk(config('media.disk'))->put($key, $stream, ['visibility' => 'private'])) {
-                    throw new \RuntimeException('The private report could not be stored.');
+                $reportPath = $this->reports->create($safeFilename, $requestId, $contentType, $issues);
+                if (filesize($reportPath) > config('blog.report_max_bytes')) {
+                    throw new \RuntimeException('The generated Word report exceeds the size limit.');
                 }
+                $key = 'blog-import-reports/'.$reportId.'.docx';
+                $stream = fopen($reportPath, 'rb');
+                try {
+                    if (! Storage::disk(config('media.disk'))->put($key, $stream, ['visibility' => 'private'])) {
+                        throw new \RuntimeException('The private report could not be stored.');
+                    }
+                } finally {
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                }
+                $report = ['id' => $reportId, 'filename' => 'news-import-errors.docx', 'expires_at' => now()->addDay()->utc()->toISOString()];
+                $reportStorageKey = $key;
+            } catch (Throwable) {
+                $issues[] = $this->issueForField('file', 'REPORT_UNAVAILABLE', 'گزارش سند در دسترس نیست؛ خطاهای همین پاسخ JSON را نگه دارید.', 'گزارش خطا');
+                $reportStorageKey = null;
             } finally {
-                if (is_resource($stream)) {
-                    fclose($stream);
+                if ($reportPath && is_file($reportPath)) {
+                    unlink($reportPath);
                 }
-            }
-            $report = ['id' => $reportId, 'filename' => $contentType === 'news' ? 'news-import-errors.docx' : 'blog-import-errors.docx', 'expires_at' => now()->addDay()->utc()->toISOString()];
-            $reportStorageKey = $key;
-        } catch (Throwable) {
-            $issues[] = $this->issueForField('file', 'REPORT_UNAVAILABLE', 'گزارش Word در دسترس نیست؛ خطاهای همین پاسخ JSON را نگه دارید.', 'گزارش خطا');
-            $reportStorageKey = null;
-        } finally {
-            if ($reportPath && is_file($reportPath)) {
-                unlink($reportPath);
             }
         }
 
         $error = [
             'code' => 'IMPORT_VALIDATION_FAILED',
-            'message' => 'Please correct the document fields.',
-            'fields' => (object) $exception->fields,
+            'message' => $contentType === 'blog' ? 'عنوان و عنوان انگلیسی سند را بررسی و اصلاح کنید.' : 'Please correct the document fields.',
+            'fields' => $exception->fields,
             'issues' => $issues,
-            'report' => $report,
+            ...($contentType === 'news' ? ['report' => $report] : []),
         ];
+        if ($contentType === 'blog') {
+            $error = $this->errorPresenter->presentImportError($error);
+        }
         try {
             DB::transaction(function () use ($session, $actor, $importId, $error, $report, $reportStorageKey, $safeFilename): void {
                 $this->sessions->currentUser($session);
                 if ($report && $reportStorageKey) {
                     DB::table('blog_import_reports')->insert([
                         'id' => $report['id'], 'user_id' => $actor->id, 'import_id' => $importId,
-                        'storage_key' => $reportStorageKey, 'original_filename' => $safeFilename,
+                        'storage_key' => $reportStorageKey, 'original_filename' => $safeFilename ?? 'گزارش خبر.docx',
                         'expires_at' => now()->addDay(), 'created_at' => now(),
                     ]);
                 }
@@ -458,15 +513,15 @@ class ImportWordDocument
     private function issueForField(string $field, string $code, string $message, ?string $location = null): array
     {
         $labels = [
-            'title' => 'عنوان مقاله', 'slug' => 'نشانی انگلیسی', 'description' => 'توضیح کوتاه',
-            'category_name' => 'نام دسته‌بندی', 'reading_minutes' => 'زمان مطالعه',
-            'meta_description' => 'توضیحات متا', 'cover_image' => 'تصویر روی جلد',
-            'content' => 'متن مقاله', 'file' => 'فایل Word', 'template' => 'قالب Word',
+            'title' => 'عنوان مقاله', 'slug' => 'عنوان انگلیسی', 'description' => 'توضیحات',
+            'category_name' => 'دسته‌بندی', 'reading_minutes' => 'زمان مطالعه',
+            'meta_description' => 'توضیحات متا', 'cover_image' => 'تصویر',
+            'content' => 'محتوا', 'file' => 'فایل انتخاب‌شده', 'template' => 'ساختار سند',
         ];
 
         return [
-            'code' => $code, 'field' => $field, 'label' => $labels[$field] ?? $field,
-            'location' => $location ?? ($labels[$field] ?? 'فایل Word'), 'message' => $message,
+            'code' => $code, 'field' => $field, 'label' => $labels[$field] ?? 'بخش سند',
+            'location' => $location ?? ($labels[$field] ?? 'فایل انتخاب‌شده'), 'message' => $message,
         ];
     }
 
@@ -506,7 +561,7 @@ class ImportWordDocument
         return [
             'id' => (int) $article->id, 'title' => $article->title, 'slug' => $article->slug,
             'description' => $article->description, 'cover_image' => $article->cover_image,
-            'content' => $article->content, 'reading_minutes' => (int) $article->reading_minutes,
+            'content' => $article->content, 'reading_minutes' => $article->reading_minutes === null ? null : (int) $article->reading_minutes,
             'meta_description' => $article->meta_description, 'status' => $article->status,
             'scheduled_for' => $article->scheduled_for?->utc()->toISOString(),
             'author' => $author ? ['id' => (int) $author->id, 'name' => $author->name] : null,

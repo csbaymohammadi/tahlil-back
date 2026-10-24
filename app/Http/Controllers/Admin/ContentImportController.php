@@ -30,6 +30,7 @@ class ContentImportController extends Controller
 
         $response = response()->json([
             'data' => ['content_type' => $result['content_type'], 'record' => $result['snapshot']],
+            'warnings' => $result['warnings'] ?? [],
             'request_id' => $request->attributes->get('request_id'),
         ], $result['status'])->header('Cache-Control', 'private, no-store');
 

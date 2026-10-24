@@ -24,7 +24,7 @@ The global authenticated management guard treats all active administrators equal
 
 ## Article resource and endpoints
 
-Article detail has these fields:
+Article detail has these fields. `slug` is the English title used by the frontend; there is no separate English-title property. Optional fields may be empty, and an unset reading time is returned as `null`:
 
 ```json
 {
@@ -33,7 +33,7 @@ Article detail has these fields:
   "slug": "understanding-market-price-references",
   "description": "A short introduction.",
   "cover_image": "",
-  "reading_minutes": 5,
+  "reading_minutes": null,
   "status": "draft",
   "scheduled_for": null,
   "author": {"id": 12, "name": "Example Editor"},
@@ -55,11 +55,13 @@ Article detail has these fields:
 | --- | --- | --- |
 | GET | `/blog/articles?page=1&per_page=10&q=` | List Draft, Scheduled, and Published records; `per_page` is 10, 20, or 50; sort newest first. Search normalized title and current author name. |
 | GET | `/blog/articles/{id}` | Return full live article detail. |
-| POST | `/blog/articles` | Create an article; required: `title`, `slug`, `content`, `category_id` (include null to uncategorize), `reading_minutes`, and `status`. Optional `description`, `cover_image`, and `meta_description` default to empty strings. Returns 201, version 1, and `Location`. |
-| PATCH | `/blog/articles/{id}` | Require `expected_version` and at least one editable field. Omitted fields are preserved; empty optional strings clear values; null is valid only for `category_id` and `scheduled_for` where applicable. A stale version returns 409. |
+| POST | `/blog/articles` | Only `title` and `slug` are required. Every other content field may be omitted or empty; omitted optional fields are stored empty, except `reading_minutes`, which is `null`. Status defaults to `draft`. Returns 201, version 1, `Location`, and a `warnings` array. |
+| PATCH | `/blog/articles/{id}` | Require `expected_version` and at least one editable field. Omitted fields are preserved. Empty or null optional text clears its value; invalid optional values are ignored by storing an empty value or `null` and returned in `warnings`. A stale version returns 409. |
 | DELETE | `/blog/articles/{id}?expected_version=2` | Soft-delete after version check. Returns 204; repeated deletion returns 404. |
 
-Title is trimmed plain text, 1–200 Unicode characters. Slug is 1–200 lowercase ASCII letters/digits with single hyphen separators, unique across all current and historical ownership. Summary is up to 2,000 characters; meta description up to 500. Reading time is a strict integer from 1–1,440. Null is not accepted for optional text/image fields; send `""` to clear. Category must be a live blog category or null.
+Only the title and English title are required: title is trimmed plain text of 1–200 Unicode characters; `slug` is 1–200 lowercase ASCII letters/digits with single hyphen separators and unique across current and historical ownership. The title editor should send its English title in `slug`. Description, cover, body, meta description, category, and reading time are optional with no form-level length or required checks. The backend still enforces safe HTML, media access, file integrity, and resource limits. An unusable description, image, category, or reading time does not block saving: the value stays empty or `null`, and the response includes Persian warnings such as `{ "field": "category_id", "code": "CATEGORY_IGNORED", "message": "دسته‌بندی قابل‌استفاده نیست و مقاله بدون دسته‌بندی ذخیره شد." }`. Reading time is `null` when unset; no default is fabricated. Category may be omitted or null to clear it.
+
+Create/update success responses contain `warnings: []` when no optional values were ignored. Warning `field` and `code` keys remain stable for frontend handling; every human-readable warning is Persian. These warnings do not indicate a failed save.
 
 Status is `draft`, `published`, or `scheduled`. Schedule time must be a future ISO 8601 instant when Scheduled and null otherwise. First publication time is retained across later edits and republishing. The author is always taken from the session, never from request data.
 
@@ -97,17 +99,36 @@ Publicly effective article/category/author changes create durable rows in `blog_
 
 `POST /content-imports` accepts exactly multipart parts `content_type=blog` or `content_type=news` and one `file`. This handoff describes the Blog target; see [the news handoff](4-panel-news-api.md) for News-specific template, category, report filename, and response location behavior. Supply a UUID `Idempotency-Key`; a matching administrator/key/module/file checksum replays the original result for 24 hours. Same key with different bytes or a different module returns 409 `IDEMPOTENCY_CONFLICT`. A concurrent or live lease returns 409 `IMPORT_IN_PROGRESS` and `Retry-After`. A deleted imported record is never resurrected; replay returns 404 `IMPORT_RESULT_NOT_FOUND`. New processing is limited to 5 attempts per administrator per 15 minutes and one active conversion per administrator.
 
-Files must be `.doc` or `.docx`, case-insensitively, and 1 byte–20 MiB. MIME is advisory. The server checks actual DOCX/legacy OLE signatures and bounds ZIP entries to 2,000 and expanded bytes to 128 MiB. It accepts up to 50 embedded raster images and 150 million total pixels. Images are normalized to PNG (static) or WebP (animated), then use the existing shared-media quota/storage and transaction-safe references. A successful request returns 201 with `{ "data": { "content_type": "blog", "record": <full article detail> }, "request_id": "..." }`; imported records are always new Drafts.
+Files must be `.doc` or `.docx`, case-insensitively, and 1 byte–20 MiB. MIME is advisory. The server checks actual DOCX/legacy OLE signatures and bounds ZIP entries to 2,000 and expanded bytes to 128 MiB. It accepts up to 50 embedded raster images and 150 million total pixels. Images are normalized to PNG (static) or WebP (animated), then use the existing shared-media quota/storage and transaction-safe references. A successful request returns 201 with `{ "data": { "content_type": "blog", "record": <full article detail> }, "warnings": [], "request_id": "..." }`; imported records are always new Drafts.
 
-The template is [blog-import-v1.docx](../public/tahlilpanel/templates/blog-import-v1.docx), served at `/tahlilpanel/templates/blog-import-v1.docx`. It contains ordered markers `TAHLIL_CONTENT_IMPORT_V1`, `content_type: blog`, `[cover_image]`, and `[content]`; its metadata table has exactly one row for each ASCII key `title`, `slug`, `description`, `category_name`, `reading_minutes`, and `meta_description`. Placeholder values like `[[title]]` mean empty. The parser never guesses columns, silently creates categories, chooses a random cover, or uses request-supplied author/status data.
+The current template is [blog-import-v2.docx](../public/tahlilpanel/templates/blog-import-v2.docx), served at `/tahlilpanel/templates/blog-import-v2.docx`. Its Persian sections appear in this order: **عنوان**, **عنوان انگلیسی**, **توضیحات**, **تصویر**, **محتوا**, **توضیحات متا**. The category and reading-time sections may optionally follow. Put the English title in the second section; it becomes the article `slug`. Put the cover image in the image section; the first image there is used as the cover. Images in the content section remain inline. Empty description, cover, content, metadata, category, or reading time does not prevent Draft creation. Invalid optional values are left empty and reported in a Persian `warnings` array. The parser also continues to accept the previous v1 template for files already in circulation. It does not infer categories, choose a random cover, or use request-supplied author/status data.
 
-Document validation returns 422 `IMPORT_VALIDATION_FAILED` with ordered `issues` (`code`, `field`, `label`, `location`, `message`), normal `fields` arrays, and optional `{id, filename, expires_at}` report metadata. Messages are safe to render as escaped text. If report generation fails, JSON issues remain and `report` is null with a `REPORT_UNAVAILABLE` issue. Reports are private, owner-bound DOCX files, expire after 24 hours, and download only through `GET /content-imports/reports/{report_id}`. The route returns the DOCX MIME type and `no-store` headers.
+Blog import validation returns 422 `IMPORT_VALIDATION_FAILED` with stable machine `code` and `field` keys, ordered Persian `issues` (`label`, `location`, and `message`), and Persian `fields` messages. Only the title and English title are content-validation errors. Damaged, encrypted, unsafe, oversized, or structurally unsupported files can still fail the file/security checks. New Blog errors are JSON-only: they contain no report, filename, or display timestamp. Existing News and older persisted report records continue to use the shared private report endpoint; it is not part of the new Blog flow. Do not show or request a report after a Blog error.
 
-The initial frontend timeout should be 120 seconds. Do not auto-retry writes. On timeout retain the selected file and idempotency key, explain that closing the browser does not cancel server work, and retry the exact file/key to recover the committed result. For a corrected file, issue a new key. An error-report download never retries import.
+Successful article creation and Word import include `warnings`, which may be empty. The imported record is always a Draft. The initial frontend timeout should be 120 seconds. Do not auto-retry writes. On timeout retain the selected file and idempotency key, explain that closing the browser does not cancel server work, and retry the exact file/key to recover the committed result. For a corrected file, issue a new key.
 
-### Legacy DOC prerequisites
+### Ubuntu 24.04 server prerequisites
 
-DOC conversion runs only when all prerequisites resolve: LibreOffice (`soffice`), Python with `oletools==0.60.2`, the checked-in OLE inspection helper, and OS isolation. macOS uses `sandbox-exec`; Linux uses `bwrap` with namespaces, read-only runtime paths, a private writable temporary directory, and no network. The conversion process is capped at 45 seconds; total request processing target is 90 seconds. Missing sandbox/tooling returns a controlled service error, never an unsandboxed fallback. `requirements-word-import.txt` documents the isolated Python package. Install prerequisites in the deployment image and verify sandbox policy there; DOC conversion was not claimed as acceptance-tested in an environment without all prerequisites.
+DOCX is read directly by PHP. Install/enable PHP extensions `zip`, `xml`/DOM, `mbstring`, `fileinfo`, and `gd`; the image normalizer also needs FFmpeg. DOCX import does not require LibreOffice or Python. For example, on Ubuntu 24.04 with the matching PHP 8.3 packages:
+
+```sh
+sudo apt update
+sudo apt install php8.3-zip php8.3-xml php8.3-mbstring php8.3-gd ffmpeg
+```
+
+These PHP package names are from Ubuntu Noble's PHP 8.3 package set ([Ubuntu package listing](https://packages.ubuntu.com/source/noble/php8.3)).
+
+Legacy DOC conversion additionally requires LibreOffice Writer, Python 3 with a virtual environment containing the pinned `oletools` dependency, and Bubblewrap. Install the operating-system packages and create an isolated venv owned by deployment, not writable by the web worker:
+
+```sh
+sudo apt install libreoffice-writer python3 python3-venv bubblewrap
+sudo python3 -m venv /opt/tahlil-word-import-venv
+sudo /opt/tahlil-word-import-venv/bin/pip install -r /path/to/release/requirements-word-import.txt
+```
+
+Set `WORD_IMPORT_PYTHON=/opt/tahlil-word-import-venv/bin/python`, `LIBREOFFICE_BINARY=/usr/bin/soffice`, and `BWRAP_BINARY=/usr/bin/bwrap` in the application environment, then reload PHP-FPM/workers. The runtime uses read-only system/runtime binds, a private temporary work directory, no network, a 45-second DOC conversion ceiling, and a 90-second total processing ceiling. Verify the complete conversion under the actual PHP-FPM service user. Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor, so if `bwrap` cannot create namespaces, review the host policy and apply a narrowly scoped profile for the service; do not disable AppArmor or namespace restrictions globally ([Ubuntu 24.04 release notes](https://documentation.ubuntu.com/release-notes/24.04/)). Missing isolation causes a controlled error, never an unsandboxed conversion.
+
+DOC conversion runs only when all prerequisites resolve: LibreOffice (`soffice`), Python with `oletools==0.60.2`, the checked-in OLE inspection helper, and OS isolation. macOS uses `sandbox-exec`; Linux uses `bwrap`. Install prerequisites in the deployment image and verify the policy there.
 
 DOCX is parsed directly with bounded ZIP/XML operations, `LIBXML_NONET`, no external entities, and external package relationships rejected. The converter rejects active/OLE content, encrypted or malformed files, unsupported image/structure cases, and external image fetches. This implementation does not run antivirus, sanitize original EXIF before parsing, reproduce every Word typography feature, or implement frontend error rendering.
 
@@ -138,8 +159,8 @@ The browser must not set multipart `Content-Type` manually. Same-site deployment
 
 ## Operational verification and actual coverage
 
-- Automated feature tests cover article/category CRUD, normalized search/name handling, versions/no-op, soft-delete/merge counts, scheduled publication, internal slug resolution, successful DOCX parsing/import, success replay, validation issue/report generation, report ownership, idempotency conflicts, and a controlled 503 when legacy DOC conversion prerequisites are unavailable.
+- Automated feature tests cover article/category CRUD, normalized search/name handling, versions/no-op, optional-field warnings, scheduled publication, internal slug resolution, both Persian v2 and legacy v1 DOCX parsing/import, success replay, Persian title/slug validation, JSON-only Blog errors, News report compatibility, idempotency conflicts, and a controlled 503 when legacy DOC conversion prerequisites are unavailable.
 - PHPUnit's regular suite runs against isolated SQLite `:memory:`. The four opt-in multi-process race tests also passed against temporary MariaDB 11.7.2 with `pcntl`: competing slug creation, category assignment versus deletion, scheduled publication versus cancellation, and same-key Word retry. The production MariaDB version was not verified; scheduler timing, shared filesystem behavior, proxy/cookie transport, and browser downloads remain deployment checks.
-- The template DOCX and a representative Persian validation report were rendered and visually inspected. The error-report response is also verified as a valid downloadable DOCX archive by feature test; a separate browser/Word compatibility test was not run.
+- The new Persian v2 template was rendered and visually inspected; the v1 and News template/report paths remain covered by feature tests. A separate Microsoft Word client compatibility test was not run.
 - Migrations and seeds were not run against the development or production database. No remote service was contacted.
 - Symfony HTML Sanitizer is declared at `^7.4`; installed version and generated OpenAPI validation are recorded with the final implementation checks.

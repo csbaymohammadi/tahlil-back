@@ -35,7 +35,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }, { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Understanding Market Price References\",\n  \"slug\": \"understanding-market-price-references\",\n  \"description\": \"An introduction to price references.\",\n  \"cover_image\": \"\",\n  \"content\": \"<h2>Price references</h2><p>An introductory explanation.</p>\",\n  \"category_id\": null,\n  \"reading_minutes\": 5,\n  \"meta_description\": \"A guide to reading price labels.\",\n  \"status\": \"draft\",\n  \"scheduled_for\": null\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Understanding Market Price References\",\n  \"slug\": \"understanding-market-price-references\"\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{apiRoot}}/blog/articles"
           }
         },
@@ -80,10 +80,10 @@
             "header": [{ "key": "Accept", "value": "application/json" }, { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }, { "key": "Idempotency-Key", "value": "{{importKey}}" }],
             "body": { "mode": "formdata", "formdata": [{ "key": "content_type", "value": "blog", "type": "text" }, { "key": "file", "type": "file", "src": "" }] },
             "url": "{{apiRoot}}/content-imports",
-            "description": "Choose one .doc or .docx file. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes."
+            "description": "Choose one .doc or .docx file. For Blog, use the Persian v2 template at /tahlilpanel/templates/blog-import-v2.docx; its sections are title, English title, description, image, content, and meta description, with optional category and reading time after. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes. Blog errors are Persian JSON without a report file; successful responses can include Persian warnings."
           }
         },
-        { "name": "Download validation report", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }], "url": "{{apiRoot}}/content-imports/reports/{{reportId}}" } }
+        { "name": "Download legacy or News validation report", "description": "New Blog imports return Persian JSON errors without report files. This endpoint remains for News and previously generated reports.", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }], "url": "{{apiRoot}}/content-imports/reports/{{reportId}}" } }
       ]
     },
     {
