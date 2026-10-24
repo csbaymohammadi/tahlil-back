@@ -1,0 +1,6 @@
+interface:
+  display_name: "Laravel & PHP Best Practices"
+  short_description: "Laravel and PHP conventions for Tahlil"
+
+policy:
+  allow_implicit_invocation: true

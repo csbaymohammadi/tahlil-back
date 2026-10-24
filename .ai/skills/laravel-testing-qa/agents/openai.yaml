@@ -1,0 +1,6 @@
+interface:
+  display_name: "Laravel Testing & QA"
+  short_description: "PHPUnit tests, isolation, and focused verification"
+
+policy:
+  allow_implicit_invocation: true

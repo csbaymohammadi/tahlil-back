@@ -1,0 +1,6 @@
+interface:
+  display_name: "Laravel Clean Architecture"
+  short_description: "Practical Laravel actions and dependency boundaries"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Laravel Security"
+  short_description: "Laravel authorization and application security"
+
+policy:
+  allow_implicit_invocation: true
