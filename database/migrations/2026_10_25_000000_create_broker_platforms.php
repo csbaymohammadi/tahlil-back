@@ -9,6 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         foreach (['broker_categories' => true, 'stock_brokerage_categories' => false] as $tableName => $hasKey) {
+            if (Schema::hasTable($tableName)) {
+                continue;
+            }
+
             Schema::create($tableName, function (Blueprint $table) use ($hasKey): void {
                 $table->id();
                 $table->string('name', 80);
@@ -30,17 +34,23 @@ return new class extends Migration
         $this->createOperationalTables('broker', 'broker_id', 'brokers');
         $this->createOperationalTables('stock_brokerage', 'stock_brokerage_id', 'stock_brokerages');
 
-        Schema::create('broker_legacy_stock_paths', function (Blueprint $table): void {
-            $table->id();
-            $table->string('source_slug', 200)->unique();
-            $table->foreignId('stock_brokerage_id')->constrained('stock_brokerages')->restrictOnDelete();
-            $table->timestamp('created_at')->useCurrent();
-            $table->index('stock_brokerage_id');
-        });
+        if (! Schema::hasTable('broker_legacy_stock_paths')) {
+            Schema::create('broker_legacy_stock_paths', function (Blueprint $table): void {
+                $table->id();
+                $table->string('source_slug', 200)->unique();
+                $table->foreignId('stock_brokerage_id')->constrained('stock_brokerages')->restrictOnDelete();
+                $table->timestamp('created_at')->useCurrent();
+                $table->index('stock_brokerage_id');
+            });
+        }
     }
 
     private function createProfiles(string $tableName, bool $stock): void
     {
+        if (Schema::hasTable($tableName)) {
+            return;
+        }
+
         Schema::create($tableName, function (Blueprint $table) use ($stock): void {
             $table->id();
             if ($stock) {
@@ -91,43 +101,65 @@ return new class extends Migration
 
     private function createSlugOwnership(string $tableName, string $profileTable, string $foreignKey): void
     {
-        Schema::create($tableName, function (Blueprint $table) use ($profileTable, $foreignKey): void {
+        $indexName = $tableName === 'stock_brokerage_slug_ownership' ? 'stock_broker_slug_public_idx' : 'broker_slug_public_idx';
+        if (Schema::hasTable($tableName)) {
+            if (! Schema::hasIndex($tableName, $indexName)) {
+                Schema::table($tableName, function (Blueprint $table) use ($foreignKey, $indexName): void {
+                    $table->index([$foreignKey, 'was_public'], $indexName);
+                });
+            }
+
+            return;
+        }
+
+        Schema::create($tableName, function (Blueprint $table) use ($profileTable, $foreignKey, $indexName): void {
             $table->id();
             $table->string('slug', 200)->unique();
             $table->foreignId($foreignKey)->constrained($profileTable)->restrictOnDelete();
             $table->boolean('was_public')->default(false);
             $table->timestamp('created_at')->useCurrent();
-            $table->index([$foreignKey, 'was_public']);
+            $table->index([$foreignKey, 'was_public'], $indexName);
         });
     }
 
     private function createOperationalTables(string $prefix, string $foreignKey, string $profileTable): void
     {
-        Schema::create($prefix.'_outbox', function (Blueprint $table) use ($foreignKey, $profileTable): void {
-            $table->id();
-            $table->foreignId($foreignKey)->nullable()->constrained($profileTable)->restrictOnDelete();
-            $table->string('event', 80);
-            $table->json('payload');
-            $table->unsignedInteger('attempts')->default(0);
-            $table->timestamp('available_at')->nullable();
-            $table->timestamp('delivered_at')->nullable();
-            $table->text('last_error')->nullable();
-            $table->timestamp('created_at')->useCurrent();
-            $table->index(['delivered_at', 'available_at', 'created_at']);
-        });
+        $outboxTable = $prefix.'_outbox';
+        $deliveryIndexName = $prefix === 'stock_brokerage' ? 'stock_broker_outbox_delivery_idx' : 'broker_outbox_delivery_idx';
+        if (! Schema::hasTable($outboxTable)) {
+            Schema::create($outboxTable, function (Blueprint $table) use ($foreignKey, $profileTable, $deliveryIndexName): void {
+                $table->id();
+                $table->foreignId($foreignKey)->nullable()->constrained($profileTable)->restrictOnDelete();
+                $table->string('event', 80);
+                $table->json('payload');
+                $table->unsignedInteger('attempts')->default(0);
+                $table->timestamp('available_at')->nullable();
+                $table->timestamp('delivered_at')->nullable();
+                $table->text('last_error')->nullable();
+                $table->timestamp('created_at')->useCurrent();
+                $table->index(['delivered_at', 'available_at', 'created_at'], $deliveryIndexName);
+            });
+        } elseif (! Schema::hasIndex($outboxTable, $deliveryIndexName)) {
+            Schema::table($outboxTable, function (Blueprint $table) use ($deliveryIndexName): void {
+                $table->index(['delivered_at', 'available_at', 'created_at'], $deliveryIndexName);
+            });
+        }
 
-        Schema::create($prefix.'_audit_events', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('actor_id')->nullable()->constrained('users')->restrictOnDelete();
-            $table->string('target_type', 30);
-            $table->unsignedBigInteger('target_id');
-            $table->string('event', 80);
-            $table->string('request_id', 80);
-            $table->json('details')->nullable();
-            $table->timestamp('created_at')->useCurrent();
-            $table->index(['target_type', 'target_id']);
-            $table->index('created_at');
-        });
+        $auditTable = $prefix.'_audit_events';
+        if (! Schema::hasTable($auditTable)) {
+            Schema::create($auditTable, function (Blueprint $table): void {
+                $table->id();
+                $table->foreignId('actor_id')->nullable()->constrained('users')->restrictOnDelete();
+                $table->string('target_type', 30);
+                $table->unsignedBigInteger('target_id');
+                $table->string('event', 80);
+                $table->string('request_id', 80);
+                $table->json('details')->nullable();
+                $table->timestamp('created_at')->useCurrent();
+                $table->index(['target_type', 'target_id']);
+                $table->index('created_at');
+            });
+        }
     }
 
     public function down(): void

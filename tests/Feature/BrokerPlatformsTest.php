@@ -23,9 +23,11 @@ use App\Support\PlatformProfileDefinition;
 use App\Support\StockBrokerSpecifications;
 use Database\Seeders\BrokerCategorySeeder;
 use Database\Seeders\StockBrokerageCategorySeeder;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\PanelTestCase;
 
 class BrokerPlatformsTest extends PanelTestCase
@@ -35,6 +37,44 @@ class BrokerPlatformsTest extends PanelTestCase
     private const FOREX = '/api/v1/admin/brokers';
 
     private const STOCK = '/api/v1/admin/stock-brokers';
+
+    public function test_broker_platform_index_names_fit_mariadb_identifier_limits(): void
+    {
+        foreach ([
+            'broker_categories', 'stock_brokerage_categories', 'brokers', 'stock_brokerages',
+            'broker_slug_ownership', 'stock_brokerage_slug_ownership', 'broker_outbox', 'stock_brokerage_outbox',
+            'broker_audit_events', 'stock_brokerage_audit_events', 'broker_legacy_stock_paths',
+        ] as $table) {
+            foreach (Schema::getIndexes($table) as $index) {
+                $this->assertLessThanOrEqual(64, strlen($index['name']), "{$table}.{$index['name']} exceeds MariaDB's identifier limit.");
+            }
+        }
+    }
+
+    public function test_broker_platform_migration_resumes_after_a_partial_mariadb_ddl_failure(): void
+    {
+        Schema::table('stock_brokerage_slug_ownership', function (Blueprint $table): void {
+            $table->dropIndex('stock_broker_slug_public_idx');
+        });
+        Schema::table('stock_brokerage_outbox', function (Blueprint $table): void {
+            $table->dropIndex('stock_broker_outbox_delivery_idx');
+        });
+        Schema::dropIfExists('broker_legacy_stock_paths');
+        Schema::dropIfExists('stock_brokerage_audit_events');
+        Schema::dropIfExists('broker_audit_events');
+        Schema::dropIfExists('broker_outbox');
+
+        $migration = require database_path('migrations/2026_10_25_000000_create_broker_platforms.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasIndex('stock_brokerage_slug_ownership', 'stock_broker_slug_public_idx'));
+        $this->assertTrue(Schema::hasIndex('stock_brokerage_outbox', 'stock_broker_outbox_delivery_idx'));
+        $this->assertTrue(Schema::hasTable('broker_outbox'));
+        $this->assertTrue(Schema::hasTable('stock_brokerage_outbox'));
+        $this->assertTrue(Schema::hasTable('broker_audit_events'));
+        $this->assertTrue(Schema::hasTable('stock_brokerage_audit_events'));
+        $this->assertTrue(Schema::hasTable('broker_legacy_stock_paths'));
+    }
 
     public function test_forex_broker_round_trips_all_fields_and_preserves_partial_updates_and_publication_time(): void
     {
