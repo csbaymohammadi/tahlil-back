@@ -83,7 +83,7 @@
             "description": "Choose one .doc or .docx file. For Blog, use the Persian v2 template at /tahlilpanel/templates/blog-import-v2.docx; its sections are title, English title, description, image, content, and meta description, with optional category and reading time after. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes. Blog errors are Persian JSON without a report file; successful responses can include Persian warnings."
           }
         },
-        { "name": "Download legacy or News validation report", "description": "New Blog imports return Persian JSON errors without report files. This endpoint remains for News and previously generated reports.", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }], "url": "{{apiRoot}}/content-imports/reports/{{reportId}}" } }
+        { "name": "Download historical News validation report", "description": "New Blog and News imports return Persian JSON errors without report files. This endpoint remains only for reports created by older News imports.", "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }], "url": "{{apiRoot}}/content-imports/reports/{{reportId}}" } }
       ]
     },
     {

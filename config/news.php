@@ -6,7 +6,7 @@ return [
         explode(',', env('NEWS_TRUSTED_MEDIA_HOSTS', 'service.tahlilex.com')),
     ))),
     'fallback_cover' => env('NEWS_FALLBACK_COVER', ''),
-    'template_path' => public_path('tahlilpanel/templates/news-import-v1.docx'),
+    'template_path' => public_path('tahlilpanel/templates/news-import-v2.docx'),
     'featured_ids' => array_values(array_filter(array_map(
         static fn (string $id): int => (int) trim($id),
         explode(',', env('NEWS_FEATURED_IDS', '')),

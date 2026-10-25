@@ -260,7 +260,7 @@ paths:
       tags: [Word import]
       summary: Import one Word file as a new Draft
       description: >-
-        The shared importer accepts content_type=blog or content_type=news. Blog uses the Persian v2 template with optional content sections; only title and English title are required. Blog errors are Persian JSON without report metadata or files. DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
+        The shared importer accepts content_type=blog or content_type=news. Each module uses its Persian v2 template; only title and English title are required, and invalid optional values return Persian warnings. New Blog and News errors are Persian JSON without report metadata or files. The report download route is retained only for historical News reports. DOC requires LibreOffice, oletools, and OS sandbox prerequisites. Matching key/file retries replay within 24 hours.
       security:
         - PanelSession: []
       parameters:
@@ -310,7 +310,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '422':
-          description: Persian validation issues. Blog errors never include a report; News and legacy records may include report metadata.
+          description: Persian validation issues in JSON only; new Blog and News imports do not generate report files.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportError' }
@@ -326,7 +326,8 @@ paths:
     get:
       operationId: downloadWordImportReport
       tags: [Word import]
-      summary: Download a private News or legacy validation report
+      summary: Download a historical private News validation report
+      description: Compatibility endpoint for owner-bound reports created by older News imports. New import errors contain JSON only and do not create reports.
       parameters:
         - name: report_id
           in: path
@@ -542,14 +543,4 @@ components:
             issues:
               type: array
               items: { $ref: '#/components/schemas/ImportIssue' }
-            report:
-              description: Present only for News and legacy error records; omitted for new Blog errors.
-              oneOf:
-                - type: object
-                  required: [id, filename, expires_at]
-                  properties:
-                    id: { type: string, format: uuid }
-                    filename: { type: string }
-                    expires_at: { type: string, format: date-time }
-                - type: 'null'
         request_id: { type: string }

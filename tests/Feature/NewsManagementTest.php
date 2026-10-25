@@ -49,26 +49,102 @@ class NewsManagementTest extends PanelTestCase
         $this->get(self::BASE.'/items/'.$id)->assertNotFound()->assertJsonPath('error.code', 'NEWS_NOT_FOUND');
     }
 
-    public function test_unsafe_and_empty_content_are_rejected_without_saving(): void
+    public function test_optional_news_fields_can_be_empty_and_unsafe_content_is_rejected(): void
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
+        $this->postJson(self::BASE.'/items', ['title' => 'Blank draft', 'slug' => 'blank-draft'])
+            ->assertCreated()
+            ->assertJsonPath('data.content', '')
+            ->assertJsonPath('data.reading_minutes', null)
+            ->assertJsonPath('warnings', []);
+
         $payload = [
             'title' => 'Safe title', 'slug' => 'safe-title', 'content' => '<script>alert(1)</script>',
             'category_id' => null, 'reading_minutes' => 4, 'status' => 'draft',
         ];
-        $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable()->assertJsonPath('error.fields.content.0', 'The article contains an unsupported active element.');
-        $this->assertDatabaseCount('news_items', 0);
+        $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable()
+            ->assertJsonPath('error.fields.content.0', 'مقدار «محتوا» قابل‌استفاده نیست.');
+        $this->assertDatabaseCount('news_items', 1);
 
         $payload['content'] = '<p>&nbsp;</p><table><tbody><tr><td></td></tr></tbody></table>';
-        $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable();
+        $payload['title'] = 'Empty markup';
+        $payload['slug'] = 'empty-markup';
+        $this->postJson(self::BASE.'/items', $payload)->assertCreated()->assertJsonPath('data.content', '');
         $payload['content'] = '<p class="unsafe">Visible copy</p>';
+        $payload['title'] = 'Unsafe class';
+        $payload['slug'] = 'unsafe-class';
         $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable();
         $payload['content'] = '<img src="https://user@service.tahlilex.com/image.png" alt="cover">';
+        $payload['title'] = 'Unsafe media host';
+        $payload['slug'] = 'unsafe-media-host';
         $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable();
         $payload['content'] = '<p>Visible copy</p></main><script>alert(1)</script><main>';
+        $payload['title'] = 'Unsafe fragment';
+        $payload['slug'] = 'unsafe-fragment';
         $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable();
+        $this->assertDatabaseCount('news_items', 2);
+    }
+
+    public function test_only_title_and_english_title_are_required_and_validation_is_persian(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+
+        $this->postJson(self::BASE.'/items', ['slug' => 'valid-slug'])->assertUnprocessable()
+            ->assertJsonPath('error.fields.title.0', 'عنوان خبر الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.');
+        $this->postJson(self::BASE.'/items', ['title' => 'عنوان معتبر', 'slug' => 'عنوان-نامعتبر'])
+            ->assertUnprocessable()
+            ->assertJsonPath('error.fields.slug.0', 'عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید؛ طول آن حداکثر ۲۰۰ نویسه باشد.');
         $this->assertDatabaseCount('news_items', 0);
+    }
+
+    public function test_unusable_optional_news_values_are_cleared_with_persian_warnings(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $response = $this->postJson(self::BASE.'/items', [
+            'title' => 'Optional values',
+            'slug' => 'optional-values',
+            'description' => ['not a string'],
+            'cover_image' => 42,
+            'content' => null,
+            'category_id' => 'not-an-id',
+            'reading_minutes' => 'not a number',
+            'meta_description' => str_repeat('م', 501),
+        ])->assertCreated()
+            ->assertJsonPath('data.description', '')
+            ->assertJsonPath('data.cover_image', '')
+            ->assertJsonPath('data.content', '')
+            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.reading_minutes', null);
+
+        $this->assertSame(
+            ['description', 'cover_image', 'meta_description', 'category_id', 'reading_minutes'],
+            array_column($response->json('warnings'), 'field'),
+        );
+        $this->assertSame(1, NewsItem::query()->firstOrFail()->version);
+    }
+
+    public function test_patch_accepts_unusable_optional_values_without_advancing_noop_version(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $id = $this->postJson(self::BASE.'/items', ['title' => 'Patch draft', 'slug' => 'patch-draft'])
+            ->assertCreated()->json('data.id');
+
+        $response = $this->patchJson(self::BASE.'/items/'.$id, [
+            'expected_version' => 1,
+            'description' => ['not a string'],
+            'category_id' => 999999,
+            'reading_minutes' => 'not a number',
+        ])->assertOk()
+            ->assertJsonPath('data.version', 1)
+            ->assertJsonPath('data.description', '')
+            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.reading_minutes', null);
+
+        $this->assertSame(['description', 'category_id', 'reading_minutes'], array_column($response->json('warnings'), 'field'));
     }
 
     public function test_category_names_are_normalized_and_delete_uncategorizes_articles(): void
@@ -185,7 +261,7 @@ class NewsManagementTest extends PanelTestCase
         $this->postJson(self::BASE.'/items', [
             'title' => 'Wrong domain category', 'slug' => 'wrong-domain-category', 'content' => '<p>News copy</p>',
             'category_id' => $blogCategory->id, 'reading_minutes' => 4, 'status' => 'draft',
-        ])->assertUnprocessable();
+        ])->assertCreated()->assertJsonPath('data.category_id', null)->assertJsonPath('warnings.0.code', 'CATEGORY_IGNORED');
         $this->assertDatabaseHas('blog_categories', ['id' => $blogCategory->id]);
     }
 

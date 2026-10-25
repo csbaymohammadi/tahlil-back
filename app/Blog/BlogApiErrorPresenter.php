@@ -31,6 +31,7 @@ class BlogApiErrorPresenter
         'CSRF_INVALID' => 'اعتبار امنیتی درخواست معتبر نیست؛ توکن تازه دریافت و دوباره تلاش کنید.',
         'INVALID_JSON' => 'ساختار دادهٔ ارسالی معتبر نیست.',
         'ARTICLE_NOT_FOUND' => 'مقاله پیدا نشد یا حذف شده است.',
+        'NEWS_NOT_FOUND' => 'خبر پیدا نشد یا حذف شده است.',
         'VERSION_CONFLICT' => 'مقاله هم‌زمان تغییر کرده است؛ نسخهٔ تازه را دریافت کنید.',
         'SLUG_TAKEN' => 'این عنوان انگلیسی قبلاً استفاده یا رزرو شده است.',
         'IDEMPOTENCY_CONFLICT' => 'این شناسه برای فایل یا نوع محتوای دیگری استفاده شده است.',
@@ -56,13 +57,13 @@ class BlogApiErrorPresenter
     /** @param array<string, list<string>> $fields
      * @return array{message: string, fields: array<string, list<string>>}
      */
-    public function present(string $code, string $message, array $fields): array
+    public function present(string $code, string $message, array $fields, string $contentType = 'blog'): array
     {
-        $message = $this->topLevelMessage($code, $message, $fields);
+        $message = $this->topLevelMessage($code, $message, $fields, $contentType);
         $presentedFields = [];
         foreach ($fields as $field => $messages) {
             foreach ($messages as $fieldMessage) {
-                $presentedFields[$field][] = $this->fieldMessage($field, $code, $fieldMessage);
+                $presentedFields[$field][] = $this->fieldMessage($field, $code, $fieldMessage, $contentType);
             }
         }
 
@@ -72,14 +73,14 @@ class BlogApiErrorPresenter
     /** @param array<string, mixed> $error
      * @return array<string, mixed>
      */
-    public function presentImportError(array $error): array
+    public function presentImportError(array $error, string $contentType = 'blog'): array
     {
         $code = is_string($error['code'] ?? null) ? $error['code'] : 'IMPORT_VALIDATION_FAILED';
         $message = is_string($error['message'] ?? null) ? $error['message'] : '';
         $fields = $error['fields'] ?? [];
         $fields = is_object($fields) ? get_object_vars($fields) : $fields;
         $fields = is_array($fields) ? $fields : [];
-        $presented = $this->present($code, $message, $fields);
+        $presented = $this->present($code, $message, $fields, $contentType);
         $error['message'] = $presented['message'];
         $error['fields'] = (object) $presented['fields'];
 
@@ -90,9 +91,9 @@ class BlogApiErrorPresenter
             }
             $field = is_string($issue['field'] ?? null) ? $issue['field'] : 'file';
             $issueCode = is_string($issue['code'] ?? null) ? $issue['code'] : $code;
-            $issue['label'] = self::LABELS[$field] ?? 'بخش سند';
+            $issue['label'] = $field === 'title' ? 'عنوان '.$this->contentLabel($contentType) : (self::LABELS[$field] ?? 'بخش سند');
             $issue['location'] = $this->persianText((string) ($issue['location'] ?? ''), 'بخش سند: '.$issue['label']);
-            $issue['message'] = $this->fieldMessage($field, $issueCode, (string) ($issue['message'] ?? ''));
+            $issue['message'] = $this->fieldMessage($field, $issueCode, (string) ($issue['message'] ?? ''), $contentType);
             $error['issues'][$index] = $issue;
         }
 
@@ -101,11 +102,11 @@ class BlogApiErrorPresenter
         return $error;
     }
 
-    private function fieldMessage(string $field, string $code, string $message): string
+    private function fieldMessage(string $field, string $code, string $message, string $contentType = 'blog'): string
     {
         $label = self::LABELS[$field] ?? 'این بخش';
         if ($field === 'title') {
-            return 'عنوان مقاله الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.';
+            return 'عنوان '.$this->contentLabel($contentType).' الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.';
         }
         if ($field === 'slug') {
             return $code === 'SLUG_TAKEN'
@@ -129,8 +130,16 @@ class BlogApiErrorPresenter
     }
 
     /** @param array<string, list<string>> $fields */
-    private function topLevelMessage(string $code, string $message, array $fields): string
+    private function topLevelMessage(string $code, string $message, array $fields, string $contentType = 'blog'): string
     {
+        if (in_array($code, ['ARTICLE_NOT_FOUND', 'NEWS_NOT_FOUND'], true)) {
+            return $contentType === 'news' ? self::MESSAGES['NEWS_NOT_FOUND'] : self::MESSAGES['ARTICLE_NOT_FOUND'];
+        }
+        if ($code === 'VERSION_CONFLICT') {
+            return $contentType === 'news'
+                ? 'خبر هم‌زمان تغییر کرده است؛ نسخهٔ تازه را دریافت کنید.'
+                : 'مقاله هم‌زمان تغییر کرده است؛ نسخهٔ تازه را دریافت کنید.';
+        }
         if (in_array($code, ['VALIDATION_FAILED', 'IMPORT_VALIDATION_FAILED'], true)) {
             $titleFieldsOnly = $fields !== [] && array_diff(array_keys($fields), ['title', 'slug']) === [];
             if ($titleFieldsOnly) {
@@ -141,10 +150,15 @@ class BlogApiErrorPresenter
 
             return $code === 'IMPORT_VALIDATION_FAILED'
                 ? 'فایل یا ساختار سند قابل‌پردازش نیست؛ جزئیات فارسی هر بخش را بررسی کنید.'
-                : 'ساختار درخواست یا محتوای مقاله با الزامات امنیتی سازگار نیست.';
+                : 'ساختار درخواست یا محتوای '.$this->contentLabel($contentType).' با الزامات امنیتی سازگار نیست.';
         }
 
         return self::MESSAGES[$code] ?? $this->persianText($message, 'در پردازش درخواست خطایی رخ داد.');
+    }
+
+    private function contentLabel(string $contentType): string
+    {
+        return $contentType === 'news' ? 'خبر' : 'مقاله';
     }
 
     private function persianText(string $message, string $fallback): string

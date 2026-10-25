@@ -49,7 +49,7 @@ class NewsItemController extends Controller
     {
         $newsItem = NewsItem::query()->with(['author', 'category'])->find(PanelIds::parse($id));
         if (! $newsItem) {
-            return response()->json(['error' => ['code' => 'NEWS_NOT_FOUND', 'message' => 'The news item was not found.', 'fields' => (object) []], 'request_id' => $request->attributes->get('request_id')], 404);
+            return response()->json(['error' => ['code' => 'NEWS_NOT_FOUND', 'message' => 'خبر پیدا نشد یا حذف شده است.', 'fields' => (object) []], 'request_id' => $request->attributes->get('request_id')], 404);
         }
 
         return response()->json(['data' => (new NewsItemResource($newsItem))->resolve($request), 'request_id' => $request->attributes->get('request_id')]);
@@ -57,17 +57,19 @@ class NewsItemController extends Controller
 
     public function store(NewsItemRequest $request, SaveNewsItem $save): JsonResponse
     {
-        $newsItem = $save->handle($request->attributes->get('panel_session'), null, $request->validated(), $request->attributes->get('request_id'));
+        $result = $save->handle($request->attributes->get('panel_session'), null, $request->validated(), $request->attributes->get('request_id'));
+        $newsItem = $result->newsItem;
 
-        return response()->json(['data' => (new NewsItemResource($newsItem))->resolve($request), 'request_id' => $request->attributes->get('request_id')], 201)
+        return response()->json(['data' => (new NewsItemResource($newsItem))->resolve($request), 'warnings' => $result->warnings, 'request_id' => $request->attributes->get('request_id')], 201)
             ->header('Location', route('panel.news.items.show', ['id' => $newsItem->id], false));
     }
 
     public function update(NewsItemRequest $request, string $id, SaveNewsItem $save): JsonResponse
     {
-        $newsItem = $save->handle($request->attributes->get('panel_session'), PanelIds::parse($id), $request->validated(), $request->attributes->get('request_id'));
+        $result = $save->handle($request->attributes->get('panel_session'), PanelIds::parse($id), $request->validated(), $request->attributes->get('request_id'));
+        $newsItem = $result->newsItem;
 
-        return response()->json(['data' => (new NewsItemResource($newsItem))->resolve($request), 'request_id' => $request->attributes->get('request_id')]);
+        return response()->json(['data' => (new NewsItemResource($newsItem))->resolve($request), 'warnings' => $result->warnings, 'request_id' => $request->attributes->get('request_id')]);
     }
 
     public function destroy(Request $request, string $id, DeleteNewsItem $delete): Response

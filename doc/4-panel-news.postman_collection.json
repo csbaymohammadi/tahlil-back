@@ -316,11 +316,12 @@
               ]
             },
             "url": "{{apiRoot}}/content-imports",
-            "description": "Choose one .doc or .docx file. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes."
+            "description": "Choose one .doc or .docx file. For News, use /tahlilpanel/templates/news-import-v2.docx: عنوان، عنوان انگلیسی، توضیحات، تصویر، محتوا، توضیحات متا; دسته‌بندی and زمان مطالعه may follow. Only title and English title are required; optional-field issues return Persian warnings. Do not set Content-Type manually; Postman supplies the multipart boundary. Keep the same key only when retrying the exact same bytes. New errors are Persian JSON without a report."
           }
         },
         {
-          "name": "Download validation report",
+          "name": "Download historical validation report",
+          "description": "Only reports created by older News imports are available here. New imports return Persian JSON errors and do not create report files.",
           "request": {
             "method": "GET",
             "header": [

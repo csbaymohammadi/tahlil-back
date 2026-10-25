@@ -1,0 +1,339 @@
+{
+  "info": {
+    "name": "Tahlil Panel Forex Brokers API",
+    "description": "Private session-authenticated API examples. Set sessionCookie and csrfToken after panel login. Create and patch requests update itemId/expectedVersion automatically; category create updates categoryId/categoryExpectedVersion.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000/api/v1/admin"
+    },
+    {
+      "key": "sessionCookie",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "itemId",
+      "value": "1"
+    },
+    {
+      "key": "expectedVersion",
+      "value": "1"
+    },
+    {
+      "key": "categoryId",
+      "value": "1"
+    },
+    {
+      "key": "targetCategoryId",
+      "value": "2"
+    },
+    {
+      "key": "categoryExpectedVersion",
+      "value": "1"
+    },
+    {
+      "key": "targetCategoryExpectedVersion",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "List profiles",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/items?page=1&per_page=10&q="
+      }
+    },
+    {
+      "name": "Get profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/items/{{itemId}}"
+      }
+    },
+    {
+      "name": "Create profile (all 24 specification keys)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/items",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Example Forex Broker\",\n  \"english_name\": \"Example Broker\",\n  \"slug\": \"example-forex-broker\",\n  \"description\": \"API example only.\",\n  \"category_id\": 1,\n  \"specifications\": {\n    \"established_at\": \"\",\n    \"head_office_address\": \"\",\n    \"physical_branch_count\": \"\",\n    \"years_active\": \"\",\n    \"minimum_deposit\": \"\",\n    \"maximum_withdrawal\": \"\",\n    \"in_person_visit\": \"yes\",\n    \"address_transparency\": \"yes\",\n    \"active_social_media\": \"yes\",\n    \"around_the_clock_support\": \"yes\",\n    \"support_availability\": \"yes\",\n    \"copy_trading\": \"yes\",\n    \"identity_documents\": \"\",\n    \"dedicated_app\": \"yes\",\n    \"trading_platform\": \"\",\n    \"account_types\": \"\",\n    \"account_currency\": \"\",\n    \"trading_fee\": \"\",\n    \"registration_fee\": \"\",\n    \"spread\": \"\",\n    \"inamad\": \"yes\",\n    \"virtual_business_union\": \"yes\",\n    \"computer_trade_organization\": \"yes\",\n    \"regulator\": \"\"\n  },\n  \"content\": \"<h2>Overview</h2><p>Editorial review.</p>\",\n  \"meta_description\": \"Example profile for API integration.\",\n  \"status\": \"draft\",\n  \"logo\": \"/images/brokers/example.png\",\n  \"website_url\": \"https://broker.example/\",\n  \"founded_year\": \"2007\",\n  \"platforms\": \"MetaTrader 5\",\n  \"markets\": \"Forex and CFDs\",\n  \"access\": \"Web and mobile\",\n  \"account_currency\": \"USD and EUR\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const profile = pm.response.json().data;",
+              "  pm.collectionVariables.set('itemId', String(profile.id));",
+              "  pm.collectionVariables.set('expectedVersion', String(profile.version));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patch profile (partial specifications)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/items/{{itemId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expected_version\": {{expectedVersion}},\n  \"status\": \"published\",\n  \"specifications\": {\n    \"regulator\": \"Updated value\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const profile = pm.response.json().data;",
+              "  pm.collectionVariables.set('expectedVersion', String(profile.version));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Soft-delete profile",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/items/{{itemId}}?expected_version={{expectedVersion}}"
+      }
+    },
+    {
+      "name": "List categories",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/categories?q="
+      }
+    },
+    {
+      "name": "Get category",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/categories/{{categoryId}}"
+      }
+    },
+    {
+      "name": "Create category",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/categories",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Example category\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const category = pm.response.json().data;",
+              "  pm.collectionVariables.set('categoryId', String(category.id));",
+              "  pm.collectionVariables.set('categoryExpectedVersion', String(category.version));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete category and uncategorize profiles",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/categories/{{categoryId}}?expected_version={{categoryExpectedVersion}}"
+      }
+    },
+    {
+      "name": "Merge category into another",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "tahlil-panel-session-v2={{sessionCookie}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-CSRF-Token",
+            "value": "{{csrfToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/brokers/categories/{{categoryId}}/merge",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expected_version\": {{categoryExpectedVersion}},\n  \"target_category_id\": {{targetCategoryId}},\n  \"target_expected_version\": {{targetCategoryExpectedVersion}}\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

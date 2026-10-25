@@ -123,11 +123,13 @@ class NewsMutationConcurrencyTest extends PanelTestCase
             $this->assertContains($statuses, [[409, 422], [422, 422]]);
             $this->assertDatabaseCount('blog_content_imports', 1);
             $this->assertDatabaseCount('news_items', 0);
-            $this->assertDatabaseCount('blog_import_reports', 1);
+            $this->assertDatabaseCount('blog_import_reports', 0);
             if ($statuses === [422, 422]) {
                 $first = json_decode($results['first-import']['body'], true, 64, JSON_THROW_ON_ERROR);
                 $retry = json_decode($results['retry-import']['body'], true, 64, JSON_THROW_ON_ERROR);
-                $this->assertSame($first['error']['report']['id'], $retry['error']['report']['id']);
+                $this->assertSame($first['error']['issues'], $retry['error']['issues']);
+                $this->assertArrayNotHasKey('report', $first['error']);
+                $this->assertArrayNotHasKey('report', $retry['error']);
             }
         } finally {
             if (is_file($temporaryFile)) {

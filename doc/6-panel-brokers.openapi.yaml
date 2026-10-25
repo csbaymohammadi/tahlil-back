@@ -1,0 +1,456 @@
+openapi: 3.1.0
+info:
+  title: Tahlil Panel Forex Brokers API
+  version: 1.0.0
+  description: Private forex broker administration API. Mutations require the panel session and X-CSRF-Token.
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development
+security:
+  - PanelSession: []
+paths:
+  /brokers/items:
+    get:
+      operationId: listBrokers
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, enum: [10, 20, 50], default: 10 } }
+        - { name: q, in: query, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: Paginated administrative broker rows.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerAdminListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      operationId: createBroker
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BrokerCreate' } } }
+      responses:
+        '201':
+          description: Created detail; Location points to the new item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerAdminResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /brokers/items/{broker_id}:
+    parameters:
+      - { name: broker_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getBroker
+      responses:
+        '200':
+          description: Full administrative detail, including all 24 specifications.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerAdminResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    patch:
+      operationId: updateBroker
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BrokerPatch' } } }
+      responses:
+        '200':
+          description: Canonical updated detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerAdminResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      operationId: deleteBroker
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expected_version, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Soft-deleted. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /brokers/categories:
+    get:
+      operationId: listBrokerCategories
+      parameters: [{ name: q, in: query, schema: { type: string, maxLength: 200 } }]
+      responses:
+        '200':
+          description: Complete live category list with broker_count.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerCategoryListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      operationId: createBrokerCategory
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties: { name: { type: string, minLength: 1, maxLength: 80 } }
+      responses:
+        '201':
+          description: Category created with a generated stable key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerCategoryResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /brokers/categories/{category_id}:
+    parameters:
+      - { name: category_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getBrokerCategory
+      responses:
+        '200':
+          description: Current category and version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerCategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    delete:
+      operationId: deleteBrokerCategory
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expected_version, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Category deleted; brokers uncategorized and affected_broker_count returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerCategoryMutationResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /brokers/categories/{category_id}/merge:
+    post:
+      operationId: mergeBrokerCategory
+      parameters:
+        - { name: category_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, target_category_id, target_expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                target_category_id: { type: integer, minimum: 1 }
+                target_expected_version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Source merged; moved_broker_count returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BrokerCategoryMutationResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+components:
+  securitySchemes:
+    PanelSession: { type: apiKey, in: cookie, name: tahlil-panel-session-v2 }
+  parameters:
+    CsrfToken: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+  schemas:
+    SpecificationText: { type: string, maxLength: 1500 }
+    SpecificationStatus: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], maxLength: 1500 }
+    BrokerAdminCategory:
+      oneOf:
+        - type: object
+          required: [id, name, key]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            key: { type: string }
+        - type: 'null'
+    BrokerAdminItem:
+      type: object
+      required: [id, title, english_name, slug, description, logo, website_url, founded_year, platforms, markets, access, account_currency, status, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 200 }
+        english_name: { type: string, maxLength: 200 }
+        slug: { type: string, maxLength: 200 }
+        description: { type: string }
+        logo: { type: string, maxLength: 2048 }
+        website_url: { type: string, maxLength: 2048 }
+        founded_year: { type: string, maxLength: 4 }
+        platforms: { type: string, maxLength: 1500 }
+        markets: { type: string, maxLength: 1500 }
+        access: { type: string, maxLength: 1500 }
+        account_currency: { type: string, maxLength: 1500 }
+        status: { type: string, enum: [draft, published] }
+        author:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            - type: 'null'
+        category_id: { type: [integer, 'null'] }
+        category: { $ref: '#/components/schemas/BrokerAdminCategory' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        public_path: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+    BrokerAdminDetail:
+      allOf:
+        - $ref: '#/components/schemas/BrokerAdminItem'
+        - type: object
+          required: [content, meta_description, specifications]
+          properties:
+            content: { type: string, x-maxBytes: 1048576 }
+            meta_description: { type: string, maxLength: 500 }
+            specifications: { $ref: '#/components/schemas/BrokerSpecifications' }
+    BrokerAdminResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/BrokerAdminDetail' }
+        request_id: { type: string }
+    BrokerAdminListResponse:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/BrokerAdminItem' }
+        meta:
+          type: object
+          required: [page, per_page, total, total_pages]
+          properties:
+            page: { type: integer }
+            per_page: { type: integer, enum: [10, 20, 50] }
+            total: { type: integer }
+            total_pages: { type: integer }
+        request_id: { type: string }
+    BrokerCategory:
+      type: object
+      required: [id, name, key, broker_count, created_at, updated_at, version]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 80 }
+        key: { type: string, maxLength: 100 }
+        broker_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    BrokerCategoryResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/BrokerCategory' }
+        request_id: { type: string }
+    BrokerCategoryListResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/BrokerCategory' }
+        request_id: { type: string }
+    BrokerCategoryMutationResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          oneOf:
+            - type: object
+              required: [deleted_category_id, affected_broker_count]
+              properties:
+                deleted_category_id: { type: integer }
+                affected_broker_count: { type: integer }
+            - type: object
+              required: [source_category_id, target_category_id, moved_broker_count]
+              properties:
+                source_category_id: { type: integer }
+                target_category_id: { type: integer }
+                moved_broker_count: { type: integer }
+        request_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        request_id: { type: string }
+    BrokerSpecifications:
+      type: object
+      additionalProperties: false
+      properties:
+        established_at: { $ref: '#/components/schemas/SpecificationText' }
+        head_office_address: { $ref: '#/components/schemas/SpecificationText' }
+        physical_branch_count: { $ref: '#/components/schemas/SpecificationText' }
+        years_active: { $ref: '#/components/schemas/SpecificationText' }
+        minimum_deposit: { $ref: '#/components/schemas/SpecificationText' }
+        maximum_withdrawal: { $ref: '#/components/schemas/SpecificationText' }
+        in_person_visit: { $ref: '#/components/schemas/SpecificationStatus' }
+        address_transparency: { $ref: '#/components/schemas/SpecificationStatus' }
+        active_social_media: { $ref: '#/components/schemas/SpecificationStatus' }
+        around_the_clock_support: { $ref: '#/components/schemas/SpecificationStatus' }
+        support_availability: { $ref: '#/components/schemas/SpecificationStatus' }
+        copy_trading: { $ref: '#/components/schemas/SpecificationStatus' }
+        identity_documents: { $ref: '#/components/schemas/SpecificationText' }
+        dedicated_app: { $ref: '#/components/schemas/SpecificationStatus' }
+        trading_platform: { $ref: '#/components/schemas/SpecificationText' }
+        account_types: { $ref: '#/components/schemas/SpecificationText' }
+        account_currency: { $ref: '#/components/schemas/SpecificationText' }
+        trading_fee: { $ref: '#/components/schemas/SpecificationText' }
+        registration_fee: { $ref: '#/components/schemas/SpecificationText' }
+        spread: { $ref: '#/components/schemas/SpecificationText' }
+        inamad: { $ref: '#/components/schemas/SpecificationStatus' }
+        virtual_business_union: { $ref: '#/components/schemas/SpecificationStatus' }
+        computer_trade_organization: { $ref: '#/components/schemas/SpecificationStatus' }
+        regulator: { $ref: '#/components/schemas/SpecificationText' }
+    BrokerCreate:
+      type: object
+      additionalProperties: false
+      required: [title, english_name, slug, logo, website_url, category_id, content, status]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        english_name: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
+        description: { type: string, maxLength: 2000, default: '' }
+        logo: { type: string, minLength: 1, maxLength: 2048 }
+        website_url: { type: string, format: uri, maxLength: 2048 }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$' }
+        platforms: { type: string, maxLength: 1500, default: '' }
+        markets: { type: string, maxLength: 1500, default: '' }
+        access: { type: string, maxLength: 1500, default: '' }
+        account_currency: { type: string, maxLength: 1500, default: '' }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        specifications: { $ref: '#/components/schemas/BrokerSpecifications' }
+        content: { type: string, maxLength: 1048576, x-maxBytes: 1048576 }
+        meta_description: { type: string, maxLength: 500, default: '' }
+        status: { type: string, enum: [draft, published] }
+    BrokerPatch:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        english_name: { type: string, minLength: 1, maxLength: 200 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        logo: { type: string, minLength: 1, maxLength: 2048 }
+        website_url: { type: string, format: uri, maxLength: 2048 }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$' }
+        platforms: { type: string, maxLength: 1500 }
+        markets: { type: string, maxLength: 1500 }
+        access: { type: string, maxLength: 1500 }
+        account_currency: { type: string, maxLength: 1500 }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        specifications: { $ref: '#/components/schemas/BrokerSpecifications' }
+        content: { type: string, maxLength: 1048576, x-maxBytes: 1048576 }
+        meta_description: { type: string, maxLength: 500 }
+        status: { type: string, enum: [draft, published] }
+  responses:
+    Unauthenticated:
+      description: 401 UNAUTHENTICATED.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: 403 FORBIDDEN or CSRF_INVALID.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: 409 SLUG_TAKEN, CATEGORY_NAME_TAKEN, or VERSION_CONFLICT.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    PayloadTooLarge:
+      description: 413 PAYLOAD_TOO_LARGE.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ValidationFailed:
+      description: 422 VALIDATION_FAILED with dot-path field errors.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: 429 RATE_LIMITED.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

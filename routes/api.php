@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BlogArticleController;
 use App\Http\Controllers\Admin\BlogCategoryController;
+use App\Http\Controllers\Admin\BrokerCategoryController;
+use App\Http\Controllers\Admin\BrokerController;
 use App\Http\Controllers\Admin\ContentImportController;
 use App\Http\Controllers\Admin\ExchangeCategoryController;
 use App\Http\Controllers\Admin\ExchangeItemController;
@@ -10,6 +12,8 @@ use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\NewsCategoryController;
 use App\Http\Controllers\Admin\NewsItemController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\StockBrokerageCategoryController;
+use App\Http\Controllers\Admin\StockBrokerageController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Middleware\PanelRequest;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +78,32 @@ Route::prefix('v1/admin/exchanges')->name('panel.exchanges.')->middleware(PanelR
     Route::post('categories', [ExchangeCategoryController::class, 'store'])->name('categories.store');
     Route::delete('categories/{id}', [ExchangeCategoryController::class, 'destroy'])->name('categories.destroy');
     Route::post('categories/{id}/merge', [ExchangeCategoryController::class, 'merge'])->name('categories.merge');
+});
+
+Route::prefix('v1/admin/brokers')->name('panel.brokers.')->middleware(PanelRequest::class)->group(function (): void {
+    Route::get('items', [BrokerController::class, 'index'])->name('items.index');
+    Route::get('items/{id}', [BrokerController::class, 'show'])->name('items.show');
+    Route::post('items', [BrokerController::class, 'store'])->name('items.store');
+    Route::patch('items/{id}', [BrokerController::class, 'update'])->name('items.update');
+    Route::delete('items/{id}', [BrokerController::class, 'destroy'])->name('items.destroy');
+    Route::get('categories', [BrokerCategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{id}', [BrokerCategoryController::class, 'show'])->name('categories.show');
+    Route::post('categories', [BrokerCategoryController::class, 'store'])->name('categories.store');
+    Route::delete('categories/{id}', [BrokerCategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('categories/{id}/merge', [BrokerCategoryController::class, 'merge'])->name('categories.merge');
+});
+
+Route::prefix('v1/admin/stock-brokers')->name('panel.stock-brokers.')->middleware(PanelRequest::class)->group(function (): void {
+    Route::get('items', [StockBrokerageController::class, 'index'])->name('items.index');
+    Route::get('items/{id}', [StockBrokerageController::class, 'show'])->name('items.show');
+    Route::post('items', [StockBrokerageController::class, 'store'])->name('items.store');
+    Route::patch('items/{id}', [StockBrokerageController::class, 'update'])->name('items.update');
+    Route::delete('items/{id}', [StockBrokerageController::class, 'destroy'])->name('items.destroy');
+    Route::get('categories', [StockBrokerageCategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{id}', [StockBrokerageCategoryController::class, 'show'])->name('categories.show');
+    Route::post('categories', [StockBrokerageCategoryController::class, 'store'])->name('categories.store');
+    Route::delete('categories/{id}', [StockBrokerageCategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('categories/{id}/merge', [StockBrokerageCategoryController::class, 'merge'])->name('categories.merge');
 });
 
 Route::prefix('v1/admin')->name('panel.content-imports.')->middleware(PanelRequest::class)->group(function (): void {

@@ -34,8 +34,10 @@ class PanelRequest
         $contentImport = $request->routeIs('panel.content-imports.store');
         $newsItemMutation = $request->routeIs('panel.news.items.store', 'panel.news.items.update');
         $exchangeItemMutation = $request->routeIs('panel.exchanges.items.store', 'panel.exchanges.items.update');
+        $brokerItemMutation = $request->routeIs('panel.brokers.items.store', 'panel.brokers.items.update');
+        $stockBrokerageItemMutation = $request->routeIs('panel.stock-brokers.items.store', 'panel.stock-brokers.items.update');
         $multipart = $mediaUpload || $contentImport;
-        $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') || $newsItemMutation || $exchangeItemMutation ? 2 * 1024 * 1024 : 16384;
+        $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') || $newsItemMutation || $exchangeItemMutation || $brokerItemMutation || $stockBrokerageItemMutation ? 2 * 1024 * 1024 : 16384;
         $raw = $multipart ? '' : $request->getContent();
         if (! $multipart && (strlen($raw) > $bodyLimit || (int) $request->header('Content-Length', 0) > $bodyLimit)) {
             throw new PanelAuthException(413, 'PAYLOAD_TOO_LARGE', 'The request body exceeds the endpoint size limit.');
@@ -84,7 +86,9 @@ class PanelRequest
             $request->routeIs('panel.news.categories.index') => ['q'],
             $request->routeIs('panel.exchanges.items.index') => ['page', 'per_page', 'q'],
             $request->routeIs('panel.exchanges.categories.index') => ['q'],
-            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy') => ['expected_version'],
+            $request->routeIs('panel.brokers.items.index', 'panel.stock-brokers.items.index') => ['page', 'per_page', 'q'],
+            $request->routeIs('panel.brokers.categories.index', 'panel.stock-brokers.categories.index') => ['q'],
+            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy', 'panel.brokers.items.destroy', 'panel.brokers.categories.destroy', 'panel.stock-brokers.items.destroy', 'panel.stock-brokers.categories.destroy') => ['expected_version'],
             default => [],
         };
         if (array_diff(array_keys($request->query->all()), $allowedQuery) !== []) {

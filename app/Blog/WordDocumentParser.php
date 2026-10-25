@@ -34,12 +34,15 @@ class WordDocumentParser
 
     private string $imageNamePrefix = '';
 
+    private string $contentLabel = 'مقاله';
+
     /** @return array{fields: array<string, mixed>, images: array<string, array{token: string, bytes: string, mime: string, name: string, width: int, height: int, animated: bool}>, warnings: list<array{field: string, code: string, message: string}>} */
     public function parse(string $path, string $contentType = 'blog'): array
     {
         if (! in_array($contentType, ['blog', 'news'], true)) {
             throw new \InvalidArgumentException('Unsupported content import module.');
         }
+        $this->contentLabel = $contentType === 'news' ? 'خبر' : 'مقاله';
         $this->relationships = [];
         $this->imageTokens = [];
         $this->images = [];
@@ -77,8 +80,8 @@ class WordDocumentParser
 
             $blocks = $this->children($body);
             $this->loadListTypes($zip);
-            if ($contentType === 'blog' && ! $this->hasLegacyTemplateMarker($blocks) && $this->hasPersianBlogSections($blocks)) {
-                return ['fields' => $this->parsePersianBlogSections($blocks, $zip), 'images' => $this->images, 'warnings' => $this->warnings];
+            if (! $this->hasLegacyTemplateMarker($blocks) && $this->hasPersianSections($blocks)) {
+                return ['fields' => $this->parsePersianSections($blocks, $zip), 'images' => $this->images, 'warnings' => $this->warnings];
             }
 
             $markerLocations = $this->markerLocations($blocks);
@@ -103,7 +106,7 @@ class WordDocumentParser
                 }
             }
             if (count($metadataTables) !== 1) {
-                $this->fail('METADATA_TABLE_INVALID', 'template', 'جدول ثابت اطلاعات مقاله پیدا نشد یا بیش از یک جدول وجود دارد.', 'جدول اطلاعات مقاله');
+                $this->fail('METADATA_TABLE_INVALID', 'template', 'جدول ثابت اطلاعات محتوا پیدا نشد یا بیش از یک جدول وجود دارد.', 'جدول اطلاعات محتوا');
             }
             $fields = $this->metadata($metadataTables[0]);
             $coverNodes = array_slice($blocks, $positions[2] + 1, $positions[3] - $positions[2] - 1);
@@ -130,7 +133,7 @@ class WordDocumentParser
             $contentNodes = array_slice($blocks, $positions[3] + 1);
             $html = $this->renderBlocks($contentNodes);
             if (strlen($html) > 1_048_576) {
-                $this->fail('CONTENT_TOO_LARGE', 'content', 'متن مقاله از سقف یک مگابایت بیشتر است.', 'بخش متن مقاله');
+                $this->fail('CONTENT_TOO_LARGE', 'content', 'متن '.$this->contentLabel.' از سقف یک مگابایت بیشتر است.', 'بخش متن '.$this->contentLabel);
             }
             $fields['cover_image'] = $coverToken;
             $fields['content'] = $html;
@@ -288,7 +291,7 @@ class WordDocumentParser
     }
 
     /** @param list<DOMNode> $blocks */
-    private function hasPersianBlogSections(array $blocks): bool
+    private function hasPersianSections(array $blocks): bool
     {
         $known = ['عنوان', 'عنوان انگلیسی', 'توضیحات', 'تصویر', 'محتوا', 'توضیحات متا', 'دسته‌بندی', 'زمان مطالعه'];
         foreach ($blocks as $block) {
@@ -315,7 +318,7 @@ class WordDocumentParser
     /** @param list<DOMNode> $blocks
      * @return array{title: string, slug: string, description: string, category_name: string, reading_minutes: string, cover_image: string, content: string, meta_description: string}
      */
-    private function parsePersianBlogSections(array $blocks, ZipArchive $zip): array
+    private function parsePersianSections(array $blocks, ZipArchive $zip): array
     {
         $labels = [
             'title' => 'عنوان',
@@ -392,13 +395,13 @@ class WordDocumentParser
                         $values['cover_image'] = $this->image($zip, $references[0]);
                     } catch (WordImportValidationException) {
                         $this->pixelTotal = $pixelsBefore;
-                        $this->warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_IGNORED', 'message' => 'تصویر جلد قابل‌استفاده نبود و مقاله بدون تصویر جلد ذخیره می‌شود.'];
+                        $this->warnings[] = ['field' => 'cover_image', 'code' => 'COVER_IMAGE_IGNORED', 'message' => 'تصویر جلد قابل‌استفاده نبود و '.$this->contentLabel.' بدون تصویر جلد ذخیره می‌شود.'];
                     }
                 }
             } elseif ($field === 'content') {
                 $values['content'] = $this->renderBlocks($nodes);
                 if (strlen($values['content']) > 1_048_576) {
-                    $this->fail('CONTENT_TOO_LARGE', 'content', 'متن مقاله از سقف یک مگابایت بیشتر است.', 'محتوا');
+                    $this->fail('CONTENT_TOO_LARGE', 'content', 'متن '.$this->contentLabel.' از سقف یک مگابایت بیشتر است.', 'محتوا');
                 }
             } else {
                 $text = $this->sectionText($nodes);
@@ -440,14 +443,14 @@ class WordDocumentParser
             $cells = $this->childrenByName($row, 'tc');
             $cellTexts = array_map(fn (DOMNode $cell): string => trim($this->text($cell)), $cells);
             if (count($cellTexts) !== 3) {
-                $this->fail('METADATA_ROW_INVALID', 'template', 'سطر جدول اطلاعات باید سه ستون داشته باشد.', 'جدول اطلاعات مقاله');
+                $this->fail('METADATA_ROW_INVALID', 'template', 'سطر جدول اطلاعات باید سه ستون داشته باشد.', 'جدول اطلاعات محتوا');
             }
             $key = $cellTexts[1];
             if ($key === '') {
-                $this->fail('METADATA_KEY_MISSING', 'template', 'کلید ثابت یکی از ردیف‌های اطلاعات خالی است.', 'جدول اطلاعات مقاله');
+                $this->fail('METADATA_KEY_MISSING', 'template', 'کلید ثابت یکی از ردیف‌های اطلاعات خالی است.', 'جدول اطلاعات محتوا');
             }
             if (! in_array($key, $expected, true)) {
-                $this->fail('UNKNOWN_METADATA_KEY', 'template', 'کلید اطلاعات ناشناخته است؛ کلیدهای ASCII قالب را تغییر ندهید.', 'جدول اطلاعات مقاله');
+                $this->fail('UNKNOWN_METADATA_KEY', 'template', 'کلید اطلاعات ناشناخته است؛ کلیدهای ASCII قالب را تغییر ندهید.', 'جدول اطلاعات محتوا');
             }
             if (array_key_exists($key, $values)) {
                 $this->fail('DUPLICATE_METADATA_KEY', $key, 'این کلید در جدول اطلاعات دوباره تکرار شده است.', 'ردیف '.$key.' جدول اطلاعات');
@@ -533,7 +536,7 @@ class WordDocumentParser
             } elseif ($this->is($block, 'sectPr')) {
                 continue;
             } else {
-                $this->fail('UNSUPPORTED_WORD_STRUCTURE', 'content', 'در بخش متن ساختار پشتیبانی‌نشده‌ای وجود دارد.', 'بخش متن مقاله');
+                $this->fail('UNSUPPORTED_WORD_STRUCTURE', 'content', 'در بخش متن ساختار پشتیبانی‌نشده‌ای وجود دارد.', 'بخش متن '.$this->contentLabel);
             }
         }
         if ($openList !== null) {
@@ -567,7 +570,7 @@ class WordDocumentParser
                 $relationshipId = $child instanceof DOMElement ? $child->getAttributeNS(self::R, 'id') : '';
                 $relationship = $this->relationships[$relationshipId] ?? null;
                 if (! $relationship || ! $relationship['external'] || ! str_ends_with($relationship['type'], '/hyperlink')) {
-                    $this->fail('WORD_HYPERLINK_INVALID', 'content', 'پیوند موجود در سند معتبر نیست.', 'بخش متن مقاله');
+                    $this->fail('WORD_HYPERLINK_INVALID', 'content', 'پیوند موجود در سند معتبر نیست.', 'بخش متن '.$this->contentLabel);
                 }
                 $href = $relationship['target'];
                 $html .= '<a href="'.htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">'.$this->renderInline($child).'</a>';
@@ -623,7 +626,7 @@ class WordDocumentParser
     {
         $blip = $drawing instanceof DOMElement ? $drawing->getElementsByTagNameNS(self::A, 'blip')->item(0) : null;
         if (! $blip instanceof DOMElement) {
-            $this->fail('WORD_IMAGE_INVALID', 'content', 'تصویر تعبیه‌شدهٔ سند خوانده نمی‌شود.', 'تصویر متن مقاله');
+            $this->fail('WORD_IMAGE_INVALID', 'content', 'تصویر تعبیه‌شدهٔ سند خوانده نمی‌شود.', 'تصویر متن '.$this->contentLabel);
         }
         $relationshipId = $blip->getAttributeNS(self::R, 'embed');
         $token = $this->image($this->currentZip(), $relationshipId);
@@ -651,7 +654,7 @@ class WordDocumentParser
         }
         $relationship = $this->relationships[$relationshipId] ?? null;
         if (! $relationship || $relationship['external'] || ! str_ends_with($relationship['type'], '/image')) {
-            $this->fail('WORD_IMAGE_INVALID', 'content', 'تصویر متن مقاله باید داخل خود سند Word تعبیه شده باشد.', 'تصویر متن مقاله');
+            $this->fail('WORD_IMAGE_INVALID', 'content', 'تصویر متن '.$this->contentLabel.' باید داخل خود سند Word تعبیه شده باشد.', 'تصویر متن '.$this->contentLabel);
         }
         $bytes = $zip->getFromName($relationship['target']);
         if (! is_string($bytes) || $bytes === '') {
@@ -687,23 +690,23 @@ class WordDocumentParser
     {
         $rows = $this->childrenByName($table, 'tr');
         if (count($rows) > 200) {
-            $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'جدول سند نمی‌تواند بیش از ۲۰۰ ردیف داشته باشد.', 'جدول متن مقاله');
+            $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'جدول سند نمی‌تواند بیش از ۲۰۰ ردیف داشته باشد.', 'جدول متن '.$this->contentLabel);
         }
         $html = '<table><tbody>';
         foreach ($rows as $row) {
             $cells = $this->childrenByName($row, 'tc');
             if (count($cells) > 50) {
-                $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'جدول سند نمی‌تواند بیش از ۵۰ ستون داشته باشد.', 'جدول متن مقاله');
+                $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'جدول سند نمی‌تواند بیش از ۵۰ ستون داشته باشد.', 'جدول متن '.$this->contentLabel);
             }
             $html .= '<tr>';
             foreach ($cells as $cell) {
                 if ($cell->getElementsByTagNameNS(self::W, 'vMerge')->length > 0) {
-                    $this->fail('WORD_TABLE_UNSUPPORTED', 'content', 'ادغام عمودی سلول‌های جدول پشتیبانی نمی‌شود؛ جدول را ساده کنید.', 'جدول متن مقاله');
+                    $this->fail('WORD_TABLE_UNSUPPORTED', 'content', 'ادغام عمودی سلول‌های جدول پشتیبانی نمی‌شود؛ جدول را ساده کنید.', 'جدول متن '.$this->contentLabel);
                 }
                 $span = $cell->getElementsByTagNameNS(self::W, 'gridSpan')->item(0);
                 $colspan = $span instanceof DOMElement ? (int) $span->getAttributeNS(self::W, 'val') : 1;
                 if ($colspan > 50 || $colspan < 1) {
-                    $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'گسترهٔ یک سلول جدول از حد مجاز بیشتر است.', 'جدول متن مقاله');
+                    $this->fail('WORD_TABLE_TOO_LARGE', 'content', 'گسترهٔ یک سلول جدول از حد مجاز بیشتر است.', 'جدول متن '.$this->contentLabel);
                 }
                 $html .= '<td'.($colspan > 1 ? ' colspan="'.$colspan.'"' : '').'>'.$this->renderBlocks($this->children($cell)).'</td>';
             }
@@ -740,12 +743,12 @@ class WordDocumentParser
         }
         $level = $numbering->getElementsByTagNameNS(self::W, 'ilvl')->item(0);
         if ($level instanceof DOMElement && $level->getAttributeNS(self::W, 'val') !== '0') {
-            $this->fail('WORD_NESTED_LIST_UNSUPPORTED', 'content', 'فهرست‌های چندسطحی را پیش از ورود به فهرست تک‌سطحی تبدیل کنید.', 'فهرست متن مقاله');
+            $this->fail('WORD_NESTED_LIST_UNSUPPORTED', 'content', 'فهرست‌های چندسطحی را پیش از ورود به فهرست تک‌سطحی تبدیل کنید.', 'فهرست متن '.$this->contentLabel);
         }
         $numberId = $numbering->getElementsByTagNameNS(self::W, 'numId')->item(0);
         $id = $numberId instanceof DOMElement ? $numberId->getAttributeNS(self::W, 'val') : '';
         if (! isset($this->listTypes[$id])) {
-            $this->fail('WORD_LIST_UNSUPPORTED', 'content', 'نوع فهرست Word پشتیبانی نمی‌شود.', 'فهرست متن مقاله');
+            $this->fail('WORD_LIST_UNSUPPORTED', 'content', 'نوع فهرست Word پشتیبانی نمی‌شود.', 'فهرست متن '.$this->contentLabel);
         }
 
         return $this->listTypes[$id];
@@ -775,7 +778,7 @@ class WordDocumentParser
     {
         $parts = parse_url($url);
         if (! is_array($parts) || ! in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https', 'mailto', 'tel'], true) || isset($parts['user']) || isset($parts['pass'])) {
-            $this->fail('WORD_LINK_UNSAFE', 'content', 'سند شامل پیوند ناامن یا پشتیبانی‌نشده است.', 'پیوند متن مقاله');
+            $this->fail('WORD_LINK_UNSAFE', 'content', 'سند شامل پیوند ناامن یا پشتیبانی‌نشده است.', 'پیوند متن '.$this->contentLabel);
         }
     }
 

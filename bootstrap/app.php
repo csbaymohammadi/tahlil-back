@@ -90,8 +90,9 @@ return Application::configure(basePath: dirname(__DIR__))
             } else {
                 [$status, $code, $message] = [500, 'INTERNAL_ERROR', 'An unexpected error occurred.'];
             }
-            if ($request->routeIs('panel.blog.articles.*', 'panel.content-imports.store', 'panel.content-imports.report')) {
-                $presented = app(BlogApiErrorPresenter::class)->present($code, $message, $fields);
+            if ($request->routeIs('panel.blog.articles.*', 'panel.news.items.*', 'panel.content-imports.store', 'panel.content-imports.report')) {
+                $contentType = $request->routeIs('panel.news.items.*') || ($request->routeIs('panel.content-imports.store') && $request->input('content_type') === 'news') ? 'news' : 'blog';
+                $presented = app(BlogApiErrorPresenter::class)->present($code, $message, $fields, $contentType);
                 $message = $presented['message'];
                 $fields = $presented['fields'];
             }

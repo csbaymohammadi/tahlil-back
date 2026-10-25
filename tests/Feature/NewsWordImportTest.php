@@ -56,7 +56,7 @@ class NewsWordImportTest extends PanelTestCase
         ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => $key])->assertNotFound()->assertJsonPath('error.code', 'IMPORT_RESULT_NOT_FOUND');
     }
 
-    public function test_invalid_docx_returns_downloadable_private_report_and_replays_issues(): void
+    public function test_invalid_docx_returns_persian_json_without_a_report_and_replays_issues(): void
     {
         Storage::fake('media');
         $actor = User::factory()->panel()->create();
@@ -65,36 +65,15 @@ class NewsWordImportTest extends PanelTestCase
         $upload = UploadedFile::fake()->createWithContent('broken.docx', 'not a zip archive');
         $response = $this->post('/api/v1/admin/content-imports', ['content_type' => 'news', 'file' => $upload], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => $key]);
         $response->assertUnprocessable()->assertJsonPath('error.code', 'IMPORT_VALIDATION_FAILED')
-            ->assertJsonPath('error.issues.0.field', 'file');
-        $reportId = $response->json('error.report.id');
-        $this->assertNotEmpty($reportId);
+            ->assertJsonPath('error.issues.0.field', 'file')
+            ->assertJsonPath('error.message', 'فایل یا ساختار سند قابل‌پردازش نیست؛ جزئیات فارسی هر بخش را بررسی کنید.')
+            ->assertJsonMissingPath('error.report');
+        $this->assertDatabaseCount('blog_import_reports', 0);
         $this->assertDatabaseCount('news_items', 0);
-
-        $reportResponse = $this->get('/api/v1/admin/content-imports/reports/'.$reportId)->assertOk()
-            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-            ->assertHeader('Cache-Control', 'max-age=0, no-store, private')
-            ->assertHeader('Content-Disposition')->assertHeader('Content-Disposition', 'attachment; filename=news-import-errors.docx');
-        $reportBytes = $reportResponse->streamedContent();
-        $this->assertIsString($reportBytes);
-        $reportPath = tempnam(sys_get_temp_dir(), 'blog-error-report-test-');
-        $this->assertIsString($reportPath);
-        file_put_contents($reportPath, $reportBytes);
-        $archive = new ZipArchive;
-        $this->assertSame(true, $archive->open($reportPath));
-        $reportXml = (string) $archive->getFromName('word/document.xml');
-        $this->assertStringContainsString('INVALID_WORD_FILE', $reportXml);
-        foreach ($response->json('error.issues') as $issue) {
-            $this->assertStringContainsString(htmlspecialchars($issue['message'], ENT_XML1 | ENT_QUOTES, 'UTF-8'), $reportXml);
-        }
-        $archive->close();
-        unlink($reportPath);
         $this->post('/api/v1/admin/content-imports', [
             'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('broken.docx', 'not a zip archive'),
-        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => $key])->assertUnprocessable()->assertJsonPath('error.report.id', $reportId);
-
-        $other = User::factory()->panel()->create();
-        $this->panel($other);
-        $this->get('/api/v1/admin/content-imports/reports/'.$reportId)->assertNotFound()->assertJsonPath('error.code', 'IMPORT_REPORT_NOT_FOUND');
+        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => $key])->assertUnprocessable()->assertJsonMissingPath('error.report');
+        $this->assertDatabaseCount('blog_import_reports', 0);
     }
 
     public function test_embedded_cover_and_body_image_are_normalized_and_attached_atomically(): void
@@ -177,7 +156,7 @@ class NewsWordImportTest extends PanelTestCase
         $this->assertDatabaseCount('news_items', 0);
     }
 
-    public function test_expired_reports_and_import_keys_are_pruned(): void
+    public function test_expired_import_keys_are_pruned_without_generating_word_reports(): void
     {
         Storage::fake('media');
         $actor = User::factory()->panel()->create();
@@ -185,21 +164,111 @@ class NewsWordImportTest extends PanelTestCase
         $response = $this->post('/api/v1/admin/content-imports', [
             'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('broken.docx', 'not a zip archive'),
         ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => '70587bad-e20e-4385-a332-d3852f204974'])->assertUnprocessable();
-        $reportId = $response->json('error.report.id');
-        $this->assertTrue(Storage::disk('media')->exists('blog-import-reports/'.$reportId.'.docx'));
+        $response->assertJsonMissingPath('error.report');
+        $this->assertDatabaseCount('blog_import_reports', 0);
 
         $this->travel(25)->hours();
         Artisan::call('blog:prune');
 
         $this->assertDatabaseCount('blog_content_imports', 0);
         $this->assertDatabaseCount('blog_import_reports', 0);
-        $this->assertFalse(Storage::disk('media')->exists('blog-import-reports/'.$reportId.'.docx'));
+    }
+
+    public function test_persian_news_template_accepts_empty_optional_fields_and_null_reading_time(): void
+    {
+        Storage::fake('media');
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $bytes = $this->completedPersianTemplate(['title' => 'خبر آزمایشی', 'slug' => 'sample-news']);
+
+        $response = $this->post('/api/v1/admin/content-imports', [
+            'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('خبر.docx', $bytes),
+        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => '2c12a5f8-8d40-46e8-b076-0b5f790bd130'])->assertCreated()
+            ->assertJsonPath('data.record.title', 'خبر آزمایشی')
+            ->assertJsonPath('data.record.slug', 'sample-news')
+            ->assertJsonPath('data.record.description', '')
+            ->assertJsonPath('data.record.cover_image', '')
+            ->assertJsonPath('data.record.content', '')
+            ->assertJsonPath('data.record.meta_description', '')
+            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.reading_minutes', null)
+            ->assertJsonPath('data.record.status', 'draft')
+            ->assertJsonPath('warnings', []);
+
+        $this->assertDatabaseCount('news_items', 1);
+    }
+
+    public function test_provided_persian_news_sample_creates_a_draft(): void
+    {
+        Storage::fake('media');
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $samplePath = base_path('doc/samples/news-word-import-sample-fa.docx');
+        $sample = file_get_contents($samplePath);
+        $this->assertIsString($sample);
+
+        $response = $this->post('/api/v1/admin/content-imports', [
+            'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('نمونه-خبر.docx', $sample),
+        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => '04e6c184-6cf6-4ac7-8f66-2c8013d641cb'])->assertCreated()
+            ->assertJsonPath('data.record.title', 'راهنمای خواندن خبرهای بازار با نگاه دقیق‌تر')
+            ->assertJsonPath('data.record.slug', 'reading-market-news-with-context')
+            ->assertJsonPath('data.record.status', 'draft');
+
+        $this->assertMatchesRegularExpression('/<h2(?:\s|>)/', $response->json('data.record.content'));
+        $this->assertMatchesRegularExpression('/<p(?:\s|>)/', $response->json('data.record.content'));
+        $this->assertDatabaseCount('news_items', 1);
+    }
+
+    public function test_invalid_optional_news_values_are_ignored_with_persian_warnings(): void
+    {
+        Storage::fake('media');
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $bytes = $this->completedPersianTemplate([
+            'title' => 'خبر با هشدار', 'slug' => 'news-with-warnings',
+            'description' => str_repeat('توضیح', 500), 'category_name' => 'دسته ناموجود',
+            'reading_minutes' => 'نامعتبر', 'meta_description' => str_repeat('متا', 300),
+        ]);
+
+        $response = $this->post('/api/v1/admin/content-imports', [
+            'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('خبر.docx', $bytes),
+        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => '52061baf-1b02-4a92-9873-d86db4ab8cb7'])->assertCreated()
+            ->assertJsonPath('data.record.description', '')
+            ->assertJsonPath('data.record.meta_description', '')
+            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.reading_minutes', null);
+
+        $this->assertCount(4, $response->json('warnings'));
+        foreach ($response->json('warnings') as $warning) {
+            $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $warning['message']);
+        }
+    }
+
+    public function test_news_title_and_english_title_remain_required_with_fully_persian_issues(): void
+    {
+        Storage::fake('media');
+        $actor = User::factory()->panel()->create();
+        $this->panel($actor);
+        $bytes = $this->completedPersianTemplate([]);
+
+        $response = $this->post('/api/v1/admin/content-imports', [
+            'content_type' => 'news', 'file' => UploadedFile::fake()->createWithContent('خبر.docx', $bytes),
+        ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => 'b6349dc1-cb1b-4822-9eb9-907d275d51cf'])->assertUnprocessable()
+            ->assertJsonPath('error.code', 'IMPORT_VALIDATION_FAILED')
+            ->assertJsonPath('error.message', 'عنوان و عنوان انگلیسی سند را بررسی و اصلاح کنید.')
+            ->assertJsonMissingPath('error.report');
+
+        $this->assertNotEmpty($response->json('error.issues'));
+        foreach ($response->json('error.issues') as $issue) {
+            $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $issue['label'].$issue['location'].$issue['message']);
+        }
+        $this->assertDatabaseCount('news_items', 0);
     }
 
     /** @param array<string, string> $values */
     private function completedTemplate(array $values, ?string $imageBytes = null): string
     {
-        $template = config('news.template_path');
+        $template = public_path('tahlilpanel/templates/news-import-v1.docx');
         $temporary = tempnam(sys_get_temp_dir(), 'blog-word-test-');
         $this->assertIsString($temporary);
         copy($template, $temporary);
@@ -236,6 +305,51 @@ class NewsWordImportTest extends PanelTestCase
             $archive->addFromString('word/media/import.png', $imageBytes);
         }
         $archive->addFromString('word/document.xml', $xml);
+        $archive->close();
+        $bytes = file_get_contents($temporary);
+        unlink($temporary);
+        $this->assertIsString($bytes);
+
+        return $bytes;
+    }
+
+    /** @param array<string, string> $values */
+    private function completedPersianTemplate(array $values): string
+    {
+        $temporary = tempnam(sys_get_temp_dir(), 'news-persian-word-test-');
+        $this->assertIsString($temporary);
+        copy(config('news.template_path'), $temporary);
+        $archive = new ZipArchive;
+        $this->assertSame(true, $archive->open($temporary));
+        $xml = $archive->getFromName('word/document.xml');
+        $this->assertIsString($xml);
+        $document = new DOMDocument('1.0', 'UTF-8');
+        $this->assertTrue($document->loadXML($xml));
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $sections = [
+            'title' => 'عنوان', 'slug' => 'عنوان انگلیسی', 'description' => 'توضیحات',
+            'cover_image' => 'تصویر', 'content' => 'محتوا', 'meta_description' => 'توضیحات متا',
+            'category_name' => 'دسته‌بندی', 'reading_minutes' => 'زمان مطالعه',
+        ];
+        foreach ($sections as $field => $label) {
+            $heading = $xpath->query('//w:p[normalize-space(string(.))="'.$label.'"]')->item(0);
+            $this->assertNotNull($heading, 'Missing section '.$label);
+            $valueParagraph = $heading->nextSibling;
+            while ($valueParagraph !== null && ($valueParagraph->nodeType !== XML_ELEMENT_NODE || $valueParagraph->localName !== 'p')) {
+                $valueParagraph = $valueParagraph->nextSibling;
+            }
+            $this->assertNotNull($valueParagraph, 'Missing value paragraph for '.$label);
+            $value = $values[$field] ?? '';
+            if ($value !== '') {
+                $run = $document->createElementNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:r');
+                $text = $document->createElementNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'w:t');
+                $text->appendChild($document->createTextNode($value));
+                $run->appendChild($text);
+                $valueParagraph->appendChild($run);
+            }
+        }
+        $archive->addFromString('word/document.xml', $document->saveXML());
         $archive->close();
         $bytes = file_get_contents($temporary);
         unlink($temporary);

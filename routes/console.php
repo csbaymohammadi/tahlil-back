@@ -21,3 +21,7 @@ Schedule::command('news:publish-due')->everyTenSeconds()->runInBackground()->wit
 Schedule::command('news:prune')->hourly()->withoutOverlapping();
 
 Schedule::command('exchanges:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('platform-profiles:prune broker')->hourly()->withoutOverlapping();
+
+Schedule::command('platform-profiles:prune stock-brokers')->hourly()->withoutOverlapping();

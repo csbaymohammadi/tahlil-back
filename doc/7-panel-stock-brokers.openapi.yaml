@@ -1,0 +1,443 @@
+openapi: 3.1.0
+info:
+  title: Tahlil Panel Stock Brokerages API
+  version: 1.0.0
+  description: Private stock brokerage administration API. Mutations require the panel session and X-CSRF-Token.
+servers:
+  - url: http://localhost:8000/api/v1/admin
+    description: Local development
+security:
+  - PanelSession: []
+paths:
+  /stock-brokers/items:
+    get:
+      operationId: listStockBrokerages
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, enum: [10, 20, 50], default: 10 } }
+        - { name: q, in: query, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: Paginated administrative stock brokerage rows.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageAdminListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      operationId: createStockBrokerage
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StockBrokerageCreate' } } }
+      responses:
+        '201':
+          description: Created detail; Location points to the new item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageAdminResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /stock-brokers/items/{stock_broker_id}:
+    parameters:
+      - { name: stock_broker_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getStockBrokerage
+      responses:
+        '200':
+          description: Full administrative detail, including all 24 specifications and fixed kind.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageAdminResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404':
+          description: STOCK_BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    patch:
+      operationId: updateStockBrokerage
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/StockBrokeragePatch' } } }
+      responses:
+        '200':
+          description: Canonical updated detail.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageAdminResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: STOCK_BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      operationId: deleteStockBrokerage
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expected_version, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Soft-deleted. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: STOCK_BROKER_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /stock-brokers/categories:
+    get:
+      operationId: listStockBrokerageCategories
+      parameters: [{ name: q, in: query, schema: { type: string, maxLength: 200 } }]
+      responses:
+        '200':
+          description: Complete live category list with brokerage_count.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageCategoryListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      operationId: createStockBrokerageCategory
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties: { name: { type: string, minLength: 1, maxLength: 80 } }
+      responses:
+        '201':
+          description: Category created. Stock categories have no public key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageCategoryResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /stock-brokers/categories/{category_id}:
+    parameters:
+      - { name: category_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getStockBrokerageCategory
+      responses:
+        '200':
+          description: Current category and version.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageCategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    delete:
+      operationId: deleteStockBrokerageCategory
+      parameters:
+        - { $ref: '#/components/parameters/CsrfToken' }
+        - { name: expected_version, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200':
+          description: Category deleted; brokerages uncategorized and affected_brokerage_count returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageCategoryMutationResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+  /stock-brokers/categories/{category_id}/merge:
+    post:
+      operationId: mergeStockBrokerageCategory
+      parameters:
+        - { name: category_id, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { $ref: '#/components/parameters/CsrfToken' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, target_category_id, target_expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                target_category_id: { type: integer, minimum: 1 }
+                target_expected_version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Source merged; moved_brokerage_count returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StockBrokerageCategoryMutationResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: CATEGORY_NOT_FOUND.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+components:
+  securitySchemes:
+    PanelSession: { type: apiKey, in: cookie, name: tahlil-panel-session-v2 }
+  parameters:
+    CsrfToken: { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+  schemas:
+    SpecificationText: { type: string, maxLength: 1500 }
+    SpecificationStatus: { type: string, enum: ['', 'yes', 'no', 'not-applicable'], maxLength: 1500 }
+    StockBrokerageAdminCategory:
+      oneOf:
+        - type: object
+          required: [id, name]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        - type: 'null'
+    StockBrokerageAdminItem:
+      type: object
+      required: [id, title, english_name, slug, description, logo, website_url, founded_year, kind, status, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        english_name: { type: string, maxLength: 120 }
+        slug: { type: string, maxLength: 120 }
+        description: { type: string }
+        logo: { type: string, maxLength: 2048 }
+        website_url: { type: string, maxLength: 2048 }
+        founded_year: { type: string, maxLength: 4 }
+        kind: { type: string, const: stock-brokers }
+        status: { type: string, enum: [draft, published] }
+        author:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            - type: 'null'
+        category_id: { type: [integer, 'null'] }
+        category: { $ref: '#/components/schemas/StockBrokerageAdminCategory' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        public_path: { type: [string, 'null'] }
+        version: { type: integer, minimum: 1 }
+    StockBrokerageAdminDetail:
+      allOf:
+        - $ref: '#/components/schemas/StockBrokerageAdminItem'
+        - type: object
+          required: [content, meta_description, specifications]
+          properties:
+            content: { type: string, x-maxBytes: 1048576 }
+            meta_description: { type: string, maxLength: 500 }
+            specifications: { $ref: '#/components/schemas/StockBrokerageSpecifications' }
+    StockBrokerageAdminResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/StockBrokerageAdminDetail' }
+        request_id: { type: string }
+    StockBrokerageAdminListResponse:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/StockBrokerageAdminItem' }
+        meta:
+          type: object
+          required: [page, per_page, total, total_pages]
+          properties:
+            page: { type: integer }
+            per_page: { type: integer, enum: [10, 20, 50] }
+            total: { type: integer }
+            total_pages: { type: integer }
+        request_id: { type: string }
+    StockBrokerageCategory:
+      type: object
+      required: [id, name, brokerage_count, created_at, updated_at, version]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 80 }
+        brokerage_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer, minimum: 1 }
+    StockBrokerageCategoryResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/StockBrokerageCategory' }
+        request_id: { type: string }
+    StockBrokerageCategoryListResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/StockBrokerageCategory' }
+        request_id: { type: string }
+    StockBrokerageCategoryMutationResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data:
+          oneOf:
+            - type: object
+              required: [deleted_category_id, affected_brokerage_count]
+              properties:
+                deleted_category_id: { type: integer }
+                affected_brokerage_count: { type: integer }
+            - type: object
+              required: [source_category_id, target_category_id, moved_brokerage_count]
+              properties:
+                source_category_id: { type: integer }
+                target_category_id: { type: integer }
+                moved_brokerage_count: { type: integer }
+        request_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        request_id: { type: string }
+    StockBrokerageSpecifications:
+      type: object
+      additionalProperties: false
+      properties:
+        established_at: { $ref: '#/components/schemas/SpecificationText' }
+        head_office_address: { $ref: '#/components/schemas/SpecificationText' }
+        physical_branch_count: { $ref: '#/components/schemas/SpecificationText' }
+        years_active: { $ref: '#/components/schemas/SpecificationText' }
+        minimum_purchase: { $ref: '#/components/schemas/SpecificationText' }
+        maximum_purchase: { $ref: '#/components/schemas/SpecificationText' }
+        minimum_sale: { $ref: '#/components/schemas/SpecificationText' }
+        maximum_sale: { $ref: '#/components/schemas/SpecificationText' }
+        in_person_visit: { $ref: '#/components/schemas/SpecificationStatus' }
+        address_transparency: { $ref: '#/components/schemas/SpecificationStatus' }
+        active_social_media: { $ref: '#/components/schemas/SpecificationStatus' }
+        around_the_clock_support: { $ref: '#/components/schemas/SpecificationStatus' }
+        support_availability: { $ref: '#/components/schemas/SpecificationStatus' }
+        online_trading: { $ref: '#/components/schemas/SpecificationStatus' }
+        identity_documents: { $ref: '#/components/schemas/SpecificationText' }
+        dedicated_app: { $ref: '#/components/schemas/SpecificationStatus' }
+        trading_platform: { $ref: '#/components/schemas/SpecificationText' }
+        account_opening_documents: { $ref: '#/components/schemas/SpecificationText' }
+        trading_fee: { $ref: '#/components/schemas/SpecificationText' }
+        registration_fee: { $ref: '#/components/schemas/SpecificationText' }
+        inamad: { $ref: '#/components/schemas/SpecificationStatus' }
+        virtual_business_union: { $ref: '#/components/schemas/SpecificationStatus' }
+        computer_trade_organization: { $ref: '#/components/schemas/SpecificationStatus' }
+        regulator: { $ref: '#/components/schemas/SpecificationText' }
+    StockBrokerageCreate:
+      type: object
+      additionalProperties: false
+      required: [title, english_name, slug, category_id, content, status]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        english_name: { type: string, minLength: 1, maxLength: 120 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 120 }
+        description: { type: string, maxLength: 2000, default: '' }
+        logo: { type: string, maxLength: 2048, default: '' }
+        website_url: { oneOf: [{ type: string, const: '' }, { type: string, format: uri }], maxLength: 2048, default: '' }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$', default: '' }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        specifications: { $ref: '#/components/schemas/StockBrokerageSpecifications' }
+        content: { type: string, maxLength: 1048576, x-maxBytes: 1048576 }
+        meta_description: { type: string, maxLength: 500, default: '' }
+        status: { type: string, enum: [draft, published] }
+    StockBrokeragePatch:
+      type: object
+      additionalProperties: false
+      required: [expected_version]
+      minProperties: 2
+      properties:
+        expected_version: { type: integer, minimum: 1 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        english_name: { type: string, minLength: 1, maxLength: 120 }
+        slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+        logo: { type: string, maxLength: 2048 }
+        website_url: { oneOf: [{ type: string, const: '' }, { type: string, format: uri }], maxLength: 2048 }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$' }
+        category_id: { type: [integer, 'null'], minimum: 1 }
+        specifications: { $ref: '#/components/schemas/StockBrokerageSpecifications' }
+        content: { type: string, maxLength: 1048576, x-maxBytes: 1048576 }
+        meta_description: { type: string, maxLength: 500 }
+        status: { type: string, enum: [draft, published] }
+  responses:
+    Unauthenticated:
+      description: 401 UNAUTHENTICATED.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: 403 FORBIDDEN or CSRF_INVALID.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: 409 SLUG_TAKEN, CATEGORY_NAME_TAKEN, or VERSION_CONFLICT.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    PayloadTooLarge:
+      description: 413 PAYLOAD_TOO_LARGE.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ValidationFailed:
+      description: 422 VALIDATION_FAILED with dot-path field errors.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: 429 RATE_LIMITED.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

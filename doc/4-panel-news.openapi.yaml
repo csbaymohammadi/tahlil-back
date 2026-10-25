@@ -68,7 +68,7 @@ paths:
             X-Request-ID: { $ref: '#/components/headers/RequestId' }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/NewsResponse' }
+              schema: { $ref: '#/components/schemas/NewsWriteResponse' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
   /news/items/{id}:
@@ -101,7 +101,7 @@ paths:
           description: Updated canonical detail
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/NewsResponse' }
+              schema: { $ref: '#/components/schemas/NewsWriteResponse' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '422': { $ref: '#/components/responses/Error' }
@@ -245,7 +245,14 @@ paths:
       operationId: importNewsFromWord
       tags: [Shared Word import]
       summary: Import a Word document as a Draft
-      description: Accepts content_type=blog or news; template marker and category scope must match the selected module. DOC requires sandboxed conversion prerequisites.
+      description: >-
+        Accepts content_type=blog or news. News accepts the Persian v2 template
+        at /tahlilpanel/templates/news-import-v2.docx: عنوان, عنوان انگلیسی,
+        توضیحات, تصویر, محتوا, توضیحات متا; category and reading time may follow.
+        Only title and slug are required. Optional empty or unusable fields are
+        ignored with Persian warnings. New validation errors are Persian JSON
+        without report metadata. The previous news-import-v1.docx remains
+        supported. DOC requires sandboxed conversion prerequisites.
       parameters:
         - $ref: '#/components/parameters/CsrfToken'
         - name: Idempotency-Key
@@ -280,6 +287,15 @@ paths:
                     properties:
                       content_type: { type: string, enum: [blog, news] }
                       record: { $ref: '#/components/schemas/NewsDetail' }
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                      required: [field, code, message]
+                      properties:
+                        field: { type: string }
+                        code: { type: string }
+                        message: { type: string, description: Persian user-facing warning }
                   request_id: { type: string }
         '409':
           description: Idempotency conflict or active processing lease
@@ -290,7 +306,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '422':
-          description: Validation issues and optional private report metadata
+          description: Persian validation issues in JSON; new imports do not generate report files
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ImportError' }
@@ -307,6 +323,7 @@ paths:
       operationId: downloadNewsWordImportReport
       tags: [Shared Word import]
       summary: Download a private Word import error report
+      description: Historical compatibility endpoint for owner-bound reports created by older News imports. New imports return JSON issues and do not create reports.
       parameters:
         - name: report_id
           in: path
@@ -374,7 +391,7 @@ components:
         slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
         description: { type: string, maxLength: 2000 }
         cover_image: { type: string, maxLength: 2048 }
-        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        reading_minutes: { type: [integer, 'null'], minimum: 1, maximum: 1440 }
         status: { type: string, enum: [draft, published, scheduled] }
         scheduled_for: { type: [string, 'null'], format: date-time }
         author: { oneOf: [{ $ref: '#/components/schemas/Author' }, { type: 'null' }] }
@@ -388,16 +405,16 @@ components:
     NewsCreate:
       type: object
       additionalProperties: false
-      required: [title, slug, content, category_id, reading_minutes, status]
+      required: [title, slug]
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
         slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
-        description: { type: string, maxLength: 2000, default: '' }
-        cover_image: { type: string, maxLength: 2048, default: '' }
-        content: { type: string, maxLength: 1048576 }
-        category_id: { type: [integer, 'null'] }
-        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
-        meta_description: { type: string, maxLength: 500, default: '' }
+        description: { description: Optional; unsupported values are cleared with a warning. }
+        cover_image: { description: Optional; unsafe or unavailable values are cleared with a warning. }
+        content: { description: Optional sanitized HTML; unsafe HTML is rejected and unsupported types are cleared with a warning. }
+        category_id: { description: Optional News category ID; invalid values are cleared with a warning. }
+        reading_minutes: { description: Optional integer; invalid values are stored as null with a warning. }
+        meta_description: { description: Optional; unsupported values are cleared with a warning. }
         status: { type: string, enum: [draft, published, scheduled] }
         scheduled_for: { type: [string, 'null'], format: date-time }
     NewsPatch:
@@ -409,12 +426,12 @@ components:
         expected_version: { type: integer, minimum: 1, maximum: 9007199254740991 }
         title: { type: string, minLength: 1, maxLength: 200 }
         slug: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 200 }
-        description: { type: string, maxLength: 2000 }
-        cover_image: { type: string, maxLength: 2048 }
-        content: { type: string, maxLength: 1048576 }
-        category_id: { type: [integer, 'null'] }
-        reading_minutes: { type: integer, minimum: 1, maximum: 1440 }
-        meta_description: { type: string, maxLength: 500 }
+        description: { description: Optional; unsupported values are cleared with a warning. }
+        cover_image: { description: Optional; unsafe or unavailable values are cleared with a warning. }
+        content: { description: Optional sanitized HTML; unsafe HTML is rejected and unsupported types are cleared with a warning. }
+        category_id: { description: Optional News category ID; invalid values are cleared with a warning. }
+        reading_minutes: { description: Optional integer; invalid values are stored as null with a warning. }
+        meta_description: { description: Optional; unsupported values are cleared with a warning. }
         status: { type: string, enum: [draft, published, scheduled] }
         scheduled_for: { type: [string, 'null'], format: date-time }
     NewsResponse:
@@ -423,6 +440,22 @@ components:
       properties:
         data: { $ref: '#/components/schemas/NewsDetail' }
         request_id: { type: string }
+    NewsWriteResponse:
+      type: object
+      required: [data, warnings, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/NewsDetail' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/OptionalValueWarning' }
+        request_id: { type: string }
+    OptionalValueWarning:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code: { type: string }
+        message: { type: string, description: Persian user-visible warning. }
     Author:
       type: object
       required: [id, name]
@@ -485,7 +518,28 @@ components:
             message: { type: string }
             fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
         request_id: { type: string }
+    ImportIssue:
+      type: object
+      required: [code, field, label, location, message]
+      properties:
+        code: { type: string }
+        field: { type: string }
+        label: { type: string, description: Persian display label }
+        location: { type: string, description: Persian document location }
+        message: { type: string, description: Persian user-facing issue }
     ImportError:
-      allOf:
-        - $ref: '#/components/schemas/Error'
-      description: Error envelope whose error may additionally contain issues and report metadata.
+      type: object
+      required: [error, request_id]
+      description: Persian JSON validation envelope; new imports never include report metadata.
+      properties:
+        error:
+          type: object
+          required: [code, message, fields, issues]
+          properties:
+            code: { type: string, const: IMPORT_VALIDATION_FAILED }
+            message: { type: string }
+            fields: { type: object, additionalProperties: { type: array, items: { type: string } } }
+            issues:
+              type: array
+              items: { $ref: '#/components/schemas/ImportIssue' }
+        request_id: { type: string }

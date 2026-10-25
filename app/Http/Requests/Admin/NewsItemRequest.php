@@ -18,20 +18,18 @@ class NewsItemRequest extends FormRequest
     public function rules(): array
     {
         $create = $this->isMethod('POST');
-        $required = $create ? ['required'] : ['sometimes'];
-        $categoryRequired = $create ? ['present'] : ['sometimes'];
 
         return [
             'expected_version' => $create ? ['prohibited'] : ['required', 'integer:strict', 'min:1', 'max:9007199254740991'],
-            'title' => [...$required, 'string', 'min:1', 'max:200'],
-            'slug' => [...$required, 'string', 'min:1', 'max:200', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/D'],
-            'description' => ['sometimes', 'string', 'max:2000'],
-            'cover_image' => ['sometimes', 'string', 'max:2048'],
-            'content' => [...$required, 'string', 'max:1048576'],
-            'category_id' => [...$categoryRequired, 'nullable', 'integer:strict', 'min:1', 'max:9007199254740991'],
-            'reading_minutes' => [...$required, 'integer:strict', 'min:1', 'max:1440'],
-            'meta_description' => ['sometimes', 'string', 'max:500'],
-            'status' => [...$required, 'string', Rule::in(['draft', 'published', 'scheduled'])],
+            'title' => [$create ? 'required' : 'sometimes', 'string', 'min:1', 'max:200'],
+            'slug' => [$create ? 'required' : 'sometimes', 'string', 'min:1', 'max:200', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/D'],
+            'description' => ['sometimes'],
+            'cover_image' => ['sometimes'],
+            'content' => ['sometimes'],
+            'category_id' => ['sometimes'],
+            'reading_minutes' => ['sometimes'],
+            'meta_description' => ['sometimes'],
+            'status' => ['sometimes', 'string', Rule::in(['draft', 'published', 'scheduled'])],
             'scheduled_for' => ['sometimes', 'nullable', 'string', 'regex:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/D'],
         ];
     }
@@ -47,7 +45,12 @@ class NewsItemRequest extends FormRequest
             }
             if (is_string($this->input('content')) && strlen($this->input('content')) <= 1_048_576) {
                 try {
-                    app(BlogHtmlSanitizer::class)->sanitize($this->input('content'), config('news.trusted_media_hosts', []));
+                    app(BlogHtmlSanitizer::class)->sanitize(
+                        $this->input('content'),
+                        config('news.trusted_media_hosts', []),
+                        rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'],
+                        allowEmpty: true,
+                    );
                 } catch (PanelAuthException $exception) {
                     foreach ($exception->fields['content'] ?? ['The content is not supported.'] as $message) {
                         $validator->errors()->add('content', $message);
@@ -55,5 +58,26 @@ class NewsItemRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'title.required' => 'عنوان خبر را وارد کنید.',
+            'title.string' => 'عنوان خبر باید متن باشد.',
+            'title.min' => 'عنوان خبر را وارد کنید.',
+            'title.max' => 'عنوان خبر حداکثر می‌تواند ۲۰۰ نویسه باشد.',
+            'slug.required' => 'عنوان انگلیسی خبر را وارد کنید.',
+            'slug.string' => 'عنوان انگلیسی باید متن باشد.',
+            'slug.min' => 'عنوان انگلیسی خبر را وارد کنید.',
+            'slug.max' => 'عنوان انگلیسی حداکثر می‌تواند ۲۰۰ نویسه باشد.',
+            'slug.regex' => 'عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید.',
+            'expected_version.required' => 'نسخهٔ فعلی خبر را بفرستید.',
+            'expected_version.integer' => 'نسخهٔ خبر معتبر نیست.',
+            'expected_version.min' => 'نسخهٔ خبر معتبر نیست.',
+            'status.in' => 'وضعیت انتشار خبر معتبر نیست.',
+            'scheduled_for.regex' => 'زمان انتشار را با قالب استاندارد تاریخ ارسال کنید.',
+        ];
     }
 }

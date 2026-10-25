@@ -4,8 +4,10 @@ namespace App\Providers;
 
 use App\Media\MediaConsumers;
 use App\Models\BlogArticle;
+use App\Models\Broker;
 use App\Models\Exchange;
 use App\Models\NewsItem;
+use App\Models\StockBrokerage;
 use App\Models\User;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
@@ -43,6 +45,16 @@ class AppServiceProvider extends ServiceProvider
             'exchange',
             static fn (int $id, User $actor): bool => Exchange::query()->whereKey($id)->exists(),
             static fn (int $id): bool => Exchange::public()->whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register(
+            'broker',
+            static fn (int $id, User $actor): bool => Broker::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => Broker::public()->whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register(
+            'stock-brokers',
+            static fn (int $id, User $actor): bool => StockBrokerage::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => StockBrokerage::public()->whereKey($id)->exists(),
         );
     }
 }
