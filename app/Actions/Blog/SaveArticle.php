@@ -13,13 +13,14 @@ use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\BlogText;
 use App\Support\PanelIds;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SaveArticle
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): BlogArticleSaveResult
@@ -146,6 +147,8 @@ class SaveArticle
                     'attempts' => 0, 'available_at' => now(), 'created_at' => now(),
                 ]);
             }
+
+            $this->publicIndex->sync('articles', $article->id);
 
             return new BlogArticleSaveResult($article->fresh(['author', 'category']), $warnings);
         });

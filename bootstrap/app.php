@@ -30,12 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(PanelEnvelope::class);
-        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')]);
-        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')]);
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->report(function (Throwable $exception) {
-            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
+            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
                 Log::error('Panel request failed.', [
                     'request_id' => request()->attributes->get('request_id'),
                     'exception_type' => $exception::class,
@@ -46,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'new_password']);
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
+            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
                 return null;
             }
             $fields = [];
@@ -90,6 +90,20 @@ return Application::configure(basePath: dirname(__DIR__))
                 [$status, $code, $message] = [$exception->getStatusCode(), 'NOT_FOUND', 'The endpoint was not found.'];
             } else {
                 [$status, $code, $message] = [500, 'INTERNAL_ERROR', 'An unexpected error occurred.'];
+            }
+            if ($status === 503) {
+                $publicCode = match (true) {
+                    $request->is('api/v1/page-settings') => 'PUBLIC_CONFIGURATION_UNAVAILABLE',
+                    $request->is('api/v1/blog/*') => 'BLOG_UNAVAILABLE',
+                    $request->is('api/v1/search') => 'SEARCH_UNAVAILABLE',
+                    $request->is('api/v1/sitemap/*') => 'SITEMAP_UNAVAILABLE',
+                    $request->is('api/v1/comments/*') => 'COMMENTS_UNAVAILABLE',
+                    default => null,
+                };
+                if ($publicCode !== null) {
+                    $code = $publicCode;
+                    $message = 'Public information is temporarily unavailable.';
+                }
             }
             if ($request->routeIs('panel.blog.articles.*', 'panel.news.items.*', 'panel.content-imports.store', 'panel.content-imports.report')) {
                 $contentType = $request->routeIs('panel.news.items.*') || ($request->routeIs('panel.content-imports.store') && $request->input('content_type') === 'news') ? 'news' : 'blog';

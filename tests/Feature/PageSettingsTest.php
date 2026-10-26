@@ -124,7 +124,7 @@ class PageSettingsTest extends PanelTestCase
         $data['advertisements']['home_header'] = [['image' => $asset->canonicalUrl(), 'link' => '/news']];
         $this->putJson(self::BASE, $data)->assertOk();
         $this->assertDatabaseHas('media_references', ['consumer_type' => 'page-settings', 'media_id' => $asset->id]);
-        $this->get('/api/v1/page-settings')->assertOk()->assertJsonPath('data.advertisements.home_header.0.rel', 'sponsored noopener noreferrer');
+        $this->get('/api/v1/page-settings')->assertOk()->assertJsonPath('data.advertisements.home_header.0.alt', 'تبلیغات')->assertJsonMissingPath('data.advertisements.home_header.0.target');
         $data = $this->body();
         $data['advertisements']['home_header'] = [];
         $this->putJson(self::BASE, $data)->assertOk();

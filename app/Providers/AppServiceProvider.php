@@ -48,10 +48,10 @@ class AppServiceProvider extends ServiceProvider
         );
         Media::saved(static function (Media $media): void {
             if ($media->wasChanged(['status', 'deleted_at', 'canonical_name'])) {
-                (new PublicChanges)->record('media_changed', 'media-'.Str::uuid());
+                app(PublicChanges::class)->record('media_changed', 'media-'.Str::uuid());
             }
         });
-        User::deleted(static fn (User $user) => (new PublicChanges)->record('author_deleted', 'user-'.Str::uuid()));
+        User::deleted(static fn (User $user) => app(PublicChanges::class)->record('author_deleted', 'user-'.Str::uuid()));
         TrustProxies::at(config('panel.trusted_proxies'));
         $this->app->make(MediaConsumers::class)->register('video',
             static fn (int $id, User $actor): bool => Tutorial::whereKey($id)->exists(),

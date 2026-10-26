@@ -7,11 +7,12 @@ use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 
 abstract class DeletePlatformProfile
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -45,6 +46,7 @@ abstract class DeletePlatformProfile
                     'attempts' => 0, 'available_at' => now(), 'created_at' => now(),
                 ]);
             }
+            $this->publicIndex->sync($definition->slug, $id);
         });
     }
 }

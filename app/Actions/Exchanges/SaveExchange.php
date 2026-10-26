@@ -12,12 +12,13 @@ use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\ExchangeSpecifications;
 use App\Support\ExchangeText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SaveExchange
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): Exchange
@@ -103,6 +104,9 @@ class SaveExchange
             if ($wasPublished || $isPublished) {
                 $this->outbox($requestId, $exchange->id, 'exchange_changed', ['status' => $values['status'], 'slug' => $values['slug']]);
             }
+
+            $this->publicIndex->sync('exchanges', $exchange->id);
+            $this->publicIndex->refreshType('bonuses');
 
             return $exchange->fresh(['author', 'category']);
         });

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\NewsItem;
 use App\Support\PanelMutationLock;
+use App\Support\PublicContentIndex;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -14,7 +15,7 @@ class PublishDueNewsItems extends Command
 
     protected $description = 'Publish due scheduled news items using durable database tasks';
 
-    public function handle(): int
+    public function handle(PublicContentIndex $index): int
     {
         $this->reconcile();
         $tasks = DB::table('news_schedule_tasks')->whereNull('processed_at')->where('due_at', '<=', now())
@@ -24,7 +25,7 @@ class PublishDueNewsItems extends Command
         $published = 0;
         foreach ($tasks as $taskId) {
             try {
-                if ($this->publish((int) $taskId)) {
+                if ($this->publish((int) $taskId, $index)) {
                     $published++;
                 }
             } catch (Throwable $exception) {
@@ -55,9 +56,9 @@ class PublishDueNewsItems extends Command
         }
     }
 
-    private function publish(int $taskId): bool
+    private function publish(int $taskId, PublicContentIndex $index): bool
     {
-        return DB::transaction(function () use ($taskId): bool {
+        return DB::transaction(function () use ($taskId, $index): bool {
             PanelMutationLock::acquire();
             $task = DB::table('news_schedule_tasks')->where('id', $taskId)->lockForUpdate()->first();
             if (! $task || $task->processed_at !== null) {
@@ -89,6 +90,8 @@ class PublishDueNewsItems extends Command
                 'payload' => json_encode(['news_item_id' => $newsItem->id, 'slug' => $newsItem->slug, 'planned_at' => $plannedAt, 'actual_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),
                 'attempts' => 0, 'available_at' => now(), 'created_at' => now(),
             ]);
+
+            $index->sync('news', $newsItem->id);
 
             return true;
         });

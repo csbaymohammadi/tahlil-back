@@ -11,17 +11,30 @@ class PanelEnvelope
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
+        if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
             return $next($request);
         }
         $request->attributes->set('request_id', 'req_'.Str::uuid());
         $response = $next($request);
         $response->headers->set('X-Request-ID', $request->attributes->get('request_id'));
-        if (! str_contains($response->headers->get('Cache-Control', ''), 'no-store')) {
+        $public = $request->is('api/v1/page-settings', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*') || ($request->is('api/v1/comments/*') && $request->isMethodSafe());
+        if ($public && ! $request->is('api/v1/sitemap/*')) {
+            $response->headers->set('Cache-Control', $response->getStatusCode() >= 400 ? 'no-store' : 'no-cache, must-revalidate');
+        } elseif (! str_contains($response->headers->get('Cache-Control', ''), 'no-store')) {
             $response->headers->set('Cache-Control', 'no-store');
         }
-        $response->setVary('Cookie', false);
-        if ($request->is('api/v1/page-settings', 'api/v1/analytics/*')) {
+        if (! $public) {
+            $response->setVary('Cookie', false);
+        }
+        if ($public && ! $request->is('api/v1/comments/*')) {
+            $response->setVary('Origin', false);
+            if ($origin = $request->attributes->get('public_origin')) {
+                $response->headers->set('Access-Control-Allow-Origin', $origin);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Accept, If-None-Match');
+                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After, ETag, Location');
+            }
+        } elseif ($request->is('api/v1/analytics/*')) {
             $response->setVary('Origin', false);
             if ($origin = $request->attributes->get('presentation_origin')) {
                 $response->headers->set('Access-Control-Allow-Origin', $origin);

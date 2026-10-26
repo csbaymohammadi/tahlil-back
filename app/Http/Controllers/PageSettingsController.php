@@ -10,6 +10,11 @@ class PageSettingsController extends Controller
 {
     public function show(Request $request, SettingsProjection $projection): JsonResponse
     {
-        return response()->json(['data' => $projection->public(), 'request_id' => $request->attributes->get('request_id')])->header('Cache-Control', 'no-store');
+        $data = $projection->public();
+        $response = response()->json(['data' => $data, 'request_id' => $request->attributes->get('request_id')]);
+        $response->setEtag($data['revision']);
+        $response->isNotModified($request);
+
+        return $response;
     }
 }

@@ -2,21 +2,19 @@
 
 namespace App\PageSettings;
 
+use App\Blog\PublicArticleProjection;
 use App\Bonuses\BonusPublicProjection;
 use App\Exchanges\ExchangePublicProjection;
 use App\Models\PageSetting;
-use App\Models\PlatformProfile;
 use App\Models\Tutorial;
-use App\PlatformProfiles\PlatformPublicProjection;
-use App\Profile\PublicAuthor;
-use App\Support\PlatformProfileDefinition;
+use App\Support\PublicText;
 use App\Tutorials\TutorialProjection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class SettingsProjection
 {
-    public function __construct(private SelectionCatalog $catalog, private SettingsMedia $media, private ExchangePublicProjection $exchanges, private PlatformPublicProjection $platforms, private BonusPublicProjection $bonuses, private TutorialProjection $tutorials, private PublicAuthor $authors) {}
+    public function __construct(private SelectionCatalog $catalog, private SettingsMedia $media, private ExchangePublicProjection $exchanges, private BonusPublicProjection $bonuses, private TutorialProjection $tutorials, private PublicArticleProjection $articles) {}
 
     /** @return array<string, mixed> */
     public function admin(PageSetting $settings): array
@@ -66,11 +64,11 @@ class SettingsProjection
                     foreach ($row['selected_ids'] as $id) {
                         $record = $records->get($id);
                         if ($this->catalog->reason($record, $row['key']) === null) {
-                            $items[] = $this->card($record, $row['key']);
+                            $items[] = $this->card($record, $row['key'], $area);
                         }
                     }
                     unset($row['selected_ids']);
-                    $row['items'] = array_values($row['key'] === 'news' ? array_slice($items, 0, 4) : $items);
+                    $row['items'] = array_values($items);
                     if ($area === 'menu') {
                         $row['label'] = SettingsDefinition::MENU[$row['key']][0];
                         $row['all_href'] = SettingsDefinition::MENU[$row['key']][1];
@@ -83,50 +81,53 @@ class SettingsProjection
                 $valid = [];
                 foreach ($items as $index => $item) {
                     if ($this->media->public($item['image'])) {
-                        $valid[] = [...$item, 'id' => $placement.'-'.$index, 'alt' => 'تبلیغات', 'target' => '_blank', 'rel' => 'sponsored noopener noreferrer'];
+                        $valid[] = [...$item, 'id' => $placement.'-'.$index, 'alt' => 'تبلیغات'];
                     }
                 }
                 $items = $valid;
             }
             unset($items);
-            $snapshot['infinite_slider'] = array_values(array_filter($snapshot['infinite_slider'], fn (array $item): bool => $this->media->public($item['logo_src'])));
+            $snapshot['infinite_slider'] = array_map(fn (array $item): array => [...$item, 'logo_src' => $this->media->public($item['logo_src']) ? $item['logo_src'] : ''], $snapshot['infinite_slider']);
 
             return [...$snapshot, 'revision' => hash('sha256', json_encode($snapshot, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE))];
         });
     }
 
     /** @return array<string, mixed> */
-    private function card(Model $record, string $key): array
+    private function card(Model $record, string $key, string $area): array
     {
+        if ($area === 'menu') {
+            $module = $key === 'exchanges' ? 'exchanges' : 'platform_profiles';
+
+            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
+                'logo' => $this->media->publicDomainImage((string) $record->logo, $module) ? $record->logo : '',
+                'href' => SettingsDefinition::MENU[$key][1].'/'.rawurlencode($record->slug)];
+        }
         if ($record instanceof Tutorial) {
-            $record->loadMissing('durations');
             $detail = $this->tutorials->publicDetail($record);
 
-            return array_intersect_key($detail, array_flip(['id', 'title', 'description', 'slug', 'public_path', 'category', 'youtube_url', 'aparat_url', 'default_provider', 'display_cover_image', 'duration_seconds', 'duration_source', 'published_at']));
+            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'href' => '/tutorials/'.rawurlencode($record->slug),
+                'description' => $record->description, 'cover_image' => $detail['display_cover_image'], 'category' => $detail['category'],
+                'duration_seconds' => $detail['duration_seconds'], 'youtube_url' => $detail['youtube_url'], 'youtube_video_id' => $record->youtube_video_id,
+                'aparat_url' => $detail['aparat_url'], 'aparat_video_id' => $detail['aparat_url'] === '' ? null : $record->aparat_video_id,
+                'default_provider' => $detail['default_provider'], 'duration_source' => $detail['duration_source'], 'published_at' => $detail['published_at']];
         }
         if ($key === 'exchanges') {
-            return $this->exchanges->card($record);
-        }
-        if ($record instanceof PlatformProfile) {
-            return $this->platforms->card($record, PlatformProfileDefinition::for($key === 'forex' ? 'broker' : $key));
+            $card = $this->exchanges->card($record);
+
+            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
+                'href' => '/exchanges/'.rawurlencode($record->slug),
+                'logo' => $this->media->publicDomainImage((string) $record->logo, 'exchanges') ? $record->logo : '',
+                'founding_year' => (string) $record->founded_year, 'platform_label' => (string) $record->platform_type,
+                'rating_average' => $card['rating_average'], 'rating_count' => $card['rating_count'], 'comment_count' => $card['comment_count']];
         }
         if ($key === 'bonuses') {
-            $record->loadMissing(['campaign.exchange', 'ratingAggregate']);
+            $card = $this->bonuses->card($record);
 
-            return $this->bonuses->card($record);
+            return [...array_intersect_key($card, array_flip(['id', 'slug', 'title', 'description', 'category', 'published_at', 'campaign', 'rating', 'rating_count'])),
+                'href' => '/bonuses/'.rawurlencode($record->slug), 'excerpt' => PublicText::plain($card['display_description']), 'cover_image' => $card['display_cover_image']];
         }
-        $record->loadMissing('author.avatar');
-        $category = $record->category?->trashed() ? null : $record->category;
-        $excerpt = html_entity_decode(strip_tags($record->content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $excerpt = mb_substr(preg_replace('/[\s\x{00A0}]+/u', ' ', trim($excerpt)) ?? '', 0, 300);
-        $cover = $record->cover_image !== '' ? $record->cover_image : (string) config($key === 'articles' ? 'blog.fallback_cover' : 'news.fallback_cover', '');
 
-        return [...$record->only(['id', 'title', 'slug', 'description', 'cover_image', 'reading_minutes']),
-            'display_description' => $record->description !== '' ? $record->description : $excerpt,
-            'display_cover_image' => $cover !== '' && $this->media->publicDomainImage($cover, $key === 'articles' ? 'blog' : 'news') ? $cover : '',
-            'content_type' => $key === 'articles' ? 'article' : 'news', 'public_path' => ($key === 'articles' ? '/blog/' : '/news/').$record->slug,
-            'published_at' => $record->published_at?->utc()->toISOString(),
-            'category' => $category ? $category->only(['id', 'name']) : null, 'author' => $this->authors->record($record->author),
-            'comment_count' => (int) $record->comment_count];
+        return $this->articles->summary($record);
     }
 }

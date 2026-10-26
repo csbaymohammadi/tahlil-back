@@ -6,11 +6,12 @@ use App\Actions\Auth\RevokeSessions;
 use App\Exceptions\PanelAuthException;
 use App\Models\NewsItem;
 use App\Models\PanelSession;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 
 class DeleteNewsItem
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     public function handle(PanelSession $session, int $id, int $expectedVersion, string $requestId): void
     {
@@ -46,6 +47,7 @@ class DeleteNewsItem
                     'attempts' => 0, 'available_at' => now(), 'created_at' => now(),
                 ]);
             }
+            $this->publicIndex->sync('news', $id);
         });
     }
 }

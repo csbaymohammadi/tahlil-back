@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Comments\CommentSubmissionLimits;
 use App\Exceptions\PanelAuthException;
+use App\Support\StrictJson;
 use Closure;
 use Illuminate\Http\Request;
 use JsonException;
@@ -16,7 +17,7 @@ class PublicCommentsRequest
     public function handle(Request $request, Closure $next): Response
     {
         $origin = $request->header('Origin');
-        if (($origin !== null || ! $request->isMethod('GET')) && $origin !== $request->getSchemeAndHttpHost()) {
+        if (($origin !== null || ! $request->isMethodSafe()) && ! in_array($origin, config('presentation.allowed_origins', []), true)) {
             throw new PanelAuthException(403, 'FORBIDDEN', 'Use the same origin as this service.');
         }
         if ($origin !== null) {
@@ -31,7 +32,7 @@ class PublicCommentsRequest
 
             return response()->noContent();
         }
-        $allowed = $request->isMethod('GET') ? ['page', 'per_page'] : [];
+        $allowed = $request->isMethodSafe() ? ['page', 'per_page'] : [];
         if (array_diff(array_keys($request->query()), $allowed) !== []) {
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'Unsupported query parameters.');
         }
@@ -39,7 +40,7 @@ class PublicCommentsRequest
         if (strlen($raw) > 32768 || (int) $request->header('Content-Length', 0) > 32768) {
             throw new PanelAuthException(413, 'PAYLOAD_TOO_LARGE', 'Comment JSON bodies may not exceed 32 KiB.');
         }
-        if ($request->isMethod('GET')) {
+        if ($request->isMethodSafe()) {
             if ($raw !== '') {
                 throw new PanelAuthException(422, 'VALIDATION_FAILED', 'GET does not accept a body.');
             }
@@ -56,6 +57,7 @@ class PublicCommentsRequest
             if (! $body instanceof \stdClass) {
                 throw new PanelAuthException(422, 'VALIDATION_FAILED', 'The body must be a JSON object.');
             }
+            StrictJson::rejectDuplicateKeys($raw);
             $request->json()->replace(json_decode($raw, true, 16, JSON_THROW_ON_ERROR));
         }
 

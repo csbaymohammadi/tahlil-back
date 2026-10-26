@@ -8,12 +8,13 @@ use App\Models\NewsCategory;
 use App\Models\NewsItem;
 use App\Models\PanelSession;
 use App\Support\BlogText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ManageNewsCategories
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     public function create(PanelSession $session, string $name, string $requestId): NewsCategory
     {
@@ -30,6 +31,8 @@ class ManageNewsCategories
             $category = new NewsCategory;
             $category->forceFill(['name' => $name, 'name_normalized' => $normalized, 'version' => 1])->save();
             $this->audit($requestId, $actor->id, $category->id, 'news_category_created', ['name' => $name]);
+
+            $this->outbox($requestId, 'news_category_changed', ['category_id' => $category->id]);
 
             return $category;
         });
@@ -106,6 +109,7 @@ class ManageNewsCategories
     /** @param array<string, mixed> $payload */
     private function outbox(string $requestId, string $event, array $payload): void
     {
+        $this->publicIndex->refreshType('news');
         DB::table('news_outbox')->insert([
             'news_item_id' => null, 'event' => $event,
             'payload' => json_encode(['request_id' => $requestId, ...$payload, 'occurred_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),

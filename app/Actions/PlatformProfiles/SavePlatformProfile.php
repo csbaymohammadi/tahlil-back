@@ -12,12 +12,13 @@ use App\Models\User;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
 use App\Support\PlatformText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 abstract class SavePlatformProfile
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -122,6 +123,8 @@ abstract class SavePlatformProfile
             if ($wasPublished || $isPublished) {
                 $this->outbox($definition, $requestId, $profile->id, $definition->eventPrefix.'_changed', ['status' => $values['status'], 'slug' => $values['slug']]);
             }
+
+            $this->publicIndex->sync($definition->slug, $profile->id);
 
             /** @var PlatformProfile $saved */
             $saved = $profile->fresh(['author', 'category']);

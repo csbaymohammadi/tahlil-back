@@ -23,7 +23,7 @@ class PublicChangeDeliveryTest extends TestCase
         Http::preventStrayRequests();
         Http::fake([self::URL => Http::response('', 204)]);
         config(['presentation.webhook_url' => self::URL, 'presentation.webhook_secret' => self::SECRET]);
-        (new PublicChanges)->record('page_settings_updated', 'req_test');
+        app(PublicChanges::class)->record('page_settings_updated', 'req_test');
         $result = app(DeliverChanges::class)->handle();
         $this->assertSame(1, $result['delivered']);
         $this->assertNotNull(DB::table('public_change_deliveries')->first()->delivered_at);
@@ -43,7 +43,7 @@ class PublicChangeDeliveryTest extends TestCase
         Http::preventStrayRequests();
         Http::fake([self::URL => Http::sequence()->push('', 503)->push('', 204)]);
         config(['presentation.webhook_url' => self::URL, 'presentation.webhook_secret' => self::SECRET]);
-        (new PublicChanges)->record('author_profile_changed', 'req_test');
+        app(PublicChanges::class)->record('author_profile_changed', 'req_test');
         $result = app(DeliverChanges::class)->handle();
         $this->assertSame(1, $result['failed']);
         $first = DB::table('public_change_deliveries')->first();
@@ -64,7 +64,7 @@ class PublicChangeDeliveryTest extends TestCase
         Http::preventStrayRequests();
         Http::fake([self::URL => Http::response('', 204)]);
         config(['presentation.webhook_url' => '', 'presentation.webhook_secret' => '']);
-        (new PublicChanges)->record('page_settings_updated', 'req_test');
+        app(PublicChanges::class)->record('page_settings_updated', 'req_test');
         $this->assertFalse(app(DeliverChanges::class)->handle()['configured']);
         $this->assertDatabaseHas('public_change_deliveries', ['attempts' => 0, 'delivered_at' => null]);
         Http::assertNothingSent();

@@ -41,6 +41,13 @@ class SelectionCatalog
             return 'deleted';
         }
         if ($record instanceof Tutorial) {
+            try {
+                if ($this->providers->parse('youtube', $record->youtube_url)['id'] !== $record->youtube_video_id) {
+                    return 'invalid_youtube_source';
+                }
+            } catch (ValidationException) {
+                return 'invalid_youtube_source';
+            }
             if ($key === 'aparat') {
                 try {
                     $source = $this->providers->parse('aparat', $record->aparat_url);
@@ -88,7 +95,7 @@ class SelectionCatalog
     {
         $model = $this->model($area, $key);
         $platform = in_array($model, [Exchange::class, Broker::class, StockBrokerage::class, GoldPlatform::class, PropFirm::class], true);
-        $query = $model::query()->select(['id', 'title', 'description', 'slug', 'created_at', ...($platform ? ['english_name'] : []), ...($model === Tutorial::class ? ['aparat_url', 'aparat_video_id'] : ['status'])]);
+        $query = $model::query()->select(['id', 'title', 'description', 'slug', 'created_at', ...($platform ? ['english_name'] : []), ...($model === Tutorial::class ? ['youtube_url', 'youtube_video_id', 'aparat_url', 'aparat_video_id'] : ['status'])]);
         if ($model !== Tutorial::class) {
             $query->public();
         }

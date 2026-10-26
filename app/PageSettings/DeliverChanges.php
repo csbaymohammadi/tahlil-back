@@ -21,7 +21,7 @@ class DeliverChanges
             foreach (self::SOURCES as $source) {
                 DB::table($source)->whereNull('delivered_at')->orderBy('id')->limit(100)->get()->each(function ($row) use ($source): void {
                     DB::table('public_change_deliveries')->insertOrIgnore(['source' => $source, 'source_id' => (string) $row->id,
-                        'payload' => json_encode(['event' => $row->event, 'occurred_at' => CarbonImmutable::parse($row->created_at, 'UTC')->toISOString(), 'areas' => ['homepage', 'navigation', 'footer', 'advertisements', 'content', 'authors', 'sitemap']], JSON_THROW_ON_ERROR),
+                        'payload' => json_encode(['event' => $row->event, 'occurred_at' => CarbonImmutable::parse($row->created_at, 'UTC')->toISOString(), 'areas' => ['homepage', 'navigation', 'footer', 'advertisements', 'content', 'authors', 'search', 'sitemap']], JSON_THROW_ON_ERROR),
                         'attempts' => 0, 'available_at' => now(), 'created_at' => now()]);
                 });
             }

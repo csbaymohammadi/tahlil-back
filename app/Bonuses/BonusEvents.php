@@ -2,10 +2,13 @@
 
 namespace App\Bonuses;
 
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 
 class BonusEvents
 {
+    public function __construct(private PublicContentIndex $publicIndex) {}
+
     /** @param array<string, mixed> $details */
     public function audit(string $event, string $requestId, ?int $actorId, int $targetId, array $details = [], string $targetType = 'bonus'): void
     {
@@ -19,6 +22,11 @@ class BonusEvents
     /** @param array<string, mixed> $payload */
     public function publicChange(string $event, string $requestId, ?int $bonusId, array $payload = []): void
     {
+        if ($bonusId === null) {
+            $this->publicIndex->refreshType('bonuses');
+        } else {
+            $this->publicIndex->sync('bonuses', $bonusId);
+        }
         DB::table('bonus_outbox')->insert([
             'bonus_id' => $bonusId, 'event' => $event,
             'payload' => json_encode(['request_id' => $requestId, 'bonus_id' => $bonusId, ...$payload, 'occurred_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),

@@ -29,11 +29,15 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BonusRatingController;
 use App\Http\Controllers\PageSettingsController;
 use App\Http\Controllers\PageViewController;
+use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\PublicCommentController;
+use App\Http\Controllers\PublicSearchController;
+use App\Http\Controllers\SitemapEntriesController;
 use App\Http\Middleware\BonusRatingRequest;
 use App\Http\Middleware\PanelRequest;
 use App\Http\Middleware\PresentationRequest;
 use App\Http\Middleware\PublicCommentsRequest;
+use App\Http\Middleware\PublicReadRequest;
 use App\Http\Middleware\StrictCommentQuery;
 use Illuminate\Support\Facades\Route;
 
@@ -47,7 +51,6 @@ Route::prefix('v1/admin')->name('panel.')->middleware([PanelRequest::class, Pres
 });
 
 Route::middleware(PresentationRequest::class)->group(function (): void {
-    Route::get('v1/page-settings', [PageSettingsController::class, 'show'])->name('page-settings.public');
     Route::post('v1/analytics/page-views', [PageViewController::class, 'store'])->name('analytics.page-views');
     Route::options('v1/analytics/page-views', fn () => response()->noContent())->name('analytics.options');
 });
@@ -209,7 +212,20 @@ Route::prefix('v1/admin/comments')->name('panel.comments.')->middleware([PanelRe
     Route::delete('{id}', [CommentController::class, 'destroy'])->name('destroy');
 });
 Route::prefix('v1/comments')->name('comments.')->middleware([StrictCommentQuery::class, PublicCommentsRequest::class])->group(function (): void {
-    Route::get('{section}/{parentId}', [PublicCommentController::class, 'index'])->name('index');
+    Route::get('{section}/{parentId}', [PublicCommentController::class, 'index'])->middleware(PublicReadRequest::class)->name('index');
     Route::post('{section}/{parentId}', [PublicCommentController::class, 'store'])->name('store');
     Route::options('{section}/{parentId}', fn () => response()->noContent())->name('options');
+});
+
+Route::prefix('v1')->middleware(PublicReadRequest::class)->group(function (): void {
+    Route::get('page-settings', [PageSettingsController::class, 'show'])->name('page-settings.public');
+    Route::get('blog/articles', [PublicBlogController::class, 'index'])->name('public.blog.index');
+    Route::get('blog/featured', [PublicBlogController::class, 'featured'])->name('public.blog.featured');
+    Route::get('blog/articles/{slug}/related', [PublicBlogController::class, 'related'])->name('public.blog.related');
+    Route::get('blog/articles/{slug}', [PublicBlogController::class, 'show'])->name('public.blog.show');
+    Route::get('search', [PublicSearchController::class, 'index'])->name('public.search');
+    Route::get('sitemap/entries', [SitemapEntriesController::class, 'index'])->name('public.sitemap');
+    foreach (['page-settings', 'blog/articles', 'blog/featured', 'blog/articles/{slug}', 'blog/articles/{slug}/related', 'search', 'sitemap/entries'] as $path) {
+        Route::options($path, fn () => response()->noContent());
+    }
 });

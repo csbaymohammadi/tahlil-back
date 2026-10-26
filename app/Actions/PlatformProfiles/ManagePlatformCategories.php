@@ -9,12 +9,13 @@ use App\Models\PlatformCategory;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
 use App\Support\PlatformText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 abstract class ManagePlatformCategories
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -131,6 +132,7 @@ abstract class ManagePlatformCategories
     /** @param array<string, mixed> $payload */
     private function outbox(PlatformProfileDefinition $definition, string $requestId, ?int $profileId, string $event, array $payload): void
     {
+        $this->publicIndex->refreshType($definition->slug);
         DB::table($definition->outboxTable)->insert([
             $definition->profileForeignKey => $profileId, 'event' => $event,
             'payload' => json_encode(['request_id' => $requestId, ...$payload, 'occurred_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),

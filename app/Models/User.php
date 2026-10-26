@@ -126,7 +126,7 @@ class User extends Authenticatable
             }
 
             if ($saved && $profileChanged) {
-                (new PublicChanges)->record('author_profile_changed', $this->securityRequestId ?? 'profile-'.Str::uuid());
+                app(PublicChanges::class)->record('author_profile_changed', $this->securityRequestId ?? 'profile-'.Str::uuid());
             }
 
             return $saved;

@@ -22,7 +22,7 @@ class PresentationBoundariesTest extends PanelTestCase
         config(['presentation.allowed_origins' => ['http://localhost'], 'analytics.allowed_origins' => ['http://localhost'], 'analytics.enabled' => true]);
     }
 
-    public function test_news_keeps_all_selected_ids_but_displays_first_four_eligible_in_order(): void
+    public function test_news_returns_every_eligible_selection_in_saved_order(): void
     {
         $this->panel(User::factory()->panel()->create());
         $items = NewsItem::factory()->count(6)->create(['status' => 'published']);
@@ -30,8 +30,8 @@ class PresentationBoundariesTest extends PanelTestCase
         $body['carousels'][2]['selected_ids'] = $items->pluck('id')->reverse()->values()->all();
         $this->putJson('/api/v1/admin/page-settings', $body)->assertOk()->assertJsonCount(6, 'data.carousels.2.selected_ids');
         $items[5]->forceFill(['status' => 'draft'])->save();
-        $response = $this->get('/api/v1/page-settings')->assertOk()->assertJsonCount(4, 'data.carousels.2.items');
-        $this->assertSame([$items[4]->id, $items[3]->id, $items[2]->id, $items[1]->id], array_column($response->json('data.carousels.2.items'), 'id'));
+        $response = $this->get('/api/v1/page-settings')->assertOk()->assertJsonCount(5, 'data.carousels.2.items');
+        $this->assertSame([$items[4]->id, $items[3]->id, $items[2]->id, $items[1]->id, $items[0]->id], array_column($response->json('data.carousels.2.items'), 'id'));
         $this->assertSame(2, PageSetting::current()->version);
     }
 

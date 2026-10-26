@@ -8,12 +8,13 @@ use App\Models\Exchange;
 use App\Models\ExchangeCategory;
 use App\Models\PanelSession;
 use App\Support\ExchangeText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ManageExchangeCategories
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     public function create(PanelSession $session, string $name, string $requestId): ExchangeCategory
     {
@@ -112,6 +113,7 @@ class ManageExchangeCategories
     /** @param array<string, mixed> $payload */
     private function outbox(string $requestId, ?int $exchangeId, string $event, array $payload): void
     {
+        $this->publicIndex->refreshType('exchanges');
         DB::table('exchange_outbox')->insert([
             'exchange_id' => $exchangeId, 'event' => $event,
             'payload' => json_encode(['request_id' => $requestId, ...$payload, 'occurred_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),

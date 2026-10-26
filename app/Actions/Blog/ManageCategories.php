@@ -8,12 +8,13 @@ use App\Models\BlogArticle;
 use App\Models\BlogCategory;
 use App\Models\PanelSession;
 use App\Support\BlogText;
+use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ManageCategories
 {
-    public function __construct(private RevokeSessions $sessions) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     public function create(PanelSession $session, string $name, string $requestId): BlogCategory
     {
@@ -30,6 +31,8 @@ class ManageCategories
             $category = new BlogCategory;
             $category->forceFill(['name' => $name, 'name_normalized' => $normalized, 'version' => 1])->save();
             $this->audit($requestId, $actor->id, $category->id, 'blog_category_created', ['name' => $name]);
+
+            $this->outbox($requestId, 'blog_category_changed', ['category_id' => $category->id]);
 
             return $category;
         });
@@ -106,6 +109,7 @@ class ManageCategories
     /** @param array<string, mixed> $payload */
     private function outbox(string $requestId, string $event, array $payload): void
     {
+        $this->publicIndex->refreshType('articles');
         DB::table('blog_outbox')->insert([
             'article_id' => null, 'event' => $event,
             'payload' => json_encode(['request_id' => $requestId, ...$payload, 'occurred_at' => now()->utc()->toISOString()], JSON_THROW_ON_ERROR),
