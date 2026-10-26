@@ -1,0 +1,2857 @@
+---
+openapi: 3.1.0
+info:
+  title: Bonuses Admin and Guest Rating API
+  version: 1.0.0
+  description: 'Backend delivery: private editorial management and public personalized
+    rating endpoints. Public archive/detail HTTP APIs and external cache delivery
+    are separate integration work.'
+servers:
+- url: "/api/v1"
+  description: Relative API root; admin endpoints include /admin
+paths:
+  "/admin/bonuses/items":
+    get:
+      summary: List non-deleted bonuses by title or author; newest first
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Page"
+      - "$ref": "#/components/parameters/PerPage"
+      - "$ref": "#/components/parameters/Search"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BonusListResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    post:
+      summary: Create bonus; maximum JSON body 2 MiB
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '201':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BonusDetailResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/BonusCreate"
+            examples:
+              publishedWithEmptyCover:
+                value:
+                  title: Campaign Overview
+                  slug: campaign-overview
+                  category_id:
+                  reading_minutes: 5
+                  content: "<h2>Conditions</h2><p>Read the campaign terms.</p>"
+                  status: published
+                  cover_image: ''
+              draft:
+                value:
+                  title: Campaign Overview
+                  slug: campaign-overview
+                  category_id:
+                  reading_minutes: 5
+                  content: "<h2>Conditions</h2><p>Read the campaign terms.</p>"
+                  status: draft
+                  cover_image: ''
+  "/admin/bonuses/items/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Read full private detail including live rating aggregates
+      security:
+      - panelSession: []
+      parameters: []
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BonusDetailResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    patch:
+      summary: Update editorial fields using optimistic version
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BonusDetailResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/BonusPatch"
+            example:
+              expected_version: 1
+              description: Updated summary
+              category_id:
+              status: published
+    delete:
+      summary: Soft-delete bonus using current version
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/ExpectedVersion"
+      responses:
+        '204':
+          description: Deleted; no response body. Shared media, campaign and vote
+            history retained.
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/admin/bonuses/categories":
+    get:
+      summary: List all live bonus categories; no pagination
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Search"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryListResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    post:
+      summary: Create name-only category and server key
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '201':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CategoryCreate"
+  "/admin/bonuses/categories/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Read fresh category and live bonus count
+      security:
+      - panelSession: []
+      parameters: []
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    delete:
+      summary: Uncategorize live bonuses and soft-delete category
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/ExpectedVersion"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DeleteCategoryResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/admin/bonuses/categories/{id}/merge":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    post:
+      summary: Transfer live source bonuses and remove source category
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MergeCategoryResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / SLUG_TAKEN / CATEGORY_NAME_TAKEN
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: UNAUTHENTICATED
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CategoryMerge"
+  "/bonuses/{id}/rating":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Get aggregate, saved choice, voter cookie and short-lived CSRF
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/Origin"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Set-Cookie:
+              schema:
+                type: string
+              description: tahlil-bonus-voter-v1 when missing/expired. Secure; HttpOnly;
+                SameSite=Lax; Path=/api/v1/bonuses; maximum age 365 days. Raw identifier
+                never in JSON.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RatingReadResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID / RATING_CONTEXT_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      description: 'Personalized, no-store. Independent context from panel session.
+        Read limits per 15 minutes: context 120, IP 300; write limits: context 30,
+        IP 120. Refresh context/token after context/CSRF errors.'
+    put:
+      summary: Insert or replace this context vote; body at most 4 KiB
+      security:
+      - bonusVoter: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/Origin"
+      responses:
+        '200':
+          description: Committed authoritative response
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RatingResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID / RATING_CONTEXT_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: BONUS_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+              description: Wait this many seconds before retrying.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store. Personalized rating data must not enter
+                page caches.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RatingWrite"
+            example:
+              value: 5
+      description: Only Published, non-deleted parents. Same value is idempotent;
+        changed value replaces vote. Rating revision changes without advancing editorial
+        version/dates. No panel login or caller-supplied voter identity.
+    options:
+      summary: Restricted rating CORS preflight
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/Origin"
+      - name: Access-Control-Request-Method
+        in: header
+        required: true
+        schema:
+          type: string
+          enum:
+          - GET
+          - PUT
+      responses:
+        '204':
+          description: Allowed origin/method/headers; credentialed CORS. No voter
+            context created.
+        '403':
+          description: Origin, method or headers not allowed.
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+    bonusVoter:
+      type: apiKey
+      in: cookie
+      name: tahlil-bonus-voter-v1
+      description: Independent opaque first-party context; PUT also requires its X-CSRF-Token.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        enum:
+        - 10
+        - 20
+        - 50
+        default: 10
+    Search:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+    ExpectedVersion:
+      name: expected_version
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    Origin:
+      name: Origin
+      in: header
+      schema:
+        type: string
+      description: Same origin as service or configured BONUS_RATING_ALLOWED_ORIGINS.
+        PUT requires this or a valid allowed Referer.
+  schemas:
+    BonusCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed plain text.
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description:
+          type: string
+          maxLength: 2000
+          default: ''
+        cover_image:
+          type: string
+          maxLength: 2048
+          default: ''
+          description: Optional trusted HTTPS image or approved root asset; empty
+            clears. Never fetched by save.
+        content:
+          type: string
+          description: Meaningful canonical sanitized HTML; at most 1 MiB in decoded
+            UTF-8 bytes.
+          x-maxBytes: 1048576
+        category_id:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        reading_minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        meta_description:
+          type: string
+          maxLength: 500
+          default: ''
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+      required:
+      - title
+      - slug
+      - content
+      - category_id
+      - reading_minutes
+      - status
+      additionalProperties: false
+    BonusPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed plain text.
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description:
+          type: string
+          maxLength: 2000
+          default: ''
+        cover_image:
+          type: string
+          maxLength: 2048
+          default: ''
+          description: Optional trusted HTTPS image or approved root asset; empty
+            clears. Never fetched by save.
+        content:
+          type: string
+          description: Meaningful canonical sanitized HTML; at most 1 MiB in decoded
+            UTF-8 bytes.
+          x-maxBytes: 1048576
+        category_id:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        reading_minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        meta_description:
+          type: string
+          maxLength: 500
+          default: ''
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - expected_version
+      additionalProperties: false
+      minProperties: 2
+      description: At least one editable field required. Omission preserves; empty
+        strings clear optional fields; only category_id accepts null. No-op preserves
+        editorial version.
+    Campaign:
+      type: object
+      properties:
+        provider:
+          oneOf:
+          - type: object
+            properties:
+              exchange_id:
+                oneOf:
+                - type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                - type: 'null'
+              name:
+                type: string
+              english_name:
+                type: string
+              logo:
+                type: string
+            required:
+            - exchange_id
+            - name
+            - english_name
+            - logo
+          - type: 'null'
+        amount_display:
+          type: string
+          maxLength: 120
+          default: ''
+        state:
+          type: string
+          enum:
+          - ended
+          - unspecified
+          default: unspecified
+      required:
+      - provider
+      - amount_display
+      - state
+      description: Read-only independent presentation metadata. New campaigns have
+        no provider, amount or assumed state.
+    Bonus:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed plain text.
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description:
+          type: string
+          maxLength: 2000
+          default: ''
+        cover_image:
+          type: string
+          maxLength: 2048
+          default: ''
+          description: Optional trusted HTTPS image or approved root asset; empty
+            clears. Never fetched by save.
+        category_id:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        reading_minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        author:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              name:
+                type: string
+            required:
+            - id
+            - name
+          - type: 'null'
+        category:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              name:
+                type: string
+              key:
+                type: string
+            required:
+            - id
+            - name
+            - key
+          - type: 'null'
+        rating:
+          oneOf:
+          - type: number
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        rating_revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        published_at:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        public_path:
+          oneOf:
+          - type: string
+          - type: 'null'
+      required:
+      - title
+      - slug
+      - description
+      - cover_image
+      - category_id
+      - reading_minutes
+      - status
+      - id
+      - version
+      - author
+      - category
+      - rating
+      - rating_count
+      - rating_revision
+      - created_at
+      - updated_at
+      - published_at
+      - public_path
+    BonusDetail:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed plain text.
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 200
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        description:
+          type: string
+          maxLength: 2000
+          default: ''
+        cover_image:
+          type: string
+          maxLength: 2048
+          default: ''
+          description: Optional trusted HTTPS image or approved root asset; empty
+            clears. Never fetched by save.
+        category_id:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        reading_minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        author:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              name:
+                type: string
+            required:
+            - id
+            - name
+          - type: 'null'
+        category:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              name:
+                type: string
+              key:
+                type: string
+            required:
+            - id
+            - name
+            - key
+          - type: 'null'
+        rating:
+          oneOf:
+          - type: number
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        rating_revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        published_at:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        public_path:
+          oneOf:
+          - type: string
+          - type: 'null'
+        content:
+          type: string
+          description: Meaningful canonical sanitized HTML; at most 1 MiB in decoded
+            UTF-8 bytes.
+          x-maxBytes: 1048576
+        meta_description:
+          type: string
+          maxLength: 500
+          default: ''
+        campaign:
+          "$ref": "#/components/schemas/Campaign"
+      required:
+      - title
+      - slug
+      - description
+      - cover_image
+      - category_id
+      - reading_minutes
+      - status
+      - id
+      - version
+      - author
+      - category
+      - rating
+      - rating_count
+      - rating_revision
+      - created_at
+      - updated_at
+      - published_at
+      - public_path
+      - content
+      - meta_description
+      - campaign
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        key:
+          type: string
+        bonus_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - key
+      - bonus_count
+      - version
+      - created_at
+      - updated_at
+    CategoryCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+      - name
+      additionalProperties: false
+    CategoryMerge:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        target_category_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        target_expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - expected_version
+      - target_category_id
+      - target_expected_version
+      additionalProperties: false
+    RatingWrite:
+      type: object
+      properties:
+        value:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required:
+      - value
+      additionalProperties: false
+    RatingResult:
+      type: object
+      properties:
+        bonus_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        my_rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        rating:
+          oneOf:
+          - type: number
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        rating_revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+      - bonus_id
+      - my_rating
+      - rating
+      - rating_count
+      - rating_revision
+    RatingRead:
+      type: object
+      properties:
+        bonus_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        my_rating:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        rating:
+          oneOf:
+          - type: number
+            minimum: 1
+            maximum: 5
+          - type: 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        rating_revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        csrf_token:
+          type: string
+          description: Opaque context-bound token valid at most 15 minutes. Never
+            cache or log.
+        csrf_expires_at:
+          type: string
+          format: date-time
+      required:
+      - bonus_id
+      - my_rating
+      - rating
+      - rating_count
+      - rating_revision
+      - csrf_token
+      - csrf_expires_at
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+          - code
+          - message
+          - fields
+        request_id:
+          type: string
+      required:
+      - error
+      - request_id
+    BonusDetailResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/BonusDetail"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    BonusListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Bonus"
+        request_id:
+          type: string
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            per_page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            total:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            total_pages:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - page
+          - per_page
+          - total
+          - total_pages
+      required:
+      - data
+      - request_id
+      - meta
+    CategoryResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/Category"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    CategoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Category"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    RatingReadResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/RatingRead"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    RatingResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/RatingResult"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    DeleteCategoryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            affected_bonus_count:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - deleted_category_id
+          - affected_bonus_count
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    MergeCategoryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            source_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            target_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            moved_bonus_count:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - source_category_id
+          - target_category_id
+          - moved_bonus_count
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id

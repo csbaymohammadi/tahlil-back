@@ -63,7 +63,7 @@ class PlatformPublicProjection
         foreach ($definition->summaryFields as $field) {
             $detail[$field] = $profile->getAttribute($field);
         }
-        if ($definition->key === 'stock-brokers') {
+        if (in_array($definition->key, ['stock-brokers', 'prop-firms'], true)) {
             $detail['display'] = ['established_at' => $detail['specifications']['established_at'] !== '' ? $detail['specifications']['established_at'] : $profile->founded_year];
         }
 

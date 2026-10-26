@@ -109,6 +109,9 @@ abstract class PlatformCategoryController extends Controller
     private function validateBody(Request $request, array $rules): array
     {
         $data = $request->json()->all();
+        if (isset($data['name']) && is_string($data['name'])) {
+            $data['name'] = trim($data['name']);
+        }
         $validator = Validator::make($data, $rules);
         $validator->after(function (\Illuminate\Validation\Validator $validator) use ($data, $rules): void {
             foreach (array_intersect(array_keys($data), array_keys($rules)) as $field) {

@@ -29,12 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(PanelEnvelope::class);
-        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*')]);
-        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*')]);
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->report(function (Throwable $exception) {
-            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*')) {
+            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
                 Log::error('Panel request failed.', [
                     'request_id' => request()->attributes->get('request_id'),
                     'exception_type' => $exception::class,
@@ -45,7 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'new_password']);
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/v1/admin/*', 'media/*')) {
+            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
                 return null;
             }
             $fields = [];

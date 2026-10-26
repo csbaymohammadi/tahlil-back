@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Media\MediaConsumers;
 use App\Models\BlogArticle;
+use App\Models\Bonus;
 use App\Models\Broker;
 use App\Models\Exchange;
 use App\Models\GoldPlatform;
 use App\Models\NewsItem;
+use App\Models\PropFirm;
 use App\Models\StockBrokerage;
 use App\Models\User;
 use Illuminate\Http\Middleware\TrustProxies;
@@ -31,6 +33,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         TrustProxies::at(config('panel.trusted_proxies'));
+        $this->app->make(MediaConsumers::class)->register('bonus',
+            static fn (int $id, User $actor): bool => Bonus::whereKey($id)->exists(),
+            static fn (int $id): bool => Bonus::public()->whereKey($id)->exists(),
+        );
         Auth::viaRequest('panel-session', fn (Request $request) => $request->attributes->get('panel_user'));
         $this->app->make(MediaConsumers::class)->register(
             'blog-article',
@@ -61,6 +67,11 @@ class AppServiceProvider extends ServiceProvider
             'gold-platforms',
             static fn (int $id, User $actor): bool => GoldPlatform::query()->whereKey($id)->exists(),
             static fn (int $id): bool => GoldPlatform::public()->whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register(
+            'prop-firms',
+            static fn (int $id, User $actor): bool => PropFirm::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => PropFirm::public()->whereKey($id)->exists(),
         );
     }
 }

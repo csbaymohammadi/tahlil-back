@@ -79,6 +79,10 @@ abstract class PlatformProfileRequest extends FormRequest
                 $validator->errors()->add($field, 'This field is not accepted.');
             }
 
+            if (array_key_exists('category_id', $data) && $data['category_id'] !== null && ! is_int($data['category_id'])) {
+                $validator->errors()->add('category_id', 'Choose an integer category ID or null.');
+            }
+
             foreach (['title', 'english_name', 'description', 'founded_year', ...$definition->summaryFields, 'meta_description'] as $field) {
                 $value = $this->input($field);
                 if (is_string($value) && strip_tags($value) !== $value) {
@@ -109,6 +113,9 @@ abstract class PlatformProfileRequest extends FormRequest
                 } else {
                     $specifications = $definition->specifications;
                     foreach (get_object_vars($raw->specifications) as $key => $value) {
+                        if (is_string($value)) {
+                            $value = trim($value);
+                        }
                         if (! in_array($key, $specifications::FIELDS, true)) {
                             $validator->errors()->add("specifications.{$key}", 'This specification is not supported.');
                         } elseif (! is_string($value)) {

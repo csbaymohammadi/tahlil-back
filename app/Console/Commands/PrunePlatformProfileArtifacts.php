@@ -8,7 +8,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-#[Signature('platform-profiles:prune {domain : broker, stock-brokers, or gold-platforms}')]
+#[Signature('platform-profiles:prune {domain : broker, stock-brokers, gold-platforms, or prop-firms}')]
 #[Description('Prune expired platform profile audit and delivered outbox records')]
 class PrunePlatformProfileArtifacts extends Command
 {
@@ -17,7 +17,7 @@ class PrunePlatformProfileArtifacts extends Command
         try {
             $definition = PlatformProfileDefinition::for((string) $this->argument('domain'));
         } catch (\InvalidArgumentException) {
-            $this->error('Choose broker, stock-brokers, or gold-platforms.');
+            $this->error('Choose broker, stock-brokers, gold-platforms, or prop-firms.');
 
             return self::FAILURE;
         }

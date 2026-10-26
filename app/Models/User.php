@@ -86,6 +86,7 @@ class User extends Authenticatable
 
             $saved = parent::save($options);
             if ($saved && $nameChanged) {
+                DB::table('bonuses')->where('author_id', $this->id)->update(['author_name_normalized' => BlogText::normalize($this->name)]);
                 DB::table('blog_articles')->where('author_id', $this->id)->update([
                     'author_name_normalized' => BlogText::normalize($this->name),
                 ]);

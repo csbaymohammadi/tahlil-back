@@ -11,7 +11,7 @@ class PanelEnvelope
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->is('api/v1/admin/*', 'media/*')) {
+        if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
             return $next($request);
         }
         $request->attributes->set('request_id', 'req_'.Str::uuid());
@@ -21,7 +21,18 @@ class PanelEnvelope
             $response->headers->set('Cache-Control', 'no-store');
         }
         $response->setVary('Cookie', false);
-        $response->headers->clearCookie('tahlil-panel-session', '/tahlilpanel', null, config('panel.secure_cookie'), true, 'lax');
+        if ($request->is('api/v1/bonuses/*')) {
+            $response->setVary('Origin', false);
+            if ($origin = $request->attributes->get('bonus_rating_origin')) {
+                $response->headers->set('Access-Control-Allow-Origin', $origin);
+                $response->headers->set('Access-Control-Allow-Credentials', 'true');
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type, X-CSRF-Token');
+                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
+            }
+        } else {
+            $response->headers->clearCookie('tahlil-panel-session', '/tahlilpanel', null, config('panel.secure_cookie'), true, 'lax');
+        }
 
         return $response;
     }

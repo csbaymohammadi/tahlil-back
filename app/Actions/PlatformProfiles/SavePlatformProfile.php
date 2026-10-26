@@ -160,7 +160,7 @@ abstract class SavePlatformProfile
         $values['english_name_normalized'] = PlatformText::panel((string) $values['english_name']);
         $values['english_public_normalized'] = PlatformText::public((string) $values['english_name']);
         $descriptionForSearch = (string) $values['description'];
-        if ($definition->key === 'gold-platforms' && $descriptionForSearch === '') {
+        if (in_array($definition->key, ['gold-platforms', 'prop-firms'], true) && $descriptionForSearch === '') {
             $descriptionForSearch = html_entity_decode(strip_tags((string) $canonicalContent), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             $descriptionForSearch = preg_replace('/[\s\x{00A0}]+/u', ' ', trim($descriptionForSearch)) ?? trim($descriptionForSearch);
             $descriptionForSearch = mb_substr($descriptionForSearch, 0, 300, 'UTF-8');

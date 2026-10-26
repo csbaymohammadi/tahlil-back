@@ -11,6 +11,9 @@ use App\Models\GoldPlatformSlugOwnership;
 use App\Models\PlatformCategory;
 use App\Models\PlatformProfile;
 use App\Models\PlatformSlugOwnership;
+use App\Models\PropFirm;
+use App\Models\PropFirmCategory;
+use App\Models\PropFirmSlugOwnership;
 use App\Models\StockBrokerage;
 use App\Models\StockBrokerageCategory;
 use App\Models\StockBrokerageSlugOwnership;
@@ -22,7 +25,7 @@ final readonly class PlatformProfileDefinition
      * @param  class-string<PlatformProfile>  $profileModel
      * @param  class-string<PlatformCategory>  $categoryModel
      * @param  class-string<PlatformSlugOwnership>  $slugModel
-     * @param  class-string<BrokerSpecifications|StockBrokerSpecifications|GoldPlatformSpecifications>  $specifications
+     * @param  class-string<BrokerSpecifications|StockBrokerSpecifications|GoldPlatformSpecifications|PropFirmSpecifications>  $specifications
      * @param  list<string>  $summaryFields
      */
     private function __construct(
@@ -74,12 +77,18 @@ final readonly class PlatformProfileDefinition
         return new self('gold-platforms', 'gold-platforms', 'gold-platforms', 120, 'gold_platform_id', 'gold_platform_audit_events', 'gold_platform_outbox', 'gold_platform_slug_ownership', 'gold_platform_categories', '', '/gold-platforms/', 'GOLD_PLATFORM_NOT_FOUND', 'gold platform', 'gold_platform', 'gold_platform', 'gold_platform_id', GoldPlatform::class, GoldPlatformCategory::class, GoldPlatformSlugOwnership::class, GoldPlatformSpecifications::class, [], false, false, false, 'gold-platforms', 'Gold Platform', 'platform_profiles.gold_platform_featured_ids', 'gold_platform_count', 'affected_gold_platform_count', 'moved_gold_platform_count', false);
     }
 
+    public static function propFirms(): self
+    {
+        return new self('prop-firms', 'prop-firms', 'prop-firms', 120, 'prop_firm_id', 'prop_firm_audit_events', 'prop_firm_outbox', 'prop_firm_slug_ownership', 'prop_firm_categories', '', '/prop-firms/', 'PROP_FIRM_NOT_FOUND', 'prop firm', 'prop_firm', 'prop_firm', 'prop_firm_id', PropFirm::class, PropFirmCategory::class, PropFirmSlugOwnership::class, PropFirmSpecifications::class, [], false, false, false, 'prop-firms', 'Prop Firm', 'platform_profiles.prop_firm_featured_ids', 'prop_firm_count', 'affected_prop_firm_count', 'moved_prop_firm_count', false);
+    }
+
     public static function for(string $key): self
     {
         return match ($key) {
             'broker' => self::forex(),
             'stock-brokers' => self::stock(),
             'gold-platforms' => self::gold(),
+            'prop-firms' => self::propFirms(),
             default => throw new InvalidArgumentException('Unknown platform profile type.'),
         };
     }
