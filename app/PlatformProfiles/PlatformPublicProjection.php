@@ -35,9 +35,9 @@ class PlatformPublicProjection
             $card['markets'] = $profile->markets;
             $card['platforms'] = $profile->platforms;
             $card['filter_keys'] = array_values(array_unique(array_filter(['forex', $category?->key])));
-        } else {
-            $card['kind'] = 'stock-brokers';
-            $card['platform_label'] = 'Stock Brokerage';
+        } elseif ($definition->kind !== null) {
+            $card['kind'] = $definition->kind;
+            $card['platform_label'] = $definition->platformLabel;
         }
 
         return $card;

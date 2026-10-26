@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\BrokerController;
 use App\Http\Controllers\Admin\ContentImportController;
 use App\Http\Controllers\Admin\ExchangeCategoryController;
 use App\Http\Controllers\Admin\ExchangeItemController;
+use App\Http\Controllers\Admin\GoldPlatformCategoryController;
+use App\Http\Controllers\Admin\GoldPlatformController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\NewsCategoryController;
 use App\Http\Controllers\Admin\NewsItemController;
@@ -104,6 +106,19 @@ Route::prefix('v1/admin/stock-brokers')->name('panel.stock-brokers.')->middlewar
     Route::post('categories', [StockBrokerageCategoryController::class, 'store'])->name('categories.store');
     Route::delete('categories/{id}', [StockBrokerageCategoryController::class, 'destroy'])->name('categories.destroy');
     Route::post('categories/{id}/merge', [StockBrokerageCategoryController::class, 'merge'])->name('categories.merge');
+});
+
+Route::prefix('v1/admin/gold-platforms')->name('panel.gold-platforms.')->middleware(PanelRequest::class)->group(function (): void {
+    Route::get('items', [GoldPlatformController::class, 'index'])->name('items.index');
+    Route::get('items/{id}', [GoldPlatformController::class, 'show'])->name('items.show');
+    Route::post('items', [GoldPlatformController::class, 'store'])->name('items.store');
+    Route::patch('items/{id}', [GoldPlatformController::class, 'update'])->name('items.update');
+    Route::delete('items/{id}', [GoldPlatformController::class, 'destroy'])->name('items.destroy');
+    Route::get('categories', [GoldPlatformCategoryController::class, 'index'])->name('categories.index');
+    Route::get('categories/{id}', [GoldPlatformCategoryController::class, 'show'])->name('categories.show');
+    Route::post('categories', [GoldPlatformCategoryController::class, 'store'])->name('categories.store');
+    Route::delete('categories/{id}', [GoldPlatformCategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('categories/{id}/merge', [GoldPlatformCategoryController::class, 'merge'])->name('categories.merge');
 });
 
 Route::prefix('v1/admin')->name('panel.content-imports.')->middleware(PanelRequest::class)->group(function (): void {

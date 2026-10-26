@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([RoleSeeder::class, PanelAdministratorSeeder::class, ExchangeCategorySeeder::class, BrokerCategorySeeder::class, StockBrokerageCategorySeeder::class]);
+        $this->call([RoleSeeder::class, PanelAdministratorSeeder::class, ExchangeCategorySeeder::class, BrokerCategorySeeder::class, StockBrokerageCategorySeeder::class, GoldPlatformCategorySeeder::class]);
         User::withTrashed()->firstOrCreate(
             ['email' => 'test@example.com'],
             fn (): array => User::factory()->raw([

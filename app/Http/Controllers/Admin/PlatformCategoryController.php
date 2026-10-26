@@ -74,7 +74,7 @@ abstract class PlatformCategoryController extends Controller
         $session = $request->attributes->get('panel_session');
         $result = app($managerClass)->delete($session, PanelIds::parse($id), (int) $query['expected_version'], (string) $request->attributes->get('request_id'));
         $data = ['deleted_category_id' => $result['deleted_category_id']];
-        $data[$this->definition()->key === 'broker' ? 'affected_broker_count' : 'affected_brokerage_count'] = $result['affected_count'];
+        $data[$this->definition()->affectedCountKey] = $result['affected_count'];
 
         return response()->json(['data' => $data, 'request_id' => $request->attributes->get('request_id')]);
     }
@@ -98,7 +98,7 @@ abstract class PlatformCategoryController extends Controller
             (string) $request->attributes->get('request_id'),
         );
         $data = ['source_category_id' => $result['source_category_id'], 'target_category_id' => $result['target_category_id']];
-        $data[$this->definition()->key === 'broker' ? 'moved_broker_count' : 'moved_brokerage_count'] = $result['moved_count'];
+        $data[$this->definition()->movedCountKey] = $result['moved_count'];
 
         return response()->json(['data' => $data, 'request_id' => $request->attributes->get('request_id')]);
     }

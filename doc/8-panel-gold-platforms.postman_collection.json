@@ -1,0 +1,183 @@
+{
+  "info": {
+    "_postman_id": "c48f85c3-0a53-46c0-a42a-e996cf772b26",
+    "name": "Tahlil Gold Platforms Admin API",
+    "description": "Management API collection. Set baseUrl to the configured origin; this collection intentionally contains no staging or production host. Set sessionCookie and csrfToken from an authenticated panel session. Mutations require CSRF. See doc/8-panel-gold-platforms-api.md for HTML sanitizer, locking, error, and public-read contracts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "", "type": "string" },
+    { "key": "sessionCookie", "value": "", "type": "string" },
+    { "key": "csrfToken", "value": "", "type": "string" },
+    { "key": "profileId", "value": "1", "type": "string" },
+    { "key": "categoryId", "value": "1", "type": "string" },
+    { "key": "targetCategoryId", "value": "2", "type": "string" },
+    { "key": "profileVersion", "value": "1", "type": "string" },
+    { "key": "categoryVersion", "value": "1", "type": "string" },
+    { "key": "targetCategoryVersion", "value": "1", "type": "string" }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Profiles",
+      "item": [
+        {
+          "name": "List profiles",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/gold-platforms/items?page=1&per_page=10&q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "gold-platforms", "items"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "per_page", "value": "10" },
+                { "key": "q", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/items/{{profileId}}"
+          }
+        },
+        {
+          "name": "Create profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Example Gold Platform\",\n  \"english_name\": \"Example Gold Platform\",\n  \"slug\": \"example-gold-platform\",\n  \"description\": \"Gold services and delivery overview.\",\n  \"logo\": \"\",\n  \"website_url\": \"\",\n  \"founded_year\": \"\",\n  \"specifications\": {\n    \"established_at\": \"\", \"head_office_address\": \"\", \"physical_branch_count\": \"\", \"years_active\": \"\",\n    \"minimum_purchase\": \"\", \"maximum_purchase\": \"\", \"minimum_sale\": \"\", \"maximum_sale\": \"\",\n    \"in_person_visit\": \"\", \"address_transparency\": \"\", \"active_social_media\": \"\", \"around_the_clock_support\": \"\",\n    \"support_availability\": \"\", \"melted_gold_trading\": \"yes\", \"identity_documents\": \"\", \"dedicated_app\": \"\",\n    \"physical_delivery_time\": \"\", \"physical_delivery_method\": \"\", \"asset_storage\": \"\",\n    \"trading_fee\": \"\", \"registration_fee\": \"\", \"inamad\": \"\", \"virtual_business_union\": \"\", \"computer_trade_organization\": \"\"\n  },\n  \"category_id\": null,\n  \"content\": \"<h2>Overview</h2><p>A review of this platform.</p>\",\n  \"meta_description\": \"\",\n  \"status\": \"draft\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/items"
+          }
+        },
+        {
+          "name": "Patch profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expected_version\": {{profileVersion}},\n  \"specifications\": { \"melted_gold_trading\": \"yes\", \"physical_delivery_method\": \"\" },\n  \"category_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/items/{{profileId}}"
+          }
+        },
+        {
+          "name": "Delete profile",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/items/{{profileId}}?expected_version={{profileVersion}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/categories?q="
+          }
+        },
+        {
+          "name": "Get category",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/categories/{{categoryId}}"
+          }
+        },
+        {
+          "name": "Create category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Gold Platform Services\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/categories"
+          }
+        },
+        {
+          "name": "Delete category",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/categories/{{categoryId}}?expected_version={{categoryVersion}}"
+          }
+        },
+        {
+          "name": "Merge category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "tahlil-panel-session-v2={{sessionCookie}}" },
+              { "key": "X-CSRF-Token", "value": "{{csrfToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expected_version\": {{categoryVersion}},\n  \"target_category_id\": {{targetCategoryId}},\n  \"target_expected_version\": {{targetCategoryVersion}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/api/v1/admin/gold-platforms/categories/{{categoryId}}/merge"
+          }
+        }
+      ]
+    }
+  ]
+}

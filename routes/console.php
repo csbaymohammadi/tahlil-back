@@ -25,3 +25,5 @@ Schedule::command('exchanges:prune')->hourly()->withoutOverlapping();
 Schedule::command('platform-profiles:prune broker')->hourly()->withoutOverlapping();
 
 Schedule::command('platform-profiles:prune stock-brokers')->hourly()->withoutOverlapping();
+
+Schedule::command('platform-profiles:prune gold-platforms')->hourly()->withoutOverlapping();

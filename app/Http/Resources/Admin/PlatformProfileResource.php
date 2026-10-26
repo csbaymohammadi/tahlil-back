@@ -35,8 +35,8 @@ class PlatformProfileResource extends JsonResource
             'website_url' => $profile->website_url,
             'founded_year' => $profile->founded_year,
         ];
-        if ($this->definition->key === 'stock-brokers') {
-            $data['kind'] = 'stock-brokers';
+        if ($this->definition->kind !== null) {
+            $data['kind'] = $this->definition->kind;
         }
         foreach ($this->definition->summaryFields as $field) {
             $data[$field] = $profile->getAttribute($field);

@@ -5,6 +5,9 @@ namespace App\Support;
 use App\Models\Broker;
 use App\Models\BrokerCategory;
 use App\Models\BrokerSlugOwnership;
+use App\Models\GoldPlatform;
+use App\Models\GoldPlatformCategory;
+use App\Models\GoldPlatformSlugOwnership;
 use App\Models\PlatformCategory;
 use App\Models\PlatformProfile;
 use App\Models\PlatformSlugOwnership;
@@ -19,7 +22,7 @@ final readonly class PlatformProfileDefinition
      * @param  class-string<PlatformProfile>  $profileModel
      * @param  class-string<PlatformCategory>  $categoryModel
      * @param  class-string<PlatformSlugOwnership>  $slugModel
-     * @param  class-string<BrokerSpecifications|StockBrokerSpecifications>  $specifications
+     * @param  class-string<BrokerSpecifications|StockBrokerSpecifications|GoldPlatformSpecifications>  $specifications
      * @param  list<string>  $summaryFields
      */
     private function __construct(
@@ -47,16 +50,28 @@ final readonly class PlatformProfileDefinition
         public bool $logoRequired,
         public bool $websiteRequired,
         public bool $hasCategoryKeys,
+        public ?string $kind,
+        public string $platformLabel,
+        public string $featuredIdsConfig,
+        public string $categoryCountKey,
+        public string $affectedCountKey,
+        public string $movedCountKey,
+        public bool $fillUnconfiguredFeatured,
     ) {}
 
     public static function forex(): self
     {
-        return new self('broker', 'brokers', 'broker', 200, 'broker_id', 'broker_audit_events', 'broker_outbox', 'broker_slug_ownership', 'broker_categories', 'broker_legacy_stock_paths', '/brokers/', 'BROKER_NOT_FOUND', 'broker', 'broker', 'broker', 'broker_id', Broker::class, BrokerCategory::class, BrokerSlugOwnership::class, BrokerSpecifications::class, ['platforms', 'markets', 'access', 'account_currency'], true, true, true);
+        return new self('broker', 'brokers', 'broker', 200, 'broker_id', 'broker_audit_events', 'broker_outbox', 'broker_slug_ownership', 'broker_categories', 'broker_legacy_stock_paths', '/brokers/', 'BROKER_NOT_FOUND', 'broker', 'broker', 'broker', 'broker_id', Broker::class, BrokerCategory::class, BrokerSlugOwnership::class, BrokerSpecifications::class, ['platforms', 'markets', 'access', 'account_currency'], true, true, true, null, 'Forex Broker', 'platform_profiles.broker_featured_ids', 'broker_count', 'affected_broker_count', 'moved_broker_count', true);
     }
 
     public static function stock(): self
     {
-        return new self('stock-brokers', 'stock-brokers', 'stock-brokers', 120, 'stock_brokerage_id', 'stock_brokerage_audit_events', 'stock_brokerage_outbox', 'stock_brokerage_slug_ownership', 'stock_brokerage_categories', 'broker_legacy_stock_paths', '/stock-brokers/', 'STOCK_BROKER_NOT_FOUND', 'stock brokerage', 'stock_broker', 'stock_broker', 'stock_brokerage_id', StockBrokerage::class, StockBrokerageCategory::class, StockBrokerageSlugOwnership::class, StockBrokerSpecifications::class, [], false, false, false);
+        return new self('stock-brokers', 'stock-brokers', 'stock-brokers', 120, 'stock_brokerage_id', 'stock_brokerage_audit_events', 'stock_brokerage_outbox', 'stock_brokerage_slug_ownership', 'stock_brokerage_categories', 'broker_legacy_stock_paths', '/stock-brokers/', 'STOCK_BROKER_NOT_FOUND', 'stock brokerage', 'stock_broker', 'stock_broker', 'stock_brokerage_id', StockBrokerage::class, StockBrokerageCategory::class, StockBrokerageSlugOwnership::class, StockBrokerSpecifications::class, [], false, false, false, 'stock-brokers', 'Stock Brokerage', 'platform_profiles.stock_broker_featured_ids', 'brokerage_count', 'affected_brokerage_count', 'moved_brokerage_count', true);
+    }
+
+    public static function gold(): self
+    {
+        return new self('gold-platforms', 'gold-platforms', 'gold-platforms', 120, 'gold_platform_id', 'gold_platform_audit_events', 'gold_platform_outbox', 'gold_platform_slug_ownership', 'gold_platform_categories', '', '/gold-platforms/', 'GOLD_PLATFORM_NOT_FOUND', 'gold platform', 'gold_platform', 'gold_platform', 'gold_platform_id', GoldPlatform::class, GoldPlatformCategory::class, GoldPlatformSlugOwnership::class, GoldPlatformSpecifications::class, [], false, false, false, 'gold-platforms', 'Gold Platform', 'platform_profiles.gold_platform_featured_ids', 'gold_platform_count', 'affected_gold_platform_count', 'moved_gold_platform_count', false);
     }
 
     public static function for(string $key): self
@@ -64,6 +79,7 @@ final readonly class PlatformProfileDefinition
         return match ($key) {
             'broker' => self::forex(),
             'stock-brokers' => self::stock(),
+            'gold-platforms' => self::gold(),
             default => throw new InvalidArgumentException('Unknown platform profile type.'),
         };
     }

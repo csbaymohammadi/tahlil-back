@@ -6,5 +6,6 @@ return [
     'sort_locale' => 'fa_IR',
     'broker_featured_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('BROKER_FEATURED_IDS', ''))))),
     'stock_broker_featured_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('STOCK_BROKER_FEATURED_IDS', ''))))),
+    'gold_platform_featured_ids' => array_values(array_filter(array_map('intval', explode(',', (string) env('GOLD_PLATFORM_FEATURED_IDS', ''))))),
     'management_rate_limit' => 300,
 ];

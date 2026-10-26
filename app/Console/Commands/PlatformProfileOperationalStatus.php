@@ -8,7 +8,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
-#[Signature('platform-profiles:status {domain : broker or stock-brokers}')]
+#[Signature('platform-profiles:status {domain : broker, stock-brokers, or gold-platforms}')]
 #[Description('Report platform profile outbox and runtime prerequisites')]
 class PlatformProfileOperationalStatus extends Command
 {
@@ -17,7 +17,7 @@ class PlatformProfileOperationalStatus extends Command
         try {
             $definition = PlatformProfileDefinition::for((string) $this->argument('domain'));
         } catch (\InvalidArgumentException) {
-            $this->error('Choose broker or stock-brokers.');
+            $this->error('Choose broker, stock-brokers, or gold-platforms.');
 
             return self::FAILURE;
         }

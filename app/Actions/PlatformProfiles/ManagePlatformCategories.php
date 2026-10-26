@@ -71,8 +71,7 @@ abstract class ManagePlatformCategories
             }
             $profileClass = $definition->profileModel;
             $affected = $profileClass::query()->where('category_id', $id)->whereNull('deleted_at');
-            $count = (clone $affected)->count();
-            $affected->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $affected->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
             $category->delete();
             $this->audit($definition, $requestId, $actor->id, $id, $definition->eventPrefix.'_category_deleted', ['affected_count' => $count]);
             $this->outbox($definition, $requestId, null, $definition->eventPrefix.'_category_changed', ['category_id' => $id, 'affected_count' => $count]);
@@ -103,8 +102,7 @@ abstract class ManagePlatformCategories
             }
             $profileClass = $definition->profileModel;
             $affected = $profileClass::query()->where('category_id', $sourceId)->whereNull('deleted_at');
-            $count = (clone $affected)->count();
-            $affected->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $affected->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
             $source->delete();
             $details = ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_count' => $count];
             $this->audit($definition, $requestId, $actor->id, $sourceId, $definition->eventPrefix.'_categories_merged', $details);

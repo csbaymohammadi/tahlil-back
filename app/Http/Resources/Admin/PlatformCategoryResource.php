@@ -25,10 +25,8 @@ class PlatformCategoryResource extends JsonResource
         ];
         if ($this->definition->hasCategoryKeys) {
             $data['key'] = $category->key;
-            $data['broker_count'] = $category->profiles_count ?? $category->profiles()->count();
-        } else {
-            $data['brokerage_count'] = $category->profiles_count ?? $category->profiles()->count();
         }
+        $data[$this->definition->categoryCountKey] = $category->profiles_count ?? $category->profiles()->count();
         $data += [
             'created_at' => $category->created_at?->utc()->toISOString(),
             'updated_at' => $category->updated_at?->utc()->toISOString(),

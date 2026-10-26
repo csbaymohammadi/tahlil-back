@@ -6,6 +6,7 @@ use App\Media\MediaConsumers;
 use App\Models\BlogArticle;
 use App\Models\Broker;
 use App\Models\Exchange;
+use App\Models\GoldPlatform;
 use App\Models\NewsItem;
 use App\Models\StockBrokerage;
 use App\Models\User;
@@ -55,6 +56,11 @@ class AppServiceProvider extends ServiceProvider
             'stock-brokers',
             static fn (int $id, User $actor): bool => StockBrokerage::query()->whereKey($id)->exists(),
             static fn (int $id): bool => StockBrokerage::public()->whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register(
+            'gold-platforms',
+            static fn (int $id, User $actor): bool => GoldPlatform::query()->whereKey($id)->exists(),
+            static fn (int $id): bool => GoldPlatform::public()->whereKey($id)->exists(),
         );
     }
 }

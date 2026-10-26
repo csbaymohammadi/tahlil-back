@@ -79,8 +79,8 @@ abstract class SavePlatformProfile
                 $profile->updated_by = $actor->id;
                 $profile->version = 1;
                 $profile->published_at = $isPublished ? now() : null;
-                if ($definition->key === 'stock-brokers') {
-                    $profile->kind = 'stock-brokers';
+                if ($definition->kind !== null) {
+                    $profile->kind = $definition->kind;
                 }
             } else {
                 $profile->updated_by = $actor->id;
@@ -154,16 +154,23 @@ abstract class SavePlatformProfile
                 $values[$field] = $old[$field] ?? (in_array($field, $emptyDefaults, true) ? '' : null);
             }
         }
+        $canonicalContent = $content ?? ($old['content'] ?? '');
         $values['title_normalized'] = PlatformText::panel((string) $values['title']);
         $values['title_public_normalized'] = PlatformText::public((string) $values['title']);
         $values['english_name_normalized'] = PlatformText::panel((string) $values['english_name']);
         $values['english_public_normalized'] = PlatformText::public((string) $values['english_name']);
-        $values['description_normalized'] = PlatformText::panel((string) $values['description']);
-        $values['description_public_normalized'] = PlatformText::public((string) $values['description']);
+        $descriptionForSearch = (string) $values['description'];
+        if ($definition->key === 'gold-platforms' && $descriptionForSearch === '') {
+            $descriptionForSearch = html_entity_decode(strip_tags((string) $canonicalContent), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $descriptionForSearch = preg_replace('/[\s\x{00A0}]+/u', ' ', trim($descriptionForSearch)) ?? trim($descriptionForSearch);
+            $descriptionForSearch = mb_substr($descriptionForSearch, 0, 300, 'UTF-8');
+        }
+        $values['description_normalized'] = PlatformText::panel($descriptionForSearch);
+        $values['description_public_normalized'] = PlatformText::public($descriptionForSearch);
         $values['markets_public_normalized'] = $definition->key === 'broker' ? PlatformText::public((string) $values['markets']) : null;
         $values['title_sort_key'] = PlatformText::persianSortKey((string) $values['title']);
         $values['specifications'] = $specifications;
-        $values['content'] = $content ?? ($old['content'] ?? '');
+        $values['content'] = $canonicalContent;
 
         return $values;
     }

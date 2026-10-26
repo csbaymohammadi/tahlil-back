@@ -1,0 +1,492 @@
+openapi: 3.1.0
+info:
+  title: Gold Platforms Admin API
+  version: 1.0.0
+  description: Session-authenticated management API. Configure the deployment origin locally; no staging or production host is assumed.
+servers:
+  - url: /api/v1/admin
+    description: Relative API base path
+security:
+  - panelSession: []
+tags:
+  - name: Profiles
+  - name: Categories
+paths:
+  /gold-platforms/items:
+    get:
+      tags: [Profiles]
+      summary: List profiles
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Draft and published profiles, newest first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileListResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Profiles]
+      summary: Create profile
+      description: Requires a panel session and CSRF token. Maximum body size is 2 MiB.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileCreate' }
+      responses:
+        '201':
+          description: Created; Location points to management detail
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /gold-platforms/items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Profiles]
+      summary: Get profile detail
+      responses:
+        '200':
+          description: Full profile, including all 24 specifications
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Profiles]
+      summary: Partially update profile
+      description: Requires expected_version and at least one profile field. Specifications merge by key.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfilePatch' }
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    delete:
+      tags: [Profiles]
+      summary: Soft-delete profile
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '204': { description: Deleted; slug and media references remain reserved }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /gold-platforms/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      parameters:
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Live categories sorted by normalized name and ID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Categories]
+      summary: Create category
+      description: Maximum body size is 16 KiB. Deleted category names remain reserved.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80, example: Gold Platform Services }
+      responses:
+        '201':
+          description: Created category
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /gold-platforms/categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Categories]
+      summary: Get category
+      responses:
+        '200':
+          description: Category and live profile count
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Categories]
+      summary: Delete category and uncategorize live profiles
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: expected_version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Deleted category; affected count is the transactional update count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [deleted_category_id, affected_gold_platform_count]
+                    properties:
+                      deleted_category_id: { type: integer }
+                      affected_gold_platform_count: { type: integer, minimum: 0 }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /gold-platforms/categories/{id}/merge:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Categories]
+      summary: Merge a category into another
+      description: Source and target versions are checked. Transfer and soft-delete run atomically under the shared mutation lock.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expected_version, target_category_id, target_expected_version]
+              properties:
+                expected_version: { type: integer, minimum: 1 }
+                target_category_id: { type: integer, minimum: 1 }
+                target_expected_version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Merge result; moved count is the transactional update count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  data:
+                    type: object
+                    required: [source_category_id, target_category_id, moved_gold_platform_count]
+                    properties:
+                      source_category_id: { type: integer }
+                      target_category_id: { type: integer }
+                      moved_gold_platform_count: { type: integer, minimum: 0 }
+                  request_id: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+      description: Authenticated panel session. Mutations also require X-CSRF-Token.
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1, maximum: 9007199254740991 }
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, enum: [10, 20, 50], default: 10 }
+    Search:
+      name: q
+      in: query
+      schema: { type: string, maxLength: 200 }
+  schemas:
+    ProfileListResponse:
+      type: object
+      required: [data, meta, request_id]
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Profile' }
+        meta:
+          type: object
+          required: [page, per_page, total, total_pages]
+          properties:
+            page: { type: integer }
+            per_page: { type: integer }
+            total: { type: integer }
+            total_pages: { type: integer }
+        request_id: { type: string }
+    ProfileDetailResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/ProfileDetail' }
+        request_id: { type: string }
+    Profile:
+      type: object
+      required: [id, title, english_name, slug, description, logo, website_url, founded_year, kind, status, author, category_id, category, created_at, updated_at, published_at, public_path, version]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 120 }
+        english_name: { type: string, maxLength: 120 }
+        slug: { type: string, maxLength: 120, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string }
+        logo: { type: string }
+        website_url: { type: string }
+        founded_year: { type: string }
+        kind: { type: string, const: gold-platforms }
+        status: { type: string, enum: [draft, published] }
+        author:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+        category_id:
+          oneOf:
+            - type: integer
+            - type: 'null'
+        category:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+        created_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        updated_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        published_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        public_path:
+          oneOf:
+            - type: string
+            - type: 'null'
+        version: { type: integer, minimum: 1 }
+    ProfileDetail:
+      allOf:
+        - $ref: '#/components/schemas/Profile'
+        - type: object
+          required: [content, meta_description, specifications]
+          properties:
+            content: { type: string, description: Canonical sanitized HTML, maxLength: 1048576 }
+            meta_description: { type: string, maxLength: 500 }
+            specifications: { $ref: '#/components/schemas/Specifications' }
+    ProfileCreate:
+      allOf:
+        - $ref: '#/components/schemas/ProfileFields'
+        - type: object
+          unevaluatedProperties: false
+          required: [title, english_name, slug, content, status, category_id]
+    ProfilePatch:
+      allOf:
+        - $ref: '#/components/schemas/ProfileFields'
+        - type: object
+          unevaluatedProperties: false
+          required: [expected_version]
+          properties:
+            expected_version: { type: integer, minimum: 1 }
+    ProfileFields:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 120 }
+        english_name: { type: string, minLength: 1, maxLength: 120 }
+        slug: { type: string, minLength: 1, maxLength: 120, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+        description: { type: string, maxLength: 2000 }
+        logo: { type: string, maxLength: 2048, description: Optional; empty string clears it. }
+        website_url: { type: string, maxLength: 2048, description: Optional HTTP/HTTPS URL without credentials; empty string clears it. }
+        founded_year: { type: string, pattern: '^(?:|[0-9]{4})$' }
+        specifications: { $ref: '#/components/schemas/Specifications' }
+        category_id:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: 'null'
+        content: { type: string, description: Sanitized HTML, at most 1 MiB in UTF-8 bytes. }
+        meta_description: { type: string, maxLength: 500 }
+        status: { type: string, enum: [draft, published] }
+    Specifications:
+      type: object
+      additionalProperties: false
+      description: Responses always include 24 keys. Create omissions become empty strings; PATCH merges supplied keys and an empty object does not change specifications.
+      properties:
+        established_at: { $ref: '#/components/schemas/EditorialSpecification' }
+        head_office_address: { $ref: '#/components/schemas/EditorialSpecification' }
+        physical_branch_count: { $ref: '#/components/schemas/EditorialSpecification' }
+        years_active: { $ref: '#/components/schemas/EditorialSpecification' }
+        minimum_purchase: { $ref: '#/components/schemas/EditorialSpecification' }
+        maximum_purchase: { $ref: '#/components/schemas/EditorialSpecification' }
+        minimum_sale: { $ref: '#/components/schemas/EditorialSpecification' }
+        maximum_sale: { $ref: '#/components/schemas/EditorialSpecification' }
+        in_person_visit: { $ref: '#/components/schemas/StatusSpecification' }
+        address_transparency: { $ref: '#/components/schemas/StatusSpecification' }
+        active_social_media: { $ref: '#/components/schemas/StatusSpecification' }
+        around_the_clock_support: { $ref: '#/components/schemas/StatusSpecification' }
+        support_availability: { $ref: '#/components/schemas/StatusSpecification' }
+        melted_gold_trading: { $ref: '#/components/schemas/StatusSpecification' }
+        identity_documents: { $ref: '#/components/schemas/EditorialSpecification' }
+        dedicated_app: { $ref: '#/components/schemas/StatusSpecification' }
+        physical_delivery_time: { $ref: '#/components/schemas/EditorialSpecification' }
+        physical_delivery_method: { $ref: '#/components/schemas/EditorialSpecification' }
+        asset_storage: { $ref: '#/components/schemas/EditorialSpecification' }
+        trading_fee: { $ref: '#/components/schemas/EditorialSpecification' }
+        registration_fee: { $ref: '#/components/schemas/EditorialSpecification' }
+        inamad: { $ref: '#/components/schemas/StatusSpecification' }
+        virtual_business_union: { $ref: '#/components/schemas/StatusSpecification' }
+        computer_trade_organization: { $ref: '#/components/schemas/StatusSpecification' }
+    EditorialSpecification:
+      type: string
+      maxLength: 1500
+      description: Plain text; empty means unspecified, not zero.
+    StatusSpecification:
+      type: string
+      enum: ['', 'yes', 'no', 'not-applicable']
+    Category:
+      type: object
+      required: [id, name, gold_platform_count, created_at, updated_at, version]
+      properties:
+        id: { type: integer }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        gold_platform_count: { type: integer, minimum: 0 }
+        created_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        updated_at: { oneOf: [{ type: string, format: date-time }, { type: 'null' }] }
+        version: { type: integer, minimum: 1 }
+    CategoryResponse:
+      type: object
+      required: [data, request_id]
+      properties:
+        data: { $ref: '#/components/schemas/Category' }
+        request_id: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error, request_id]
+      properties:
+        error:
+          type: object
+          required: [code, message, fields]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+        request_id: { type: string }
+  responses:
+    Unauthorized:
+      description: Missing or expired panel session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Invalid CSRF token or insufficient permission
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Missing or soft-deleted resource in this domain
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: Stale expected_version or reserved slug/category name
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    ValidationError:
+      description: Invalid input, unsupported HTML, or domain mismatch
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    PayloadTooLarge:
+      description: Profile body exceeds 2 MiB or category body exceeds 16 KiB
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Mutation limit is 300 requests per 15 minutes per panel user and domain
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
