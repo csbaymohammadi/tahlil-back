@@ -2,6 +2,7 @@
 
 namespace App\Exchanges;
 
+use App\Comments\CommentCounts;
 use App\Models\Exchange;
 use App\Support\ExchangeSpecifications;
 
@@ -22,7 +23,7 @@ class ExchangePublicProjection
             'category' => $this->category($exchange),
             'rating_average' => null,
             'rating_count' => 0,
-            'comment_count' => 0,
+            'comment_count' => app(CommentCounts::class)->for($exchange),
         ];
     }
 

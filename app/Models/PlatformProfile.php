@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Comments\HasPublicComments;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 abstract class PlatformProfile extends Model
 {
     use HasFactory;
+    use HasPublicComments;
     use SoftDeletes;
 
     protected $guarded = ['*'];

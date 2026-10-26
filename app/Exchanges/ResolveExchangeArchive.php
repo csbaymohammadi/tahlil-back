@@ -28,7 +28,7 @@ class ResolveExchangeArchive
         $page = (int) $filters['page'];
         $categoryKey = is_string($categoryKey) ? $categoryKey : null;
         $search = ExchangeText::public(mb_substr($search, 0, 200, 'UTF-8'));
-        $matching = Exchange::public()->with('category')->when($search !== '', function (Builder $query) use ($search): void {
+        $matching = Exchange::public()->withCount('visibleComments as comment_count')->with('category')->when($search !== '', function (Builder $query) use ($search): void {
             $pattern = '%'.addcslashes($search, '\\%_').'%';
             $query->where(function (Builder $nested) use ($pattern): void {
                 $nested->where('title_public_normalized', 'like', $pattern)

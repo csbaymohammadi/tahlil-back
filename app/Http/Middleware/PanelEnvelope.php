@@ -11,7 +11,7 @@ class PanelEnvelope
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
+        if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
             return $next($request);
         }
         $request->attributes->set('request_id', 'req_'.Str::uuid());
@@ -21,7 +21,23 @@ class PanelEnvelope
             $response->headers->set('Cache-Control', 'no-store');
         }
         $response->setVary('Cookie', false);
-        if ($request->is('api/v1/bonuses/*')) {
+        if ($request->is('api/v1/page-settings', 'api/v1/analytics/*')) {
+            $response->setVary('Origin', false);
+            if ($origin = $request->attributes->get('presentation_origin')) {
+                $response->headers->set('Access-Control-Allow-Origin', $origin);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type');
+                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
+            }
+        } elseif ($request->is('api/v1/comments/*')) {
+            $response->setVary('Origin', false);
+            if ($origin = $request->attributes->get('comment_origin')) {
+                $response->headers->set('Access-Control-Allow-Origin', $origin);
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type, Idempotency-Key');
+                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
+            }
+        } elseif ($request->is('api/v1/bonuses/*')) {
             $response->setVary('Origin', false);
             if ($origin = $request->attributes->get('bonus_rating_origin')) {
                 $response->headers->set('Access-Control-Allow-Origin', $origin);

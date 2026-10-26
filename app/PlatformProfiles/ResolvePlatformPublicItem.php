@@ -32,7 +32,7 @@ class ResolvePlatformPublicItem
             return ['type' => 'not_found'];
         }
         $profileClass = $definition->profileModel;
-        $profile = $profileClass::public()->with(['author', 'category'])->find($ownership->getAttribute($definition->profileForeignKey));
+        $profile = $profileClass::public()->withCount('visibleComments as comment_count')->with(['author', 'category'])->find($ownership->getAttribute($definition->profileForeignKey));
         if (! $profile) {
             return ['type' => 'not_found'];
         }

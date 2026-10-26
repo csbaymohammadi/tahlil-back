@@ -17,10 +17,10 @@ class ResolvePlatformSelections
         $configured = config($definition->featuredIdsConfig, []);
         $ids = array_values(array_unique(array_filter(array_map('intval', $configured), fn (int $id): bool => $id > 0 && $id !== $excludeId)));
         $profileClass = $definition->profileModel;
-        $selected = $ids === [] ? collect() : $profileClass::public()->with('category')->whereIn('id', $ids)->get()->keyBy('id');
+        $selected = $ids === [] ? collect() : $profileClass::public()->withCount('visibleComments as comment_count')->with('category')->whereIn('id', $ids)->get()->keyBy('id');
         $ordered = collect($ids)->map(fn (int $id): ?PlatformProfile => $selected->get($id))->filter()->take($limit)->values();
         if ($definition->fillUnconfiguredFeatured && $ordered->count() < $limit) {
-            $remaining = $profileClass::public()->with('category')
+            $remaining = $profileClass::public()->withCount('visibleComments as comment_count')->with('category')
                 ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
                 ->when($ordered->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $ordered->pluck('id')))
                 ->orderByDesc('created_at')->orderByDesc('id')->limit($limit - $ordered->count())->get();
@@ -38,6 +38,6 @@ class ResolvePlatformSelections
         }
         $profileClass = $definition->profileModel;
 
-        return $profileClass::public()->with('category')->whereKeyNot($current->id)->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
+        return $profileClass::public()->withCount('visibleComments as comment_count')->with('category')->whereKeyNot($current->id)->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
     }
 }

@@ -31,3 +31,9 @@ Schedule::command('platform-profiles:prune gold-platforms')->hourly()->withoutOv
 Schedule::command('platform-profiles:prune prop-firms')->hourly()->withoutOverlapping();
 
 Schedule::command('bonuses:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('tutorials:prune')->hourly()->withoutOverlapping();
+Schedule::command('comments:prune')->hourly()->withoutOverlapping();
+
+Schedule::command('presentation:deliver')->everyTenSeconds()->runInBackground()->withoutOverlapping();
+Schedule::command('analytics:prune')->daily()->withoutOverlapping();

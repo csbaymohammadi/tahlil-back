@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Comments\HasPublicComments;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Bonus extends Model
 {
     use HasFactory, SoftDeletes;
+    use HasPublicComments;
 
     protected $guarded = ['*'];
 

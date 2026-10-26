@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Comments\HasPublicComments;
 use Database\Factories\BlogArticleFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,8 @@ class BlogArticle extends Model
 {
     /** @use HasFactory<BlogArticleFactory> */
     use HasFactory, SoftDeletes;
+
+    use HasPublicComments;
 
     protected $guarded = ['*'];
 

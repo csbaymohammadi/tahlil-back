@@ -18,7 +18,7 @@ class ResolveFeaturedNewsItems
         $configuredIds = array_values(array_unique(array_slice(config('news.featured_ids', []), 0, 4)));
         $selected = $configuredIds === []
             ? new Collection
-            : NewsItem::public()->whereIn('id', $configuredIds)->get()->keyBy('id');
+            : NewsItem::public()->withCount('visibleComments as comment_count')->whereIn('id', $configuredIds)->get()->keyBy('id');
 
         if ($excludeId !== null) {
             $selected->forget($excludeId);
@@ -33,7 +33,7 @@ class ResolveFeaturedNewsItems
 
         $remaining = $limit - $ordered->count();
         if ($remaining > 0) {
-            $fallback = NewsItem::public()
+            $fallback = NewsItem::public()->withCount('visibleComments as comment_count')
                 ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
                 ->when($ordered->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $ordered->modelKeys()))
                 ->orderByDesc('published_at')->orderByDesc('id')
@@ -47,7 +47,7 @@ class ResolveFeaturedNewsItems
     /** @return Collection<int, NewsItem> */
     public function latest(?int $excludeId = null, int $limit = 4): Collection
     {
-        return NewsItem::public()
+        return NewsItem::public()->withCount('visibleComments as comment_count')
             ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
             ->orderByDesc('published_at')->orderByDesc('id')
             ->limit(max(0, min($limit, 4)))->get();

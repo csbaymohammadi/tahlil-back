@@ -2,6 +2,7 @@
 
 namespace App\PlatformProfiles;
 
+use App\Comments\CommentCounts;
 use App\Models\PlatformProfile;
 use App\Support\PlatformProfileDefinition;
 
@@ -29,7 +30,7 @@ class PlatformPublicProjection
             'category' => $category ? ['id' => $category->id, 'name' => $category->name, ...($definition->hasCategoryKeys ? ['key' => $category->key] : [])] : null,
             'rating_average' => null,
             'rating_count' => 0,
-            'comment_count' => 0,
+            'comment_count' => app(CommentCounts::class)->for($profile),
         ];
         if ($definition->key === 'broker') {
             $card['markets'] = $profile->markets;

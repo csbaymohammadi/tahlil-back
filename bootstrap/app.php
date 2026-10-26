@@ -1,6 +1,7 @@
 <?php
 
 use App\Auth\PanelSessions;
+use App\Auth\SecurityEvents;
 use App\Blog\BlogApiErrorPresenter;
 use App\Exceptions\PanelAuthException;
 use App\Http\Middleware\PanelEnvelope;
@@ -29,12 +30,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(PanelEnvelope::class);
-        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*')]);
-        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*')]);
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->report(function (Throwable $exception) {
-            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
+            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
                 Log::error('Panel request failed.', [
                     'request_id' => request()->attributes->get('request_id'),
                     'exception_type' => $exception::class,
@@ -45,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'new_password']);
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*')) {
+            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*')) {
                 return null;
             }
             $fields = [];
@@ -95,6 +96,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 $presented = app(BlogApiErrorPresenter::class)->present($code, $message, $fields, $contentType);
                 $message = $presented['message'];
                 $fields = $presented['fields'];
+            }
+            if ($request->routeIs('panel.page-settings.*', 'panel.profile.*') && in_array($status, [401, 403, 409, 422], true)) {
+                try {
+                    app(SecurityEvents::class)->record(
+                        $request->routeIs('panel.profile.*') ? 'profile_rejected' : 'page_settings_rejected',
+                        $request->attributes->get('request_id'), 'failure', $request->attributes->get('panel_user')?->id, reason: $code,
+                    );
+                } catch (Throwable) {
+                    Log::warning('Presentation audit unavailable.', ['request_id' => $request->attributes->get('request_id')]);
+                }
             }
             $response = response()->json(['error' => ['code' => $code, 'message' => $message, 'fields' => (object) $fields],
                 'request_id' => $request->attributes->get('request_id')], $status);

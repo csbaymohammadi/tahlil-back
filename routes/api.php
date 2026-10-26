@@ -7,7 +7,9 @@ use App\Http\Controllers\Admin\BonusCategoryController;
 use App\Http\Controllers\Admin\BonusController;
 use App\Http\Controllers\Admin\BrokerCategoryController;
 use App\Http\Controllers\Admin\BrokerController;
+use App\Http\Controllers\Admin\CommentController;
 use App\Http\Controllers\Admin\ContentImportController;
+use App\Http\Controllers\Admin\DashboardHomeController;
 use App\Http\Controllers\Admin\ExchangeCategoryController;
 use App\Http\Controllers\Admin\ExchangeItemController;
 use App\Http\Controllers\Admin\GoldPlatformCategoryController;
@@ -15,16 +17,40 @@ use App\Http\Controllers\Admin\GoldPlatformController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\NewsCategoryController;
 use App\Http\Controllers\Admin\NewsItemController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\PropFirmCategoryController;
 use App\Http\Controllers\Admin\PropFirmController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\StockBrokerageCategoryController;
 use App\Http\Controllers\Admin\StockBrokerageController;
+use App\Http\Controllers\Admin\TutorialCategoryController;
+use App\Http\Controllers\Admin\TutorialController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BonusRatingController;
+use App\Http\Controllers\PageSettingsController;
+use App\Http\Controllers\PageViewController;
+use App\Http\Controllers\PublicCommentController;
 use App\Http\Middleware\BonusRatingRequest;
 use App\Http\Middleware\PanelRequest;
+use App\Http\Middleware\PresentationRequest;
+use App\Http\Middleware\PublicCommentsRequest;
+use App\Http\Middleware\StrictCommentQuery;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1/admin')->name('panel.')->middleware([PanelRequest::class, PresentationRequest::class])->group(function (): void {
+    Route::get('page-settings', [App\Http\Controllers\Admin\PageSettingsController::class, 'show'])->name('page-settings.show');
+    Route::put('page-settings', [App\Http\Controllers\Admin\PageSettingsController::class, 'update'])->name('page-settings.update');
+    Route::get('page-settings/options/{area}/{key}', [App\Http\Controllers\Admin\PageSettingsController::class, 'options'])->whereIn('area', ['home', 'menu'])->name('page-settings.options.index');
+    Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('dashboard/home', [DashboardHomeController::class, 'show'])->name('dashboard.home');
+});
+
+Route::middleware(PresentationRequest::class)->group(function (): void {
+    Route::get('v1/page-settings', [PageSettingsController::class, 'show'])->name('page-settings.public');
+    Route::post('v1/analytics/page-views', [PageViewController::class, 'store'])->name('analytics.page-views');
+    Route::options('v1/analytics/page-views', fn () => response()->noContent())->name('analytics.options');
+});
 
 Route::prefix('v1/admin/auth')->name('panel.auth.')->middleware(PanelRequest::class)->group(function (): void {
     Route::get('csrf', [AuthController::class, 'csrf'])->name('csrf');
@@ -162,4 +188,28 @@ Route::prefix('v1/bonuses')->name('bonuses.rating.')->middleware(BonusRatingRequ
     Route::get('{id}/rating', [BonusRatingController::class, 'show'])->name('show');
     Route::put('{id}/rating', [BonusRatingController::class, 'update'])->name('update');
     Route::options('{id}/rating', fn () => response()->noContent())->name('options');
+});
+
+Route::prefix('v1/admin/tutorials')->name('panel.tutorials.')->middleware(PanelRequest::class)->group(function (): void {
+    Route::get('items', [TutorialController::class, 'index'])->name('items.index');
+    Route::post('items', [TutorialController::class, 'store'])->name('items.store');
+    Route::get('items/{id}', [TutorialController::class, 'show'])->name('items.show');
+    Route::patch('items/{id}', [TutorialController::class, 'update'])->name('items.update');
+    Route::delete('items/{id}', [TutorialController::class, 'destroy'])->name('items.destroy');
+    Route::get('categories', [TutorialCategoryController::class, 'index'])->name('categories.index');
+    Route::post('categories', [TutorialCategoryController::class, 'store'])->name('categories.store');
+    Route::get('categories/{id}', [TutorialCategoryController::class, 'show'])->name('categories.show');
+    Route::delete('categories/{id}', [TutorialCategoryController::class, 'destroy'])->name('categories.destroy');
+    Route::post('categories/{id}/merge', [TutorialCategoryController::class, 'merge'])->name('categories.merge');
+});
+Route::prefix('v1/admin/comments')->name('panel.comments.')->middleware([PanelRequest::class, StrictCommentQuery::class])->group(function (): void {
+    Route::get('/', [CommentController::class, 'index'])->name('index');
+    Route::get('{id}', [CommentController::class, 'show'])->name('show');
+    Route::put('{id}/reply', [CommentController::class, 'reply'])->name('reply');
+    Route::delete('{id}', [CommentController::class, 'destroy'])->name('destroy');
+});
+Route::prefix('v1/comments')->name('comments.')->middleware([StrictCommentQuery::class, PublicCommentsRequest::class])->group(function (): void {
+    Route::get('{section}/{parentId}', [PublicCommentController::class, 'index'])->name('index');
+    Route::post('{section}/{parentId}', [PublicCommentController::class, 'store'])->name('store');
+    Route::options('{section}/{parentId}', fn () => response()->noContent())->name('options');
 });

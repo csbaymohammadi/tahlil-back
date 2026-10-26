@@ -1,0 +1,1378 @@
+---
+openapi: 3.1.0
+info:
+  title: Shared Comments Admin and Public API
+  version: 1.0.0
+  description: Backend contract; UI pages and external cache delivery remain separate
+    integration work.
+servers:
+- url: "/api/v1"
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 100
+    Search:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+    ExpectedVersion:
+      name: expected_version
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Exact same scheme/host/port as the backend. No admin CSRF or guest
+        login.
+    SectionFilter:
+      name: section
+      in: query
+      schema:
+        type: string
+        enum:
+        - all
+        - blog
+        - news
+        - exchanges
+        - brokers
+        - stock-brokers
+        - gold-platforms
+        - prop-firms
+        - bonus
+        default: all
+    Section:
+      name: section
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - blog
+        - news
+        - exchanges
+        - brokers
+        - stock-brokers
+        - gold-platforms
+        - prop-firms
+        - bonus
+    ParentId:
+      name: parentId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+      description: Random UUID v4. Reuse only for identical retries within 24 hours;
+        never an access credential.
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+          - code
+          - message
+          - fields
+        request_id:
+          type: string
+      required:
+      - error
+      - request_id
+    PublicComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        text:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        created_at:
+          type: string
+          format: date-time
+        reply:
+          oneOf:
+          - type: object
+            properties:
+              text:
+                type: string
+                minLength: 1
+                maxLength: 5000
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+            required:
+            - text
+            - created_at
+            - updated_at
+          - type: 'null'
+      required:
+      - id
+      - name
+      - text
+      - created_at
+      - reply
+    AdminComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        section:
+          type: string
+          enum:
+          - blog
+          - news
+          - exchanges
+          - brokers
+          - stock-brokers
+          - gold-platforms
+          - prop-firms
+          - bonus
+        section_label:
+          type: string
+        parent_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        author:
+          type: string
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        page_title:
+          type: string
+        page_url:
+          oneOf:
+          - type: string
+          - type: 'null'
+        parent_visibility:
+          type: string
+          enum:
+          - public
+          - draft
+          - deleted
+        reply:
+          oneOf:
+          - type: object
+            properties:
+              text:
+                type: string
+                minLength: 1
+                maxLength: 5000
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              author:
+                type: string
+            required:
+            - text
+            - created_at
+            - updated_at
+            - author
+          - type: 'null'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - id
+      - section
+      - section_label
+      - parent_id
+      - author
+      - text
+      - created_at
+      - updated_at
+      - page_title
+      - page_url
+      - parent_visibility
+      - reply
+      - version
+    CommentSubmission:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Private; encrypted at rest; never present in read representations.
+        text:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required:
+      - name
+      - email
+      - text
+      additionalProperties: false
+    ReplyWrite:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - text
+      - expected_version
+      additionalProperties: false
+    AdminCommentResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/AdminComment"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    AdminCommentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AdminComment"
+        request_id:
+          type: string
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            per_page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            total:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            total_pages:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - page
+          - per_page
+          - total
+          - total_pages
+      required:
+      - data
+      - request_id
+      - meta
+    PublicCommentResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/PublicComment"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    PublicCommentListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PublicComment"
+        request_id:
+          type: string
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            per_page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            total:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            total_pages:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - page
+          - per_page
+          - total
+          - total_pages
+      required:
+      - data
+      - request_id
+      - meta
+paths:
+  "/admin/comments":
+    get:
+      summary: List private inbox; section all includes bonus; no search
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/SectionFilter"
+      - "$ref": "#/components/parameters/Page"
+      - "$ref": "#/components/parameters/PerPage"
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminCommentListResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      description: All responses no-store. JSON write bodies are at most 32 KiB. Repeated/structured
+        or unknown query keys are rejected.
+  "/admin/comments/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Read fresh card/version, including unavailable-parent history
+      security:
+      - panelSession: []
+      parameters: []
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminCommentResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      description: All responses no-store. JSON write bodies are at most 32 KiB. Repeated/structured
+        or unknown query keys are rejected.
+    delete:
+      summary: Soft-delete comment and its single reply atomically
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/ExpectedVersion"
+      responses:
+        '204':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / IDEMPOTENCY_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      description: All responses no-store. JSON write bodies are at most 32 KiB. Repeated/structured
+        or unknown query keys are rejected.
+  "/admin/comments/{id}/reply":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    put:
+      summary: Create or edit single official reply; stale version checked before
+        no-op
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '200':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminCommentResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / IDEMPOTENCY_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ReplyWrite"
+            example:
+              text: Official reply.
+              expected_version: 1
+      description: All responses no-store. JSON write bodies are at most 32 KiB. Repeated/structured
+        or unknown query keys are rejected.
+  "/comments/{section}/{parentId}":
+    parameters:
+    - "$ref": "#/components/parameters/Section"
+    - "$ref": "#/components/parameters/ParentId"
+    get:
+      summary: List only visible comments under a publicly available typed parent
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/Page"
+      - "$ref": "#/components/parameters/PerPage"
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PublicCommentListResponse"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      description: All responses no-store. JSON write bodies are at most 32 KiB. Repeated/structured
+        or unknown query keys are rejected.
+    post:
+      summary: Create immediately visible visitor comment, or replay matching key
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/Origin"
+      - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        '201':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PublicCommentResponse"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: COMMENT_NOT_FOUND / CONTENT_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: VERSION_CONFLICT / IDEMPOTENCY_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CommentSubmission"
+            example:
+              name: Sara Visitor
+              email: visitor@example.com
+              text: A meaningful visitor comment.
+      description: 'All responses no-store. JSON write bodies are at most 32 KiB.
+        Repeated/structured or unknown query keys are rejected. New matching submissions
+        persist once per UUID within 24 hours; changed target/payload conflicts. Deleted
+        results/hidden parents cannot be replayed. Rate limits: 5 attempts per IP
+        and 300 global per 900 seconds; retries count as attempts. No email or staff
+        identities in public projections.'
+    options:
+      summary: Same-origin comment preflight
+      security: []
+      parameters:
+      - "$ref": "#/components/parameters/Origin"
+      responses:
+        '204':
+          description: Allowed GET/POST and Accept/Content-Type/Idempotency-Key headers.
+        '403':
+          description: Cross-origin or unsupported request.

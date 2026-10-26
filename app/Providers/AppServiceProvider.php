@@ -8,14 +8,20 @@ use App\Models\Bonus;
 use App\Models\Broker;
 use App\Models\Exchange;
 use App\Models\GoldPlatform;
+use App\Models\Media;
 use App\Models\NewsItem;
+use App\Models\PageSetting;
 use App\Models\PropFirm;
 use App\Models\StockBrokerage;
+use App\Models\Tutorial;
 use App\Models\User;
+use App\PageSettings\PublicChanges;
+use App\Profile\PublicAuthor;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,7 +38,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->app->make(MediaConsumers::class)->register('page-settings',
+            static fn (int $id, User $actor): bool => PageSetting::whereKey($id)->exists(),
+            static fn (int $id): bool => PageSetting::whereKey($id)->exists(),
+        );
+        $this->app->make(MediaConsumers::class)->register('user',
+            static fn (int $id, User $actor): bool => User::whereKey($id)->exists(),
+            static fn (int $id): bool => PublicAuthor::eligible($id),
+        );
+        Media::saved(static function (Media $media): void {
+            if ($media->wasChanged(['status', 'deleted_at', 'canonical_name'])) {
+                (new PublicChanges)->record('media_changed', 'media-'.Str::uuid());
+            }
+        });
+        User::deleted(static fn (User $user) => (new PublicChanges)->record('author_deleted', 'user-'.Str::uuid()));
         TrustProxies::at(config('panel.trusted_proxies'));
+        $this->app->make(MediaConsumers::class)->register('video',
+            static fn (int $id, User $actor): bool => Tutorial::whereKey($id)->exists(),
+            static fn (int $id): bool => Tutorial::whereKey($id)->exists(),
+        );
         $this->app->make(MediaConsumers::class)->register('bonus',
             static fn (int $id, User $actor): bool => Bonus::whereKey($id)->exists(),
             static fn (int $id): bool => Bonus::public()->whereKey($id)->exists(),

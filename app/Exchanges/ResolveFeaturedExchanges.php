@@ -19,7 +19,7 @@ class ResolveFeaturedExchanges
         if ($configuredIds === []) {
             return $this->latest($limit, $excludeId);
         }
-        $selected = Exchange::public()->with('category')->whereIn('id', $configuredIds)->get()->keyBy('id');
+        $selected = Exchange::public()->withCount('visibleComments as comment_count')->with('category')->whereIn('id', $configuredIds)->get()->keyBy('id');
         if ($excludeId !== null) {
             $selected->forget($excludeId);
         }
@@ -42,7 +42,7 @@ class ResolveFeaturedExchanges
     /** @return Collection<int, Exchange> */
     private function latest(int $limit, ?int $excludeId): Collection
     {
-        return Exchange::public()->with('category')
+        return Exchange::public()->withCount('visibleComments as comment_count')->with('category')
             ->when($excludeId !== null, fn (Builder $query) => $query->where('id', '<>', $excludeId))
             ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)->get();
     }

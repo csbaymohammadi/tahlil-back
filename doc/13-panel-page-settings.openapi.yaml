@@ -1,0 +1,2076 @@
+---
+openapi: 3.1.0
+info:
+  title: 'Panel Page Settings API'
+  version: 1.0.0
+  description: 'Backend implementation; external UI, traffic emitter and website revalidation receiver must be connected separately.'
+servers:
+  -
+    url: /api/v1
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+            - code
+            - message
+            - fields
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - error
+        - request_id
+      additionalProperties: false
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        total_pages:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - page
+        - per_page
+        - total
+        - total_pages
+      additionalProperties: false
+    Hero:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        accent:
+          type: string
+          minLength: 0
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        primary_label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        primary_url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        secondary_label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        secondary_mobile_label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        secondary_url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+        - title
+        - accent
+        - description
+        - primary_label
+        - primary_url
+        - secondary_label
+        - secondary_mobile_label
+        - secondary_url
+      additionalProperties: false
+    Section:
+      oneOf:
+        -
+          type: object
+          properties:
+            key:
+              const: exchanges
+            kind:
+              const: exchange
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+        -
+          type: object
+          properties:
+            key:
+              const: aparat
+            kind:
+              const: video
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+        -
+          type: object
+          properties:
+            key:
+              const: news
+            kind:
+              const: news
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+        -
+          type: object
+          properties:
+            key:
+              const: bonuses
+            kind:
+              const: bonus
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+        -
+          type: object
+          properties:
+            key:
+              const: videos
+            kind:
+              const: video
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+        -
+          type: object
+          properties:
+            key:
+              const: articles
+            kind:
+              const: article
+            title:
+              type: string
+              minLength: 1
+              maxLength: 200
+            description:
+              type: string
+              minLength: 0
+              maxLength: 2000
+            action_label:
+              type: string
+              minLength: 1
+              maxLength: 120
+            action_url:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            selected_ids:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              uniqueItems: true
+          required:
+            - key
+            - kind
+            - title
+            - description
+            - action_label
+            - action_url
+            - selected_ids
+          additionalProperties: false
+    Links:
+      type: object
+      properties:
+        telegram:
+          type: string
+          minLength: 0
+          maxLength: 2048
+        instagram:
+          type: string
+          minLength: 0
+          maxLength: 2048
+        youtube:
+          type: string
+          minLength: 0
+          maxLength: 2048
+        aparat:
+          type: string
+          minLength: 0
+          maxLength: 2048
+      required:
+        - telegram
+        - instagram
+        - youtube
+        - aparat
+      additionalProperties: false
+    Ad:
+      type: object
+      properties:
+        image:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        link:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+        - image
+        - link
+      additionalProperties: false
+    Logo:
+      type: object
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'
+        logo_src:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        english_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+      required:
+        - id
+        - logo_src
+        - name
+        - english_name
+      additionalProperties: false
+    SettingsWrite:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        hero:
+          $ref: '#/components/schemas/Hero'
+        carousels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Section'
+          minItems: 6
+          maxItems: 6
+        menu:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                enum:
+                  - exchanges
+                  - forex
+                  - stock-brokers
+                  - gold-platforms
+                  - prop-firms
+              selected_ids:
+                type: array
+                items:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                maxItems: 9
+                uniqueItems: true
+            required:
+              - key
+              - selected_ids
+            additionalProperties: false
+          minItems: 5
+          maxItems: 5
+        links:
+          $ref: '#/components/schemas/Links'
+        advertisements:
+          type: object
+          properties:
+            home_header:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ad'
+            news_and_articles:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ad'
+          required:
+            - home_header
+            - news_and_articles
+          additionalProperties: false
+        infinite_slider:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+      required:
+        - expected_version
+        - hero
+        - carousels
+        - menu
+        - links
+        - advertisements
+        - infinite_slider
+      additionalProperties: false
+    SettingsRead:
+      type: object
+      properties:
+        hero:
+          $ref: '#/components/schemas/Hero'
+        carousels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Section'
+          minItems: 6
+          maxItems: 6
+        menu:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                enum:
+                  - exchanges
+                  - forex
+                  - stock-brokers
+                  - gold-platforms
+                  - prop-firms
+              selected_ids:
+                type: array
+                items:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                maxItems: 9
+                uniqueItems: true
+            required:
+              - key
+              - selected_ids
+            additionalProperties: false
+          minItems: 5
+          maxItems: 5
+        links:
+          $ref: '#/components/schemas/Links'
+        advertisements:
+          type: object
+          properties:
+            home_header:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ad'
+            news_and_articles:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ad'
+          required:
+            - home_header
+            - news_and_articles
+          additionalProperties: false
+        infinite_slider:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        selection_details:
+          type: object
+          properties:
+            home:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 9007199254740991
+                        title:
+                          type: string
+                        eligible:
+                          type: boolean
+                        reason:
+                          type:
+                            - string
+                            - 'null'
+                          enum:
+                            - null
+                            - unpublished
+                            - scheduled
+                            - deleted
+                            - not_found
+                            - invalid_aparat_source
+                      required:
+                        - id
+                        - title
+                        - eligible
+                        - reason
+                      additionalProperties: false
+                required:
+                  - key
+                  - items
+                additionalProperties: false
+            menu:
+              type: array
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 9007199254740991
+                        title:
+                          type: string
+                        eligible:
+                          type: boolean
+                        reason:
+                          type:
+                            - string
+                            - 'null'
+                          enum:
+                            - null
+                            - unpublished
+                            - scheduled
+                            - deleted
+                            - not_found
+                            - invalid_aparat_source
+                      required:
+                        - id
+                        - title
+                        - eligible
+                        - reason
+                      additionalProperties: false
+                required:
+                  - key
+                  - items
+                additionalProperties: false
+          required:
+            - home
+            - menu
+          additionalProperties: false
+      required:
+        - hero
+        - carousels
+        - menu
+        - links
+        - advertisements
+        - infinite_slider
+        - version
+        - created_at
+        - updated_at
+        - selection_details
+      additionalProperties: false
+    Author:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+        bio:
+          type: string
+        linkedin_url:
+          type: string
+        avatar_url:
+          type:
+            - string
+            - 'null'
+      required:
+        - id
+        - name
+        - bio
+        - linkedin_url
+        - avatar_url
+      additionalProperties: false
+    ExchangeCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+        slug:
+          type: string
+        public_path:
+          type: string
+        english_name:
+          type: string
+        logo:
+          type: string
+        founded_year:
+          type: string
+        platform_type:
+          type: string
+        category:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+                key:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        rating_average:
+          type:
+            - number
+            - 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        comment_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - id
+        - title
+        - slug
+        - public_path
+        - english_name
+        - logo
+        - founded_year
+        - platform_type
+        - category
+        - rating_average
+        - rating_count
+        - comment_count
+      additionalProperties: false
+    PlatformCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+        slug:
+          type: string
+        public_path:
+          type: string
+        english_name:
+          type: string
+        description:
+          type: string
+        logo:
+          type: string
+        founded_year:
+          type: string
+        category:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+                key:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        rating_average:
+          type:
+            - number
+            - 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        comment_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        markets:
+          type: string
+        platforms:
+          type: string
+        filter_keys:
+          type: array
+          items:
+            type: string
+        kind:
+          type: string
+        platform_label:
+          type: string
+      required:
+        - id
+        - title
+        - slug
+        - public_path
+        - english_name
+        - description
+        - logo
+        - founded_year
+        - category
+        - rating_average
+        - rating_count
+        - comment_count
+      additionalProperties: false
+    EditorialCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+        slug:
+          type: string
+        public_path:
+          type: string
+        description:
+          type: string
+        cover_image:
+          type: string
+        display_description:
+          type: string
+        display_cover_image:
+          type: string
+        reading_minutes:
+          type:
+            - integer
+            - 'null'
+        content_type:
+          enum:
+            - article
+            - news
+        published_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        category:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+                key:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        author:
+          anyOf:
+            -
+              $ref: '#/components/schemas/Author'
+            -
+              type: 'null'
+        comment_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - id
+        - title
+        - slug
+        - public_path
+        - description
+        - cover_image
+        - display_description
+        - display_cover_image
+        - reading_minutes
+        - content_type
+        - published_at
+        - category
+        - author
+        - comment_count
+      additionalProperties: false
+    BonusCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+        slug:
+          type: string
+        public_path:
+          type: string
+        content_type:
+          const: bonus
+        description:
+          type: string
+        display_description:
+          type: string
+        cover_image:
+          type: string
+        display_cover_image:
+          type: string
+        reading_minutes:
+          type:
+            - integer
+            - 'null'
+        published_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        category:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+                key:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        campaign:
+          type: object
+          properties:
+            provider:
+              anyOf:
+                -
+                  type: object
+                  properties:
+                    exchange_id:
+                      type:
+                        - integer
+                        - 'null'
+                    name:
+                      type: string
+                    english_name:
+                      type: string
+                    logo:
+                      type: string
+                  required:
+                    - exchange_id
+                    - name
+                    - english_name
+                    - logo
+                  additionalProperties: false
+                -
+                  type: 'null'
+            amount_display:
+              type: string
+            state:
+              enum:
+                - ended
+                - unspecified
+          required:
+            - provider
+            - amount_display
+            - state
+          additionalProperties: false
+        rating:
+          type:
+            - number
+            - 'null'
+        rating_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        rating_revision:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        comment_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - id
+        - title
+        - slug
+        - public_path
+        - content_type
+        - description
+        - display_description
+        - cover_image
+        - display_cover_image
+        - reading_minutes
+        - published_at
+        - category
+        - campaign
+        - rating
+        - rating_count
+        - rating_revision
+        - comment_count
+      additionalProperties: false
+    TutorialCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        title:
+          type: string
+        slug:
+          type: string
+        public_path:
+          type: string
+        description:
+          type: string
+        category:
+          anyOf:
+            -
+              type: object
+              properties:
+                id:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                name:
+                  type: string
+                key:
+                  type: string
+              required:
+                - id
+                - name
+              additionalProperties: false
+            -
+              type: 'null'
+        youtube_url:
+          type: string
+        aparat_url:
+          type: string
+        default_provider:
+          enum:
+            - aparat
+            - youtube
+        display_cover_image:
+          type: string
+        duration_seconds:
+          type:
+            - integer
+            - 'null'
+        duration_source:
+          type:
+            - string
+            - 'null'
+        published_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+      required:
+        - id
+        - title
+        - slug
+        - public_path
+        - description
+        - category
+        - youtube_url
+        - aparat_url
+        - default_provider
+        - display_cover_image
+        - duration_seconds
+        - duration_source
+        - published_at
+      additionalProperties: false
+    PublicSettings:
+      type: object
+      properties:
+        hero:
+          $ref: '#/components/schemas/Hero'
+        carousels:
+          type: array
+          items:
+            oneOf:
+              -
+                type: object
+                properties:
+                  key:
+                    const: exchanges
+                  kind:
+                    const: exchange
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExchangeCard'
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: aparat
+                  kind:
+                    const: video
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TutorialCard'
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: news
+                  kind:
+                    const: news
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EditorialCard'
+                    maxItems: 4
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: bonuses
+                  kind:
+                    const: bonus
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BonusCard'
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: videos
+                  kind:
+                    const: video
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TutorialCard'
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: articles
+                  kind:
+                    const: article
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  description:
+                    type: string
+                    minLength: 0
+                    maxLength: 2000
+                  action_label:
+                    type: string
+                    minLength: 1
+                    maxLength: 120
+                  action_url:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EditorialCard'
+                required:
+                  - key
+                  - kind
+                  - title
+                  - description
+                  - action_label
+                  - action_url
+                  - items
+                additionalProperties: false
+          minItems: 6
+          maxItems: 6
+        menu:
+          type: array
+          items:
+            oneOf:
+              -
+                type: object
+                properties:
+                  key:
+                    const: exchanges
+                  label:
+                    type: string
+                  all_href:
+                    const: /exchanges
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExchangeCard'
+                    maxItems: 9
+                required:
+                  - key
+                  - label
+                  - all_href
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: forex
+                  label:
+                    type: string
+                  all_href:
+                    const: /brokers
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlatformCard'
+                    maxItems: 9
+                required:
+                  - key
+                  - label
+                  - all_href
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: stock-brokers
+                  label:
+                    type: string
+                  all_href:
+                    const: /stock-brokers
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlatformCard'
+                    maxItems: 9
+                required:
+                  - key
+                  - label
+                  - all_href
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: gold-platforms
+                  label:
+                    type: string
+                  all_href:
+                    const: /gold-platforms
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlatformCard'
+                    maxItems: 9
+                required:
+                  - key
+                  - label
+                  - all_href
+                  - items
+                additionalProperties: false
+              -
+                type: object
+                properties:
+                  key:
+                    const: prop-firms
+                  label:
+                    type: string
+                  all_href:
+                    const: /prop-firms
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlatformCard'
+                    maxItems: 9
+                required:
+                  - key
+                  - label
+                  - all_href
+                  - items
+                additionalProperties: false
+          minItems: 5
+          maxItems: 5
+        links:
+          $ref: '#/components/schemas/Links'
+        advertisements:
+          type: object
+          properties:
+            home_header:
+              type: array
+              items:
+                type: object
+                properties:
+                  image:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  link:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  id:
+                    type: string
+                  alt:
+                    type: string
+                  target:
+                    const: _blank
+                  rel:
+                    const: 'sponsored noopener noreferrer'
+                required:
+                  - image
+                  - link
+                  - id
+                  - alt
+                  - target
+                  - rel
+                additionalProperties: false
+            news_and_articles:
+              type: array
+              items:
+                type: object
+                properties:
+                  image:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  link:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  id:
+                    type: string
+                  alt:
+                    type: string
+                  target:
+                    const: _blank
+                  rel:
+                    const: 'sponsored noopener noreferrer'
+                required:
+                  - image
+                  - link
+                  - id
+                  - alt
+                  - target
+                  - rel
+                additionalProperties: false
+          required:
+            - home_header
+            - news_and_articles
+          additionalProperties: false
+        infinite_slider:
+          type: array
+          items:
+            $ref: '#/components/schemas/Logo'
+        revision:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+      required:
+        - hero
+        - carousels
+        - menu
+        - links
+        - advertisements
+        - infinite_slider
+        - revision
+      additionalProperties: false
+paths:
+  /admin/page-settings:
+    get:
+      security:
+        -
+          panelSession: {  }
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SettingsRead'
+                  request_id:
+                    type: string
+                required:
+                  - data
+                  - request_id
+                additionalProperties: false
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      security:
+        -
+          panelSession: {  }
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SettingsRead'
+                  request_id:
+                    type: string
+                required:
+                  - data
+                  - request_id
+                additionalProperties: false
+        400:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        413:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        415:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsWrite'
+  /page-settings:
+    get:
+      security: {  }
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicSettings'
+                  request_id:
+                    type: string
+                required:
+                  - data
+                  - request_id
+                additionalProperties: false
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  '/admin/page-settings/options/home/{section_key}':
+    get:
+      security:
+        -
+          panelSession: {  }
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 9007199254740991
+                        kind:
+                          enum:
+                            - bonus
+                            - news
+                            - video
+                            - article
+                            - exchange
+                        title:
+                          type: string
+                        description:
+                          type: string
+                        status:
+                          const: published
+                        aparat_url:
+                          type: string
+                      required:
+                        - id
+                        - kind
+                        - title
+                        - description
+                        - status
+                      additionalProperties: false
+                  request_id:
+                    type: string
+                  meta:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                  - data
+                  - request_id
+                  - meta
+                additionalProperties: false
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        -
+          name: section_key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - exchanges
+              - aparat
+              - news
+              - bonuses
+              - videos
+              - articles
+        -
+          name: q
+          in: query
+          schema:
+            type: string
+            minLength: 0
+            maxLength: 200
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+            default: 1
+        -
+          name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+  '/admin/page-settings/options/menu/{group_key}':
+    get:
+      security:
+        -
+          panelSession: {  }
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          minimum: 1
+                          maximum: 9007199254740991
+                        title:
+                          type: string
+                        english_name:
+                          type: string
+                        public_path:
+                          type: string
+                      required:
+                        - id
+                        - title
+                        - english_name
+                        - public_path
+                      additionalProperties: false
+                  request_id:
+                    type: string
+                  meta:
+                    $ref: '#/components/schemas/Pagination'
+                required:
+                  - data
+                  - request_id
+                  - meta
+                additionalProperties: false
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      parameters:
+        -
+          name: group_key
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - exchanges
+              - forex
+              - stock-brokers
+              - gold-platforms
+              - prop-firms
+        -
+          name: q
+          in: query
+          schema:
+            type: string
+            minLength: 0
+            maxLength: 200
+        -
+          name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 9007199254740991
+            default: 1
+        -
+          name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100

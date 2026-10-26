@@ -27,7 +27,7 @@ class ResolvePlatformArchive
         }
 
         $profileClass = $definition->profileModel;
-        $matching = $profileClass::public()->with('category')->when($search !== '', function (Builder $query) use ($search, $definition): void {
+        $matching = $profileClass::public()->withCount('visibleComments as comment_count')->with('category')->when($search !== '', function (Builder $query) use ($search, $definition): void {
             $pattern = '%'.addcslashes($search, '\\%_').'%';
             $query->where(function (Builder $nested) use ($pattern, $definition): void {
                 $nested->where('title_public_normalized', 'like', $pattern)

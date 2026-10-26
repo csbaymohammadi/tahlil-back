@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Comments\HasPublicComments;
 use Database\Factories\ExchangeFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,8 @@ class Exchange extends Model
 {
     /** @use HasFactory<ExchangeFactory> */
     use HasFactory, SoftDeletes;
+
+    use HasPublicComments;
 
     protected $guarded = ['*'];
 

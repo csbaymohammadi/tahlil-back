@@ -1,0 +1,518 @@
+---
+openapi: 3.1.0
+info:
+  title: 'Panel Profile API'
+  version: 1.0.0
+  description: 'Backend implementation; external UI, traffic emitter and website revalidation receiver must be connected separately.'
+servers:
+  -
+    url: /api/v1
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+            - code
+            - message
+            - fields
+          additionalProperties: false
+        request_id:
+          type: string
+      required:
+        - error
+        - request_id
+      additionalProperties: false
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        total_pages:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+      required:
+        - page
+        - per_page
+        - total
+        - total_pages
+      additionalProperties: false
+    Profile:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        linkedin_url:
+          type: string
+          minLength: 0
+          maxLength: 2048
+        bio:
+          type: string
+          minLength: 0
+          maxLength: 5000
+        avatar_media_id:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          maximum: 9007199254740991
+        avatar_url:
+          type:
+            - string
+            - 'null'
+        updated_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - id
+        - name
+        - linkedin_url
+        - bio
+        - avatar_media_id
+        - avatar_url
+        - updated_at
+        - version
+      additionalProperties: false
+    ProfileWrite:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        linkedin_url:
+          type: string
+          minLength: 0
+          maxLength: 2048
+        bio:
+          type: string
+          minLength: 0
+          maxLength: 5000
+        avatar_media_id:
+          type:
+            - integer
+            - 'null'
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+        - expected_version
+      additionalProperties: false
+      anyOf:
+        -
+          required:
+            - name
+        -
+          required:
+            - linkedin_url
+        -
+          required:
+            - bio
+        -
+          required:
+            - avatar_media_id
+paths:
+  /admin/profile:
+    get:
+      security:
+        -
+          panelSession: {  }
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+                  request_id:
+                    type: string
+                required:
+                  - data
+                  - request_id
+                additionalProperties: false
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      security:
+        -
+          panelSession: {  }
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: 'Successful response'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Profile'
+                  request_id:
+                    type: string
+                required:
+                  - data
+                  - request_id
+                additionalProperties: false
+        400:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        413:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        415:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileWrite'
+  /admin/auth/password:
+    post:
+      security:
+        -
+          panelSession: {  }
+      parameters:
+        -
+          name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+        -
+          name: X-CSRF-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        400:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        401:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        403:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        409:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        413:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        415:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        429:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        500:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        503:
+          description: 'Error; inspect error.code and request_id'
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        204:
+          description: 'Password changed; all sessions revoked and cookies cleared'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                current_password:
+                  type: string
+                  minLength: 1
+                  maxLength: 256
+                new_password:
+                  type: string
+                  minLength: 15
+                  maxLength: 128
+              required:
+                - current_password
+                - new_password
+              additionalProperties: false

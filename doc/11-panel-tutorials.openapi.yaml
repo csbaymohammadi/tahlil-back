@@ -1,0 +1,2142 @@
+---
+openapi: 3.1.0
+info:
+  title: Tutorials Admin API
+  version: 1.0.0
+  description: Backend contract; UI pages and external cache delivery remain separate
+    integration work.
+servers:
+- url: "/api/v1"
+components:
+  securitySchemes:
+    panelSession:
+      type: apiKey
+      in: cookie
+      name: tahlil-panel-session-v2
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+        default: 1
+    PerPage:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        enum:
+        - 10
+        - 20
+        - 50
+        default: 10
+    Search:
+      name: q
+      in: query
+      schema:
+        type: string
+        maxLength: 200
+    ExpectedVersion:
+      name: expected_version
+      in: query
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 9007199254740991
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    Origin:
+      name: Origin
+      in: header
+      schema:
+        type: string
+      description: Same origin as service or configured BONUS_RATING_ALLOWED_ORIGINS.
+        PUT requires this or a valid allowed Referer.
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+          required:
+          - code
+          - message
+          - fields
+        request_id:
+          type: string
+      required:
+      - error
+      - request_id
+    TutorialCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+          default: ''
+          description: Literal multiline text, escaped on display; never an HTML body.
+        youtube_url:
+          type: string
+          maxLength: 2048
+          description: Required supported provider URL; normalized to HTTPS watch
+            URL.
+        aparat_url:
+          type: string
+          maxLength: 2048
+          default: ''
+        category_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        cover_image:
+          type: string
+          minLength: 1
+          maxLength: 2048
+      required:
+      - title
+      - youtube_url
+      - category_id
+      - cover_image
+      additionalProperties: false
+    TutorialPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+          default: ''
+          description: Literal multiline text, escaped on display; never an HTML body.
+        youtube_url:
+          type: string
+          maxLength: 2048
+          description: Required supported provider URL; normalized to HTTPS watch
+            URL.
+        aparat_url:
+          type: string
+          maxLength: 2048
+          default: ''
+        category_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        cover_image:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - expected_version
+      additionalProperties: false
+      minProperties: 2
+      description: Omission preserves. Empty clears description/Aparat only. Complete
+        result requires live category, even after category deletion.
+    Tutorial:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+          default: ''
+          description: Literal multiline text, escaped on display; never an HTML body.
+        youtube_url:
+          type: string
+          maxLength: 2048
+          description: Required supported provider URL; normalized to HTTPS watch
+            URL.
+        aparat_url:
+          type: string
+          maxLength: 2048
+          default: ''
+        category_id:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        cover_image:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        slug:
+          type: string
+          maxLength: 200
+        youtube_video_id:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{11}$"
+        aparat_video_id:
+          oneOf:
+          - type: string
+            pattern: "^[A-Za-z0-9_-]{5,32}$"
+          - type: 'null'
+        default_provider:
+          type: string
+          enum:
+          - aparat
+          - youtube
+        category:
+          oneOf:
+          - type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+                maximum: 9007199254740991
+              name:
+                type: string
+              key:
+                type: string
+            required:
+            - id
+            - name
+            - key
+          - type: 'null'
+        duration_seconds:
+          oneOf:
+          - type: integer
+            minimum: 1
+            maximum: 9007199254740991
+          - type: 'null'
+        duration_source:
+          oneOf:
+          - type: string
+            enum:
+            - aparat
+            - youtube
+          - type: 'null'
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        public_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        published_at:
+          type: string
+          format: date-time
+      required:
+      - title
+      - description
+      - youtube_url
+      - aparat_url
+      - category_id
+      - cover_image
+      - id
+      - slug
+      - youtube_video_id
+      - aparat_video_id
+      - default_provider
+      - category
+      - duration_seconds
+      - duration_source
+      - version
+      - public_path
+      - created_at
+      - updated_at
+      - published_at
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        key:
+          type: string
+        tutorial_count:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - key
+      - tutorial_count
+      - version
+      - created_at
+      - updated_at
+    CategoryCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+      required:
+      - name
+      additionalProperties: false
+    CategoryMerge:
+      type: object
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        target_category_id:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        target_expected_version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+      required:
+      - expected_version
+      - target_category_id
+      - target_expected_version
+      additionalProperties: false
+    TutorialResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/Tutorial"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    TutorialListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Tutorial"
+        request_id:
+          type: string
+        meta:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            per_page:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            total:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            total_pages:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - page
+          - per_page
+          - total
+          - total_pages
+      required:
+      - data
+      - request_id
+      - meta
+    CategoryResponse:
+      type: object
+      properties:
+        data:
+          "$ref": "#/components/schemas/Category"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    CategoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Category"
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    DeleteCategoryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            affected_tutorial_count:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - deleted_category_id
+          - affected_tutorial_count
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    MergeCategoryResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            source_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            target_category_id:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            moved_tutorial_count:
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+          required:
+          - source_category_id
+          - target_category_id
+          - moved_tutorial_count
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+paths:
+  "/admin/tutorials/items":
+    get:
+      summary: List tutorials; title-only search and newest creation first
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Page"
+      - "$ref": "#/components/parameters/PerPage"
+      - "$ref": "#/components/parameters/Search"
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TutorialListResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    post:
+      summary: Create immediately public tutorial; body at most 256 KiB
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '201':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TutorialResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TutorialCreate"
+            example:
+              title: Example Tutorial
+              youtube_url: https://youtu.be/AbCdEf12_-3?si=tracking
+              aparat_url: https://aparat.com/v/abc123
+              description: |-
+                First line
+                Second line
+              category_id: 2
+              cover_image: https://i.ytimg.com/vi/AbCdEf12_-3/hqdefault.jpg
+  "/admin/tutorials/items/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Read canonical dialog fields
+      security:
+      - panelSession: []
+      parameters: []
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TutorialResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    patch:
+      summary: Edit tutorial while preserving immutable slug
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '200':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/TutorialResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TutorialPatch"
+            example:
+              expected_version: 1
+              aparat_url: ''
+    delete:
+      summary: Soft-delete; release live YouTube claim and retain slug ownership
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/ExpectedVersion"
+      responses:
+        '204':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/admin/tutorials/categories":
+    get:
+      summary: List all live tutorial categories
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Search"
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryListResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    post:
+      summary: Create name-only tutorial category; body at most 16 KiB
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '201':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CategoryCreate"
+  "/admin/tutorials/categories/{id}":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    get:
+      summary: Read current tutorial category/version
+      security:
+      - panelSession: []
+      parameters: []
+      responses:
+        '200':
+          description: Canonical current data
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CategoryResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+    delete:
+      summary: Uncategorize live tutorials and delete category
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      - "$ref": "#/components/parameters/ExpectedVersion"
+      responses:
+        '200':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/DeleteCategoryResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/admin/tutorials/categories/{id}/merge":
+    parameters:
+    - "$ref": "#/components/parameters/Id"
+    post:
+      summary: Transfer live tutorials atomically
+      security:
+      - panelSession: []
+      parameters:
+      - "$ref": "#/components/parameters/Csrf"
+      responses:
+        '200':
+          description: Canonical committed result
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MergeCategoryResponse"
+        '401':
+          description: UNAUTHENTICATED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '400':
+          description: INVALID_JSON
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: FORBIDDEN / CSRF_INVALID
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: TUTORIAL_NOT_FOUND / CATEGORY_NOT_FOUND
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '409':
+          description: YOUTUBE_VIDEO_TAKEN / CATEGORY_NAME_TAKEN / VERSION_CONFLICT
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '413':
+          description: PAYLOAD_TOO_LARGE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '415':
+          description: UNSUPPORTED_MEDIA_TYPE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: VALIDATION_FAILED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: RATE_LIMITED
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '500':
+          description: INTERNAL_ERROR
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '503':
+          description: SERVICE_UNAVAILABLE
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+            Cache-Control:
+              schema:
+                type: string
+              description: Includes no-store.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CategoryMerge"

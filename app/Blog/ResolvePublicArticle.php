@@ -10,7 +10,7 @@ class ResolvePublicArticle
     /** @return array{type: 'article', article: BlogArticle}|array{type: 'redirect', status: 301, path: string}|array{type: 'not_found'} */
     public function resolve(string $slug): array
     {
-        $ownership = BlogSlugOwnership::query()->where('slug', $slug)->with('article')->first();
+        $ownership = BlogSlugOwnership::query()->where('slug', $slug)->with(['article' => fn ($query) => $query->withCount('visibleComments as comment_count')])->first();
         $article = $ownership?->article;
         if (! $article || $article->deleted_at !== null || $article->status !== 'published') {
             return ['type' => 'not_found'];

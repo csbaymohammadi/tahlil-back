@@ -13,7 +13,7 @@ class ResolveBonusSelections
     /** @return Collection<int, Bonus> */
     public function latest(?int $excludeId = null): Collection
     {
-        return Bonus::public()->with(['category', 'campaign.exchange', 'ratingAggregate'])
+        return Bonus::public()->withCount('visibleComments as comment_count')->with(['category', 'campaign.exchange', 'ratingAggregate'])
             ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
             ->orderByDesc('published_at')->orderByDesc('id')->limit(5)->get();
     }
@@ -22,7 +22,7 @@ class ResolveBonusSelections
     public function featured(): Collection
     {
         $ids = $this->ids('bonuses.featured_ids');
-        $bonuses = Bonus::public()->with(['category', 'campaign.exchange', 'ratingAggregate'])->whereIn('id', $ids)->get()->keyBy('id');
+        $bonuses = Bonus::public()->withCount('visibleComments as comment_count')->with(['category', 'campaign.exchange', 'ratingAggregate'])->whereIn('id', $ids)->get()->keyBy('id');
 
         return collect($ids)->map(fn (int $id): ?Bonus => $bonuses->get($id))->filter()->values();
     }

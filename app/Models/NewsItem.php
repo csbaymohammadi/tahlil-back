@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Comments\HasPublicComments;
 use Database\Factories\NewsItemFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,8 @@ class NewsItem extends Model
 {
     /** @use HasFactory<NewsItemFactory> */
     use HasFactory, SoftDeletes;
+
+    use HasPublicComments;
 
     protected $guarded = ['*'];
 

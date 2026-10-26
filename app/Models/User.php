@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Auth\PanelSessions;
 use App\Exceptions\PanelAuthException;
+use App\PageSettings\PublicChanges;
 use App\Support\BlogText;
 use App\Support\PanelMutationLock;
 use Database\Factories\UserFactory;
@@ -56,14 +57,15 @@ class User extends Authenticatable
         if ($this->isDirty('name')) {
             $this->blog_name_normalized = BlogText::normalize($this->name);
         }
-        $editable = ['username', 'name', 'email', 'password', 'role_id', 'is_active', 'avatar_media_id', 'deleted_at'];
+        $editable = ['username', 'name', 'email', 'password', 'role_id', 'is_active', 'avatar_media_id', 'linkedin_url', 'bio', 'deleted_at'];
         if ($this->exists && ! $this->isDirty($editable)) {
             return parent::save($options);
         }
 
         $nameChanged = $this->isDirty('name');
+        $profileChanged = $this->isDirty(['name', 'avatar_media_id', 'linkedin_url', 'bio', 'deleted_at']);
 
-        return DB::transaction(function () use ($options, $nameChanged): bool {
+        return DB::transaction(function () use ($options, $nameChanged, $profileChanged): bool {
             PanelMutationLock::acquire();
             if ($this->exists) {
                 $current = static::withTrashed()->lockForUpdate()->findOrFail($this->id);
@@ -121,6 +123,10 @@ class User extends Authenticatable
                         'created_at' => now(),
                     ]);
                 }
+            }
+
+            if ($saved && $profileChanged) {
+                (new PublicChanges)->record('author_profile_changed', $this->securityRequestId ?? 'profile-'.Str::uuid());
             }
 
             return $saved;

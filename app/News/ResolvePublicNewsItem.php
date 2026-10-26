@@ -10,7 +10,7 @@ class ResolvePublicNewsItem
     /** @return array{type: 'news_item', news_item: NewsItem}|array{type: 'redirect', status: 301, path: string}|array{type: 'not_found'} */
     public function resolve(string $slug): array
     {
-        $ownership = NewsSlugOwnership::query()->where('slug', $slug)->with('newsItem')->first();
+        $ownership = NewsSlugOwnership::query()->where('slug', $slug)->with(['newsItem' => fn ($query) => $query->withCount('visibleComments as comment_count')])->first();
         $newsItem = $ownership?->newsItem;
         if (! $newsItem || $newsItem->deleted_at !== null || $newsItem->status !== 'published') {
             return ['type' => 'not_found'];

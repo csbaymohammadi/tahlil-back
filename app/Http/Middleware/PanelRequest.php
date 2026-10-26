@@ -6,6 +6,7 @@ use App\Auth\PanelCsrf;
 use App\Auth\PanelSessions;
 use App\Exceptions\PanelAuthException;
 use App\Models\User;
+use App\Support\StrictJson;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -41,6 +42,13 @@ class PanelRequest
         $bonusItemMutation = $request->routeIs('panel.bonuses.items.store', 'panel.bonuses.items.update');
         $multipart = $mediaUpload || $contentImport;
         $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') || $newsItemMutation || $exchangeItemMutation || $brokerItemMutation || $stockBrokerageItemMutation || $goldPlatformItemMutation || $propFirmItemMutation || $bonusItemMutation ? 2 * 1024 * 1024 : 16384;
+        if ($request->routeIs('panel.page-settings.update')) {
+            $bodyLimit = 2 * 1024 * 1024;
+        } elseif ($request->routeIs('panel.tutorials.items.store', 'panel.tutorials.items.update')) {
+            $bodyLimit = 256 * 1024;
+        } elseif ($request->routeIs('panel.comments.reply')) {
+            $bodyLimit = 32768;
+        }
         $raw = $multipart ? '' : $request->getContent();
         if (! $multipart && (strlen($raw) > $bodyLimit || (int) $request->header('Content-Length', 0) > $bodyLimit)) {
             throw new PanelAuthException(413, 'PAYLOAD_TOO_LARGE', 'The request body exceeds the endpoint size limit.');
@@ -75,6 +83,12 @@ class PanelRequest
                 if (! $parsed instanceof \stdClass) {
                     throw new PanelAuthException(422, 'VALIDATION_FAILED', 'The body must be a JSON object.');
                 }
+                if ($request->routeIs('panel.page-settings.update', 'panel.profile.update')) {
+                    StrictJson::rejectDuplicateKeys($raw);
+                }
+                if ($request->routeIs('panel.page-settings.update')) {
+                    StrictJson::settingsShape($parsed);
+                }
                 $request->json()->replace(json_decode($raw, true, 64, JSON_THROW_ON_ERROR));
             }
         } elseif ($raw !== '') {
@@ -82,6 +96,8 @@ class PanelRequest
         }
 
         $allowedQuery = match (true) {
+            $request->routeIs('panel.page-settings.options.*') => ['q', 'page', 'per_page'],
+            $request->routeIs('panel.comments.index') => ['section', 'page', 'per_page'],
             $request->routeIs('panel.users.index') => ['page', 'per_page'],
             $request->routeIs('panel.blog.articles.index') => ['page', 'per_page', 'q'],
             $request->routeIs('panel.blog.categories.index') => ['q'],
@@ -89,9 +105,9 @@ class PanelRequest
             $request->routeIs('panel.news.categories.index') => ['q'],
             $request->routeIs('panel.exchanges.items.index') => ['page', 'per_page', 'q'],
             $request->routeIs('panel.exchanges.categories.index') => ['q'],
-            $request->routeIs('panel.brokers.items.index', 'panel.stock-brokers.items.index', 'panel.gold-platforms.items.index', 'panel.prop-firms.items.index', 'panel.bonuses.items.index') => ['page', 'per_page', 'q'],
-            $request->routeIs('panel.brokers.categories.index', 'panel.stock-brokers.categories.index', 'panel.gold-platforms.categories.index', 'panel.prop-firms.categories.index', 'panel.bonuses.categories.index') => ['q'],
-            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy', 'panel.brokers.items.destroy', 'panel.brokers.categories.destroy', 'panel.stock-brokers.items.destroy', 'panel.stock-brokers.categories.destroy', 'panel.gold-platforms.items.destroy', 'panel.gold-platforms.categories.destroy', 'panel.prop-firms.items.destroy', 'panel.prop-firms.categories.destroy', 'panel.bonuses.items.destroy', 'panel.bonuses.categories.destroy') => ['expected_version'],
+            $request->routeIs('panel.brokers.items.index', 'panel.stock-brokers.items.index', 'panel.gold-platforms.items.index', 'panel.prop-firms.items.index', 'panel.bonuses.items.index', 'panel.tutorials.items.index') => ['page', 'per_page', 'q'],
+            $request->routeIs('panel.brokers.categories.index', 'panel.stock-brokers.categories.index', 'panel.gold-platforms.categories.index', 'panel.prop-firms.categories.index', 'panel.bonuses.categories.index', 'panel.tutorials.categories.index') => ['q'],
+            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy', 'panel.brokers.items.destroy', 'panel.brokers.categories.destroy', 'panel.stock-brokers.items.destroy', 'panel.stock-brokers.categories.destroy', 'panel.gold-platforms.items.destroy', 'panel.gold-platforms.categories.destroy', 'panel.prop-firms.items.destroy', 'panel.prop-firms.categories.destroy', 'panel.bonuses.items.destroy', 'panel.bonuses.categories.destroy', 'panel.tutorials.items.destroy', 'panel.tutorials.categories.destroy', 'panel.comments.destroy') => ['expected_version'],
             default => [],
         };
         if (array_diff(array_keys($request->query->all()), $allowedQuery) !== []) {

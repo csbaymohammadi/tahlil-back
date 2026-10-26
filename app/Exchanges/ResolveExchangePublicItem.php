@@ -14,7 +14,7 @@ class ResolveExchangePublicItem
         if (! $ownership) {
             return ['type' => 'not_found'];
         }
-        $exchange = Exchange::public()->with(['author', 'category'])->find($ownership->exchange_id);
+        $exchange = Exchange::public()->withCount('visibleComments as comment_count')->with(['author', 'category'])->find($ownership->exchange_id);
         if (! $exchange) {
             return ['type' => 'not_found'];
         }

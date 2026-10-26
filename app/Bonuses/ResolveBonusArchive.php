@@ -19,7 +19,7 @@ class ResolveBonusArchive
         $categories = BonusCategory::orderBy('name_normalized')->orderBy('id')->get();
         $selected = is_int($category) ? $categories->firstWhere('id', $category) : $categories->firstWhere('key', $category);
         $needle = PlatformText::public($search);
-        $query = Bonus::public()->with(['category', 'campaign.exchange', 'ratingAggregate']);
+        $query = Bonus::public()->withCount('visibleComments as comment_count')->with(['category', 'campaign.exchange', 'ratingAggregate']);
         $this->order($query);
         $counts = [];
         $total = 0;

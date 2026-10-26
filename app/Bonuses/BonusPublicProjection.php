@@ -2,6 +2,7 @@
 
 namespace App\Bonuses;
 
+use App\Comments\CommentCounts;
 use App\Models\Bonus;
 use App\Models\BonusCampaign;
 use App\Models\Exchange;
@@ -41,7 +42,7 @@ class BonusPublicProjection
             'cover_image' => $bonus->cover_image, 'display_cover_image' => $this->media->approvedImage($cover) ? $cover : '',
             'reading_minutes' => $bonus->reading_minutes, 'published_at' => $bonus->published_at?->utc()->toISOString(),
             'category' => $category ? ['id' => $category->id, 'name' => $category->name, 'key' => $category->key] : null,
-            'campaign' => $this->campaign($bonus), ...$bonus->ratingAggregate->projection(), 'comment_count' => 0,
+            'campaign' => $this->campaign($bonus), ...$bonus->ratingAggregate->projection(), 'comment_count' => app(CommentCounts::class)->for($bonus),
         ];
     }
 
