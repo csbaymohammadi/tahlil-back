@@ -352,7 +352,7 @@ paths:
         -
           name: Origin
           in: header
-          required: true
+          required: false
           schema:
             type: string
             format: uri
@@ -368,7 +368,7 @@ paths:
         -
           name: Origin
           in: header
-          required: true
+          required: false
           schema:
             type: string
             format: uri

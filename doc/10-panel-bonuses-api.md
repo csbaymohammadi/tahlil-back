@@ -18,7 +18,7 @@ Success JSON contains `data` and `request_id`. Lists additionally contain `meta`
 
 ## 2. Administrative API
 
-All paths in this section are relative to the admin base. Require the shared `tahlil-panel-session-v2` cookie and existing active panel-session management boundary. Mutations require the panel `X-CSRF-Token`. No permission catalog, role matrix, or new login flow is introduced. Existing administrative Origin/CORS behavior is preserved; guest rating origins are independently restricted below. Browser fetches must include credentials. Default management mutation limit is 300 requests per panel user and bonus domain per 900 seconds.
+All paths in this section are relative to the admin base. Require the shared `tahlil-panel-session-v2` cookie and existing active panel-session management boundary. Mutations require the panel `X-CSRF-Token`. No permission catalog, role matrix, or new login flow is introduced. Shared CORS accepts every Origin; panel and guest rating CSRF contexts remain independent. Browser fetches must include credentials. Default management mutation limit is 300 requests per panel user and bonus domain per 900 seconds.
 
 | Method/path | Result |
 | --- | --- |
@@ -202,7 +202,7 @@ Response:
 
 The token is random, authenticated/encrypted with Laravel Crypt and bound to purpose, current context hash and expiry. It lasts at most 15 minutes and never beyond context expiry. Separate valid tokens issued to desktop/mobile controls remain valid together. It is distinct from panel CSRF and never embedded in shared cached public HTML.
 
-`PUT /bonuses/{id}/rating` requires this cookie, a current token in X-CSRF-Token, JSON body, and an allowed Origin or Referer. Only `{ "value": 5 }` is accepted, with value an actual integer 1–5. Choosing stars alone is not a write. Reject caller identity/bonus IDs, versions, counts, averages and all other keys.
+`PUT /bonuses/{id}/rating` requires this cookie, a current token in X-CSRF-Token, and a JSON body. Origin and Referer are optional and unrestricted. Only `{ "value": 5 }` is accepted, with value an actual integer 1–5. Choosing stars alone is not a write. Reject caller identity/bonus IDs, versions, counts, averages and all other keys.
 
 ```json
 {"data":{"bonus_id":81,"my_rating":5,"rating":5,"rating_count":1,"rating_revision":1},"request_id":"req_rating_write"}
@@ -214,7 +214,7 @@ Eligibility and writes share the parent mutation lock/transaction with editorial
 
 ### Origin/CORS, limits and recovery
 
-Same origin means exact scheme/host/port of this service. Configure additional explicit origins in `BONUS_RATING_ALLOWED_ORIGINS`; default is empty. PUT needs either an allowed Origin or, when Origin is absent, an allowed Referer. Missing/unverifiable or disallowed source returns 403 FORBIDDEN. GET without Origin is allowed for ordinary same-origin browser requests; supplied origins are checked. The existing permissive panel CORS remains unchanged. Rating OPTIONS accepts only GET/PUT and Accept/Content-Type/X-CSRF-Token headers, returns credentialed CORS for the exact allowed origin and creates no voter context. No wildcard rating CORS is enabled.
+Shared CORS in config/cors.php accepts all origins, requested methods and headers. Browser preflight returns 204 before authentication or voter-context initialization. Credentialed responses reflect the supplied Origin. Origin and Referer are optional and unrestricted; BONUS_RATING_ALLOWED_ORIGINS is no longer used. Actual PUT still requires the voter cookie and its current X-CSRF-Token; routing and validation still constrain real requests.
 
 Use `credentials: 'include'`. SameSite=Lax and host-only cookies still constrain truly cross-site deployments; use a same-site frontend or same-origin BFF/proxy where needed. Do not relax cookie settings implicitly. CSRF token/context errors return 403 CSRF_INVALID/RATING_CONTEXT_INVALID without a panel redirect; perform a fresh personalized GET then retry the user's explicit choice. Expired contexts with old votes retain those votes, while the new context has my_rating null.
 
@@ -295,4 +295,4 @@ The 12 management tests cover field rules, current-author search, canonical edit
 
 Tests use isolated SQLite memory databases and separate temporary SQLite databases for forked races. They do not prove MariaDB/MySQL DDL or row-lock behavior; verify on a disposable deployment-engine database before rollout. The development database was not migrated and frontend cache delivery was not exercised.
 
-Agreed differences from the full site contract: public read HTTP/UI/cache delivery and comments are not connected; comments count is neutral zero. No old campaign dataset was supplied, so no legacy provider/amount/state imports or synthetic vote totals are added. Shared admin Origin behavior follows the existing owner-approved authentication implementation; guest rating Origin/CSRF rules are implemented independently. No route/page availability, cache acknowledgement or staging/production verification is claimed beyond the backend services and endpoints tested here.
+Agreed differences from the full site contract: public read HTTP/UI/cache delivery and comments are not connected; comments count is neutral zero. No old campaign dataset was supplied, so no legacy provider/amount/state imports or synthetic vote totals are added. All APIs share unrestricted credentialed CORS; panel and guest rating CSRF contexts remain independent. No route/page availability, cache acknowledgement or staging/production verification is claimed beyond the backend services and endpoints tested here.

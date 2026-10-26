@@ -121,21 +121,20 @@ class BonusRatingTest extends TestCase
         $this->assertDatabaseHas('bonus_votes', ['bonus_id' => $bonus->id, 'value' => 4]);
     }
 
-    public function test_rating_cors_and_origin_checks_are_independent_of_permissive_panel_cors(): void
+    public function test_rating_accepts_any_origin_and_keeps_voter_context_and_csrf_protection(): void
     {
         $bonus = Bonus::factory()->published()->create();
         $this->context($bonus);
-        $this->withHeader('Origin', 'https://evil.example')->get($this->path($bonus))->assertForbidden()->assertHeaderMissing('Access-Control-Allow-Origin');
-        $this->putJson($this->path($bonus), ['value' => 5])->assertForbidden()->assertJsonPath('error.code', 'FORBIDDEN');
-        $this->withoutHeader('Origin')->putJson($this->path($bonus), ['value' => 5])->assertForbidden();
-        $this->withHeader('Referer', rtrim(config('app.url'), '/').'/bonuses/example')->putJson($this->path($bonus), ['value' => 5])->assertOk();
-        $this->withoutHeader('Referer');
-        config(['bonuses.rating_allowed_origins' => ['https://frontend.example']]);
-        $this->withHeader('Origin', 'https://frontend.example')->get($this->path($bonus))->assertOk()
-            ->assertHeader('Access-Control-Allow-Origin', 'https://frontend.example')->assertHeader('Access-Control-Allow-Credentials', 'true');
-        $this->withHeader('Access-Control-Request-Method', 'PUT')->withHeader('Access-Control-Request-Headers', 'content-type,x-csrf-token')
-            ->options($this->path($bonus))->assertNoContent()->assertHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
+        $this->withHeader('Origin', 'https://another-frontend.example')->get($this->path($bonus))->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', 'https://another-frontend.example');
+        $this->putJson($this->path($bonus), ['value' => 5])->assertOk();
+        $this->withoutHeader('Origin')->putJson($this->path($bonus), ['value' => 4])->assertOk();
+        $this->withHeader('Referer', 'https://another-frontend.example/bonuses/example')->putJson($this->path($bonus), ['value' => 3])->assertOk();
+        $this->withHeader('X-CSRF-Token', 'invalid')->putJson($this->path($bonus), ['value' => 2])->assertForbidden()->assertJsonPath('error.code', 'CSRF_INVALID');
+        $this->withHeaders(['Origin' => 'https://frontend.example', 'Access-Control-Request-Method' => 'PUT', 'Access-Control-Request-Headers' => 'content-type,x-csrf-token'])
+            ->options($this->path($bonus))->assertNoContent()->assertHeader('Access-Control-Allow-Methods', 'PUT');
         $this->assertDatabaseCount('bonus_votes', 1);
+        $this->assertDatabaseHas('bonus_votes', ['bonus_id' => $bonus->id, 'value' => 3]);
     }
 
     public function test_read_and_write_rate_limits_use_private_keys_and_retry_after(): void

@@ -112,12 +112,12 @@ class PublicCommentsTest extends TestCase
         }
     }
 
-    public function test_public_origin_transport_idempotency_and_shared_limits_are_enforced(): void
+    public function test_public_transport_idempotency_and_shared_limits_are_enforced_for_any_origin(): void
     {
         $bonus = Bonus::factory()->published()->create();
         $path = '/api/v1/comments/bonus/'.$bonus->id;
-        $this->postJson($path, ['name' => 'Visitor', 'email' => 'visitor@example.com', 'text' => 'A complete comment.'])->assertForbidden();
-        $this->withHeader('Origin', 'https://evil.test')->postJson($path, [])->assertForbidden()->assertHeaderMissing('Access-Control-Allow-Origin');
+        $this->postJson($path, ['name' => 'Visitor', 'email' => 'visitor@example.com', 'text' => 'A complete comment.'])->assertUnprocessable()->assertJsonValidationErrors('idempotency_key', 'error.fields');
+        $this->withHeader('Origin', 'https://evil.test')->postJson($path, [])->assertUnprocessable()->assertHeader('Access-Control-Allow-Origin', 'https://evil.test');
         $this->withHeader('Origin', rtrim(config('app.url'), '/'))->postJson($path, ['name' => 'Visitor', 'email' => 'visitor@example.com', 'text' => 'A complete comment.'])->assertUnprocessable();
         $this->withHeader('Idempotency-Key', 'not-a-uuid')->postJson($path, ['name' => 'Visitor', 'email' => 'visitor@example.com', 'text' => 'A complete comment.'])->assertUnprocessable();
         $this->postJson($path, ['text' => str_repeat('x', 32768)])->assertStatus(413);

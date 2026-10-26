@@ -24,7 +24,7 @@ A working empty source returns total zero, six zero devices and an empty ranking
 
 ## First-party collection contract
 
-`POST /analytics/page-views`, JSON body containing exactly `event_id` (UUID) and `path` (root-relative string, max 2048 characters). Successful acceptance, matching retry, bot exclusion or prefetch exclusion returns 204 with no body and a request-ID header. No session cookie, visitor identifier, client title, count, device or timestamp is accepted. Send with credentials omitted and an Origin exactly listed in `ANALYTICS_ALLOWED_ORIGINS` (comma-separated; default APP_URL). OPTIONS supports the required JSON CORS preflight without credentials. Body limit is 8 KiB. Duplicate keys, wrong media type, unknown fields and repeated query parameters are rejected.
+`POST /analytics/page-views`, JSON body containing exactly `event_id` (UUID) and `path` (root-relative string, max 2048 characters). Successful acceptance, matching retry, bot exclusion or prefetch exclusion returns 204 with no body and a request-ID header. No session cookie, visitor identifier, client title, count, device or timestamp is accepted. Send with credentials omitted. Origin is optional and unrestricted; ANALYTICS_ALLOWED_ORIGINS is no longer used. Shared credentialed CORS accepts all origins, requested methods and headers, and browser preflight returns 204 before event processing. Body limit is 8 KiB. Duplicate keys, wrong media type, unknown fields and repeated query parameters are rejected.
 
 ```json
 {"event_id":"7dd2cf9c-b09b-4acd-a9b2-3bef500da6a9","path":"/news/example-story?utm_source=campaign#section"}

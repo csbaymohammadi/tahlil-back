@@ -53,13 +53,13 @@ class PublicHttpContractTest extends PanelTestCase
         $this->withHeader('If-None-Match', $etag)->get('/api/v1/page-settings')->assertOk()->assertJsonPath('data.carousels.5.items', []);
     }
 
-    public function test_public_cors_has_no_credentials_and_panel_keeps_private_cache_policy(): void
+    public function test_public_and_panel_use_shared_cors_without_changing_private_cache_policy(): void
     {
         config(['presentation.allowed_origins' => ['https://www.site.test']]);
         $public = $this->withHeader('Origin', 'https://www.site.test')->get('/api/v1/blog/featured')->assertOk()
-            ->assertHeader('Access-Control-Allow-Origin', 'https://www.site.test')->assertHeaderMissing('Access-Control-Allow-Credentials');
+            ->assertHeader('Access-Control-Allow-Origin', 'https://www.site.test')->assertHeader('Access-Control-Allow-Credentials', 'true');
         $this->assertStringNotContainsString('Cookie', $public->headers->get('Vary', ''));
-        $this->withHeader('Origin', 'https://evil.test')->get('/api/v1/blog/featured')->assertOk()->assertHeaderMissing('Access-Control-Allow-Origin');
+        $this->withHeader('Origin', 'https://evil.test')->get('/api/v1/blog/featured')->assertOk()->assertHeader('Access-Control-Allow-Origin', 'https://evil.test');
         $this->withHeader('Origin', 'https://www.site.test')->options('/api/v1/search')->assertNoContent()->assertHeader('Access-Control-Allow-Origin', 'https://www.site.test');
         $this->withHeader('Origin', 'http://localhost')->get('/api/v1/admin/blog/articles')->assertUnauthorized()->assertHeader('Cache-Control', 'no-store, private');
     }
@@ -90,7 +90,7 @@ class PublicHttpContractTest extends PanelTestCase
         $this->get('/api/v1/blog/featured')->assertStatus(503)->assertJsonPath('error.code', 'BLOG_UNAVAILABLE')->assertDontSee('SQLSTATE');
     }
 
-    public function test_comments_use_configured_browser_origin_and_reject_duplicate_json_keys(): void
+    public function test_comments_accept_browser_origins_and_reject_duplicate_json_keys(): void
     {
         config(['presentation.allowed_origins' => ['https://www.site.test']]);
         $article = BlogArticle::factory()->create(['status' => 'published']);

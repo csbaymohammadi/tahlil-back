@@ -16,24 +16,7 @@ class BonusRatingRequest
 
     public function handle(Request $request, Closure $next): Response
     {
-        $origin = $request->header('Origin');
-        $referer = $request->header('Referer');
-        $source = $origin !== null ? $this->origin($origin, true) : ($referer !== null ? $this->origin($referer) : null);
-        $allowed = array_merge([$request->getSchemeAndHttpHost()], config('bonuses.rating_allowed_origins'));
-        if (($origin !== null || $referer !== null || $request->isMethod('PUT') || $request->isMethod('OPTIONS')) &&
-            ($source === null || ! in_array($source, $allowed, true))) {
-            throw new PanelAuthException(403, 'FORBIDDEN', 'Use an allowed first-party origin.');
-        }
-        if ($origin !== null) {
-            $request->attributes->set('bonus_rating_origin', $source);
-        }
         if ($request->isMethod('OPTIONS')) {
-            $headers = array_filter(array_map('trim', explode(',', strtolower($request->header('Access-Control-Request-Headers', '')))));
-            if (! in_array(strtoupper($request->header('Access-Control-Request-Method', '')), ['GET', 'PUT'], true) ||
-                array_diff($headers, ['accept', 'content-type', 'x-csrf-token']) !== []) {
-                throw new PanelAuthException(403, 'FORBIDDEN', 'Unsupported cross-origin request.');
-            }
-
             return response()->noContent();
         }
         if ($request->query->count() !== 0) {
@@ -76,19 +59,5 @@ class BonusRatingRequest
         $request->attributes->set('bonus_voter_context', $context);
 
         return $next($request);
-    }
-
-    private function origin(string $url, bool $originHeader = false): ?string
-    {
-        $parts = parse_url($url);
-        if (! is_array($parts) || ! in_array($parts['scheme'] ?? '', ['http', 'https'], true) || empty($parts['host']) ||
-            isset($parts['user']) || isset($parts['pass']) || preg_match('/[\x00-\x20\x7f]/', $url) ||
-            ($originHeader && (isset($parts['path']) || isset($parts['query']) || isset($parts['fragment'])))) {
-            return null;
-        }
-        $port = $parts['port'] ?? null;
-        $defaultPort = ($parts['scheme'] === 'https' && $port === 443) || ($parts['scheme'] === 'http' && $port === 80);
-
-        return $parts['scheme'].'://'.strtolower($parts['host']).($port !== null && ! $defaultPort ? ':'.$port : '');
     }
 }

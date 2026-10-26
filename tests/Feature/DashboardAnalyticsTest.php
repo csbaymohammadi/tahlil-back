@@ -105,8 +105,8 @@ class DashboardAnalyticsTest extends PanelTestCase
         $this->postJson(self::COLLECT, ['event_id' => (string) Str::uuid(), 'path' => '/'])->assertNoContent();
         $this->withHeader('User-Agent', 'Mozilla/5.0 Windows NT 10.0');
         $this->postJson(self::COLLECT, ['event_id' => (string) Str::uuid(), 'path' => '/tahlilpanel/dashboard/home'])->assertUnprocessable();
-        $this->withHeader('Origin', 'https://evil.example')->postJson(self::COLLECT, ['event_id' => (string) Str::uuid(), 'path' => '/'])->assertForbidden();
-        $this->assertDatabaseCount('analytics_page_views', 0);
+        $this->withHeader('Origin', 'https://another-frontend.example')->postJson(self::COLLECT, ['event_id' => (string) Str::uuid(), 'path' => '/'])->assertNoContent();
+        $this->assertDatabaseCount('analytics_page_views', 1);
     }
 
     public static function deviceAgents(): array

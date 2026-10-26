@@ -143,7 +143,7 @@ class PageSettingsTest extends PanelTestCase
         $this->get(self::BASE.'/options/home/news?q=a&q=b')->assertUnprocessable();
         $this->get(self::BASE.'/options/home/no-such-section')->assertUnprocessable();
         $this->call('PUT', self::BASE, [], $this->prepareCookiesForRequest(), [], ['CONTENT_TYPE' => 'application/json'], '{"expected_version":2,"hero":{},"hero":{}}')->assertBadRequest()->assertJsonPath('error.code', 'INVALID_JSON');
-        $this->withHeader('Origin', 'https://evil.example')->putJson(self::BASE, $this->body())->assertForbidden();
+        $this->withHeader('Origin', 'https://another-frontend.example')->putJson(self::BASE, $this->body())->assertOk()->assertJsonPath('data.version', 2);
         DB::table('page_settings')->delete();
         $this->get(self::BASE)->assertServiceUnavailable();
         $this->assertDatabaseCount('page_settings', 0);

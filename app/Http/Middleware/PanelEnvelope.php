@@ -26,40 +26,7 @@ class PanelEnvelope
         if (! $public) {
             $response->setVary('Cookie', false);
         }
-        if ($public && ! $request->is('api/v1/comments/*')) {
-            $response->setVary('Origin', false);
-            if ($origin = $request->attributes->get('public_origin')) {
-                $response->headers->set('Access-Control-Allow-Origin', $origin);
-                $response->headers->set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-                $response->headers->set('Access-Control-Allow-Headers', 'Accept, If-None-Match');
-                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After, ETag, Location');
-            }
-        } elseif ($request->is('api/v1/analytics/*')) {
-            $response->setVary('Origin', false);
-            if ($origin = $request->attributes->get('presentation_origin')) {
-                $response->headers->set('Access-Control-Allow-Origin', $origin);
-                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type');
-                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
-            }
-        } elseif ($request->is('api/v1/comments/*')) {
-            $response->setVary('Origin', false);
-            if ($origin = $request->attributes->get('comment_origin')) {
-                $response->headers->set('Access-Control-Allow-Origin', $origin);
-                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type, Idempotency-Key');
-                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
-            }
-        } elseif ($request->is('api/v1/bonuses/*')) {
-            $response->setVary('Origin', false);
-            if ($origin = $request->attributes->get('bonus_rating_origin')) {
-                $response->headers->set('Access-Control-Allow-Origin', $origin);
-                $response->headers->set('Access-Control-Allow-Credentials', 'true');
-                $response->headers->set('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS');
-                $response->headers->set('Access-Control-Allow-Headers', 'Accept, Content-Type, X-CSRF-Token');
-                $response->headers->set('Access-Control-Expose-Headers', 'X-Request-ID, Retry-After');
-            }
-        } else {
+        if ($request->is('api/v1/admin/*', 'media/*')) {
             $response->headers->clearCookie('tahlil-panel-session', '/tahlilpanel', null, config('panel.secure_cookie'), true, 'lax');
         }
 

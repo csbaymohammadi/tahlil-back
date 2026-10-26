@@ -2,7 +2,6 @@
 
 return [
     'enabled' => env('ANALYTICS_ENABLED', false),
-    'allowed_origins' => array_filter(array_map('trim', explode(',', env('ANALYTICS_ALLOWED_ORIGINS', env('APP_URL', 'http://localhost'))))),
     'retention_days' => 90,
     'collection_rate_limit' => 120,
     'dashboard_rate_limit' => 60,

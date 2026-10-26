@@ -8,7 +8,6 @@ return [
     'exchange_strip_ids' => array_values(array_filter(array_map('intval', explode(',', env('BONUS_EXCHANGE_STRIP_IDS', ''))))),
     'keywords' => [],
     'management_rate_limit' => 300,
-    'rating_allowed_origins' => array_values(array_filter(array_map('trim', explode(',', env('BONUS_RATING_ALLOWED_ORIGINS', ''))))),
     'voter_seconds' => 31536000,
     'csrf_seconds' => 900,
     'rate_window' => 900,

@@ -10,9 +10,9 @@ Backend handoff for `12-panel-comments.md`, covering the private inbox/reply/del
 | Staging | `https://<staging-host>/api/v1/admin` | `https://<staging-host>/api/v1` |
 | Production | `https://<production-host>/api/v1/admin` | `https://<production-host>/api/v1` |
 
-Development follows the current Boost-resolved URL. Deployment hosts are placeholders, not verified services. Admin routes require existing active panel session cookie tahlil-panel-session-v2 and the shared management guard; mutations require the panel X-CSRF-Token. Existing panel Origin/CORS behavior remains unchanged and no permission matrix is added. Browser admin fetches include credentials.
+Development follows the current Boost-resolved URL. Deployment hosts are placeholders, not verified services. Admin routes require existing active panel session cookie tahlil-panel-session-v2 and the shared management guard; mutations require the panel X-CSRF-Token. Shared CORS accepts all origins; session/CSRF checks remain in effect and no permission matrix is added. Browser admin fetches include credentials.
 
-Public routes require neither administrator credentials nor guest registration. POST requires an Origin exactly matching the backend's scheme/host/port; use the same-origin frontend or BFF. There is no panel/guest CSRF-token bootstrap for comment submission. Supplied GET origins are also checked, while GET without Origin is accepted. OPTIONS is restricted to same origin, GET/POST and Accept/Content-Type/Idempotency-Key headers. Rating CORS and panel CORS remain independent.
+Public routes require neither administrator credentials nor guest registration. Origin is optional and unrestricted for GET and POST. There is no panel/guest CSRF-token bootstrap for comment submission. Shared CORS accepts all origins, requested methods and headers; browser preflight returns 204 before authentication and submission. Actual POST still requires JSON, Idempotency-Key, validation and rate limits. Public clients should omit credentials.
 
 Use Accept: application/json and JSON bodies for PUT/POST. Body maximum is 32 KiB; field bounds apply separately. GET/DELETE accept no body. Unknown, structured or repeated query parameters are rejected before accepting their parsed values. Success contains data/request_id and list meta; errors contain error.code/message/fields and request_id. IDs and versions are positive safe integers; JSON numeric strings/fractions/booleans are rejected. Timestamps are server UTC ISO 8601. All admin and public comment responses use no-store and X-Request-ID. HTTP 204 is bodyless.
 
@@ -81,7 +81,7 @@ Response:
 {"data":{"id":401,"name":"Sara Visitor","text":"What are the current conditions?","created_at":"2026-10-26T10:00:00.000000Z","reply":null},"request_id":"req_comment_created"}
 ```
 
-Submission attempts after the Origin/body gate, including validation failures and retries, use atomic shared limits: default 5 per IP and 300 global per 900 seconds. Thresholds are configurable in config/comments.php. IP cache keys are HMAC-hashed; no fingerprint, voter identity or email-based ownership is created. Use the existing shared panel.rate_store; all instances need the same DB/cache/APP_KEY. Only configured panel.trusted_proxies influence source IP; do not trust arbitrary forwarded headers. Rate failures return 429 with Retry-After; retry the same key/payload after waiting. These limits are independent of login/rating limits.
+Submission attempts after the body gate, including validation failures and retries, use atomic shared limits: default 5 per IP and 300 global per 900 seconds. Thresholds are configurable in config/comments.php. IP cache keys are HMAC-hashed; no fingerprint, voter identity or email-based ownership is created. Use the existing shared panel.rate_store; all instances need the same DB/cache/APP_KEY. Only configured panel.trusted_proxies influence source IP; do not trust arbitrary forwarded headers. Rate failures return 429 with Retry-After; retry the same key/payload after waiting. These limits are independent of login/rating limits.
 
 ## Administrative inbox and reply API
 

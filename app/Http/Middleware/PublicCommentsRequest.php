@@ -16,20 +16,7 @@ class PublicCommentsRequest
 
     public function handle(Request $request, Closure $next): Response
     {
-        $origin = $request->header('Origin');
-        if (($origin !== null || ! $request->isMethodSafe()) && ! in_array($origin, config('presentation.allowed_origins', []), true)) {
-            throw new PanelAuthException(403, 'FORBIDDEN', 'Use the same origin as this service.');
-        }
-        if ($origin !== null) {
-            $request->attributes->set('comment_origin', $origin);
-        }
         if ($request->isMethod('OPTIONS')) {
-            $headers = array_filter(array_map('trim', explode(',', strtolower($request->header('Access-Control-Request-Headers', '')))));
-            if (! in_array($request->header('Access-Control-Request-Method'), ['GET', 'POST'], true) ||
-                array_diff($headers, ['accept', 'content-type', 'idempotency-key']) !== []) {
-                throw new PanelAuthException(403, 'FORBIDDEN', 'Unsupported preflight request.');
-            }
-
             return response()->noContent();
         }
         $allowed = $request->isMethodSafe() ? ['page', 'per_page'] : [];

@@ -13,10 +13,6 @@ class PublicReadRequest
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $origin = $request->header('Origin');
-        if (is_string($origin) && in_array($origin, config('presentation.allowed_origins', []), true)) {
-            $request->attributes->set('public_origin', $origin);
-        }
         if ($request->isMethod('OPTIONS')) {
             return response()->noContent();
         }

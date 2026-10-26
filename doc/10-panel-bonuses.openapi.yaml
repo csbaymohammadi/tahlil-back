@@ -2042,7 +2042,7 @@ paths:
         changed value replaces vote. Rating revision changes without advancing editorial
         version/dates. No panel login or caller-supplied voter identity.
     options:
-      summary: Restricted rating CORS preflight
+      summary: Shared unrestricted rating CORS preflight
       security: []
       parameters:
       - "$ref": "#/components/parameters/Origin"
@@ -2051,15 +2051,10 @@ paths:
         required: true
         schema:
           type: string
-          enum:
-          - GET
-          - PUT
       responses:
         '204':
-          description: Allowed origin/method/headers; credentialed CORS. No voter
-            context created.
-        '403':
-          description: Origin, method or headers not allowed.
+          description: All origins, requested methods and headers accepted; credentialed reflected
+            CORS. No voter context created.
 components:
   securitySchemes:
     panelSession:
@@ -2123,8 +2118,8 @@ components:
       in: header
       schema:
         type: string
-      description: Same origin as service or configured BONUS_RATING_ALLOWED_ORIGINS.
-        PUT requires this or a valid allowed Referer.
+      description: Optional browser Origin; all origins accepted by shared CORS.
+        No Origin or Referer is required for PUT; voter cookie and CSRF remain required.
   schemas:
     BonusCreate:
       type: object

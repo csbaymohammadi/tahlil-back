@@ -5,10 +5,12 @@ use App\Auth\SecurityEvents;
 use App\Blog\BlogApiErrorPresenter;
 use App\Exceptions\PanelAuthException;
 use App\Http\Middleware\PanelEnvelope;
+use App\Support\RequestFailureReporter;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Encryption\MissingAppKeyException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -34,12 +36,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontReportDuplicates();
         $exceptions->report(function (Throwable $exception) {
             if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
-                Log::error('Panel request failed.', [
-                    'request_id' => request()->attributes->get('request_id'),
-                    'exception_type' => $exception::class,
-                ]);
+                app(RequestFailureReporter::class)->report($exception, request());
 
                 return false;
             }
@@ -80,6 +80,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 }
                 [$status, $message] = [409, 'A record with this value already exists.'];
                 $fields = $field ? [$field => [$message]] : [];
+            } elseif ($exception instanceof MissingAppKeyException) {
+                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Application configuration is temporarily unavailable.'];
             } elseif ($exception instanceof QueryException || $exception instanceof PDOException || $exception instanceof LockTimeoutException || $exception instanceof DecryptException || $exception instanceof RedisException || $exception instanceof ConnectionException) {
                 [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.'];
             } elseif ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 503) {

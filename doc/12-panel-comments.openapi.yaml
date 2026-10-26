@@ -61,11 +61,11 @@ components:
     Origin:
       name: Origin
       in: header
-      required: true
+      required: false
       schema:
         type: string
-      description: Exact same scheme/host/port as the backend. No admin CSRF or guest
-        login.
+      description: Optional browser Origin; all origins accepted by shared CORS. No admin
+        CSRF or guest login.
     SectionFilter:
       name: section
       in: query
@@ -1367,12 +1367,10 @@ paths:
         and 300 global per 900 seconds; retries count as attempts. No email or staff
         identities in public projections.'
     options:
-      summary: Same-origin comment preflight
+      summary: Shared unrestricted comment CORS preflight
       security: []
       parameters:
       - "$ref": "#/components/parameters/Origin"
       responses:
         '204':
-          description: Allowed GET/POST and Accept/Content-Type/Idempotency-Key headers.
-        '403':
-          description: Cross-origin or unsupported request.
+          description: All origins, requested methods and headers accepted; credentialed reflected CORS. No comment created.

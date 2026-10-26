@@ -6,7 +6,7 @@ Development base resolved by Boost: `http://localhost:8000/api/v1/admin`. Stagin
 
 `GET /profile` returns the signed-in administrator's own record. `PATCH /profile` resolves the same account from the session; no target-ID parameter exists. All active/non-deleted administrators have access, including roleless accounts. The account, auth identity, management record and author share the same immutable ID and version.
 
-Both operations require the existing `tahlil-panel-session-v2` cookie; PATCH additionally requires `X-CSRF-Token` and an exact `Origin` in `PRESENTATION_ALLOWED_ORIGINS` (defaults to APP_URL). They use the new scoped Origin policy; legacy auth/user routes retain their existing contract. Responses carry `Cache-Control: private, no-store`, `X-Request-ID`, and the shared request envelope. Limits are 300 requests/minute per account/route. Admin JSON body bound is 16 KiB, including encoded wire bytes; duplicate decoded object keys are rejected.
+Both operations require the existing `tahlil-panel-session-v2` cookie; PATCH additionally requires `X-CSRF-Token`. Origin is optional and unrestricted under the shared credentialed CORS policy in config/cors.php; session and CSRF checks remain in effect. Responses carry `Cache-Control: private, no-store`, `X-Request-ID`, and the shared request envelope. Limits are 300 requests/minute per account/route. Admin JSON body bound is 16 KiB, including encoded wire bytes; duplicate decoded object keys are rejected.
 
 ```json
 {"data":{"id":7,"name":"Example Editor","linkedin_url":"https://www.linkedin.com/in/editor","bio":"Market analysis.","avatar_media_id":42,"avatar_url":"/media/42/avatar.png","updated_at":"2026-10-26T09:00:00.000000Z","version":3},"request_id":"req_profile_read"}

@@ -14,14 +14,6 @@ class PresentationRequest
     public function handle(Request $request, Closure $next): Response
     {
         $collection = $request->routeIs('analytics.page-views', 'analytics.options');
-        $allowed = config($collection ? 'analytics.allowed_origins' : 'presentation.allowed_origins', []);
-        $origin = $request->header('Origin');
-        if (($collection || ! $request->isMethodSafe()) && (! is_string($origin) || ! in_array($origin, $allowed, true))) {
-            throw new PanelAuthException(403, 'FORBIDDEN', 'The request origin is not allowed.');
-        }
-        if ($collection || $request->routeIs('page-settings.public')) {
-            $request->attributes->set('presentation_origin', is_string($origin) && in_array($origin, $allowed, true) ? $origin : null);
-        }
         $seen = [];
         $allowedQuery = $request->routeIs('panel.page-settings.options.*') ? ['q', 'page', 'per_page'] : [];
         foreach (explode('&', (string) $request->server('QUERY_STRING', '')) as $pair) {
