@@ -17,6 +17,7 @@ use App\Models\Tutorial;
 use App\Models\User;
 use App\PageSettings\PublicChanges;
 use App\Profile\PublicAuthor;
+use App\Tutorials\PublicTutorialProjection;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -55,7 +56,11 @@ class AppServiceProvider extends ServiceProvider
         TrustProxies::at(config('panel.trusted_proxies'));
         $this->app->make(MediaConsumers::class)->register('video',
             static fn (int $id, User $actor): bool => Tutorial::whereKey($id)->exists(),
-            static fn (int $id): bool => Tutorial::whereKey($id)->exists(),
+            static function (int $id): bool {
+                $tutorial = Tutorial::find($id);
+
+                return $tutorial !== null && app(PublicTutorialProjection::class)->eligible($tutorial);
+            },
         );
         $this->app->make(MediaConsumers::class)->register('bonus',
             static fn (int $id, User $actor): bool => Bonus::whereKey($id)->exists(),

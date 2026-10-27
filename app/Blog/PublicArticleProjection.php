@@ -35,17 +35,18 @@ class PublicArticleProjection
     }
 
     /** @return array<string, mixed> */
-    public function detail(BlogArticle $article): array
+    public function detail(BlogArticle|NewsItem $article): array
     {
+        $news = $article instanceof NewsItem;
         $summary = $this->summary($article);
         $withoutIds = $this->outline->decorate($article->content, false)['content'];
         try {
-            $content = $this->sanitizer->sanitize($withoutIds, allowEmpty: true);
+            $content = $this->sanitizer->sanitize($withoutIds, config($news ? 'news.trusted_media_hosts' : 'blog.trusted_media_hosts', []), rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
         } catch (PanelAuthException $exception) {
-            throw new PanelAuthException(503, 'BLOG_UNAVAILABLE', 'The saved content cannot be displayed safely.');
+            throw new PanelAuthException(503, $news ? 'NEWS_UNAVAILABLE' : 'BLOG_UNAVAILABLE', 'The saved content cannot be displayed safely.');
         }
 
-        return [...$summary, ...$this->outline->decorate($content),
+        return [...$summary, ...$this->outline->decorate($content, prefix: $news ? 'news' : 'article'),
             'updated_at' => $article->updated_at?->utc()->toISOString(), 'meta_description' => $article->meta_description,
             'seo_description' => PublicText::plain($article->meta_description !== '' ? $article->meta_description : $summary['excerpt'], 500),
             'author_profile' => $this->authors->record($article->author),

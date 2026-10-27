@@ -7,6 +7,7 @@ use App\Models\ExchangeCategory;
 use App\Models\User;
 use App\Support\ExchangeSpecifications;
 use App\Support\ExchangeText;
+use App\Support\PublicText;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,7 @@ class ExchangeFactory extends Factory
                 'english_name_normalized' => ExchangeText::panel($exchange->english_name),
                 'english_public_normalized' => ExchangeText::public($exchange->english_name),
                 'description_normalized' => ExchangeText::panel($exchange->description),
-                'description_public_normalized' => ExchangeText::public($exchange->description),
+                'description_public_normalized' => ExchangeText::public($exchange->description !== '' ? $exchange->description : PublicText::plain($exchange->content)),
             ]);
         })->afterCreating(function (Exchange $exchange): void {
             DB::table('exchange_slug_ownership')->insert([

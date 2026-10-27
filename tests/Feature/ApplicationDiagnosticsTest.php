@@ -25,6 +25,9 @@ class ApplicationDiagnosticsTest extends TestCase
         $output = Artisan::output();
         $this->assertSame(0, $code);
         $this->assertStringContainsString('application_key', $output);
+        $this->assertStringContainsString('persian_collation', $output);
+        $this->assertStringContainsString('ICU fa_IR ordering available', $output);
+        $this->assertStringContainsString('html_sanitizer', $output);
         $this->assertStringContainsString('configured; value hidden', $output);
         $this->assertStringContainsString('0 pending', $output);
         $this->assertStringNotContainsString(config('app.key'), $output);

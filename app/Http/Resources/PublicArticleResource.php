@@ -12,6 +12,6 @@ class PublicArticleResource extends JsonResource
     {
         $projection = app(PublicArticleProjection::class);
 
-        return $request->routeIs('public.blog.show') ? $projection->detail($this->resource) : $projection->summary($this->resource);
+        return $request->routeIs('public.blog.show', 'public.news.show') ? $projection->detail($this->resource) : $projection->summary($this->resource);
     }
 }

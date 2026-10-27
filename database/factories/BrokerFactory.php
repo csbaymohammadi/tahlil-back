@@ -7,6 +7,7 @@ use App\Models\BrokerCategory;
 use App\Models\User;
 use App\Support\BrokerSpecifications;
 use App\Support\PlatformText;
+use App\Support\PublicText;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 
@@ -21,7 +22,7 @@ class BrokerFactory extends Factory
             $broker->forceFill([
                 'title_normalized' => PlatformText::panel($broker->title), 'title_public_normalized' => PlatformText::public($broker->title),
                 'english_name_normalized' => PlatformText::panel($broker->english_name), 'english_public_normalized' => PlatformText::public($broker->english_name),
-                'description_normalized' => PlatformText::panel($broker->description), 'description_public_normalized' => PlatformText::public($broker->description),
+                'description_normalized' => PlatformText::panel($broker->description), 'description_public_normalized' => PlatformText::public($broker->description !== '' ? $broker->description : PublicText::plain($broker->content)),
                 'markets_public_normalized' => PlatformText::public($broker->markets),
                 'title_sort_key' => PlatformText::persianSortKey($broker->title),
             ]);

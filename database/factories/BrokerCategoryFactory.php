@@ -11,6 +11,13 @@ class BrokerCategoryFactory extends Factory
 {
     protected $model = BrokerCategory::class;
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (BrokerCategory $category): void {
+            $category->forceFill(['name_normalized' => PlatformText::panel($category->name), 'public_name_normalized' => PlatformText::public($category->name)]);
+        });
+    }
+
     public function definition(): array
     {
         $name = fake()->unique()->words(2, true);

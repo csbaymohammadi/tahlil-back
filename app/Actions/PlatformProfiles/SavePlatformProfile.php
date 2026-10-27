@@ -13,6 +13,7 @@ use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
 use App\Support\PlatformText;
 use App\Support\PublicContentIndex;
+use App\Support\PublicText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -169,7 +170,8 @@ abstract class SavePlatformProfile
             $descriptionForSearch = mb_substr($descriptionForSearch, 0, 300, 'UTF-8');
         }
         $values['description_normalized'] = PlatformText::panel($descriptionForSearch);
-        $values['description_public_normalized'] = PlatformText::public($descriptionForSearch);
+        $publicDescription = $descriptionForSearch !== '' ? $descriptionForSearch : PublicText::plain((string) $canonicalContent);
+        $values['description_public_normalized'] = PlatformText::public($publicDescription);
         $values['markets_public_normalized'] = $definition->key === 'broker' ? PlatformText::public((string) $values['markets']) : null;
         $values['title_sort_key'] = PlatformText::persianSortKey((string) $values['title']);
         $values['specifications'] = $specifications;

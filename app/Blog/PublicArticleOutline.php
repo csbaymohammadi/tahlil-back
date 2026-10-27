@@ -8,7 +8,7 @@ use DOMXPath;
 class PublicArticleOutline
 {
     /** @return array{content: string, outline: list<array{id: string, title: string, level: int}>} */
-    public function decorate(string $html, bool $anchors = true): array
+    public function decorate(string $html, bool $anchors = true, string $prefix = 'article'): array
     {
         $dom = new DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
@@ -36,7 +36,7 @@ class PublicArticleOutline
                 $heading->parentNode->replaceChild($replacement, $heading);
                 $heading = $replacement;
             }
-            $id = 'article-heading-'.(count($outline) + 1);
+            $id = $prefix.'-heading-'.(count($outline) + 1);
             $heading->setAttribute('id', $id);
             $outline[] = ['id' => $id, 'title' => trim(preg_replace('/\s+/u', ' ', $heading->textContent) ?? ''), 'level' => (int) substr($heading->tagName, 1)];
         }

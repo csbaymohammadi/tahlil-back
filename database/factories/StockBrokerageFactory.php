@@ -6,6 +6,7 @@ use App\Models\StockBrokerage;
 use App\Models\StockBrokerageCategory;
 use App\Models\User;
 use App\Support\PlatformText;
+use App\Support\PublicText;
 use App\Support\StockBrokerSpecifications;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +22,7 @@ class StockBrokerageFactory extends Factory
             $brokerage->forceFill([
                 'kind' => 'stock-brokers', 'title_normalized' => PlatformText::panel($brokerage->title), 'title_public_normalized' => PlatformText::public($brokerage->title),
                 'english_name_normalized' => PlatformText::panel($brokerage->english_name), 'english_public_normalized' => PlatformText::public($brokerage->english_name),
-                'description_normalized' => PlatformText::panel($brokerage->description), 'description_public_normalized' => PlatformText::public($brokerage->description),
+                'description_normalized' => PlatformText::panel($brokerage->description), 'description_public_normalized' => PlatformText::public($brokerage->description !== '' ? $brokerage->description : PublicText::plain($brokerage->content)),
                 'title_sort_key' => PlatformText::persianSortKey($brokerage->title),
             ]);
         })->afterCreating(function (StockBrokerage $brokerage): void {

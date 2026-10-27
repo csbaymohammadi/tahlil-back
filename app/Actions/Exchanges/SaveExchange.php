@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Support\ExchangeSpecifications;
 use App\Support\ExchangeText;
 use App\Support\PublicContentIndex;
+use App\Support\PublicText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -153,7 +154,7 @@ class SaveExchange
         $values['english_name_normalized'] = ExchangeText::panel($values['english_name']);
         $values['english_public_normalized'] = ExchangeText::public($values['english_name']);
         $values['description_normalized'] = ExchangeText::panel($values['description']);
-        $values['description_public_normalized'] = ExchangeText::public($values['description']);
+        $values['description_public_normalized'] = ExchangeText::public($values['description'] !== '' ? $values['description'] : PublicText::plain($content ?? ($old['content'] ?? '')));
         $values['title_sort_key'] = ExchangeText::persianSortKey($values['title']);
         $values['specifications'] = $specifications;
         $values['content'] = $content ?? ($old['content'] ?? '');

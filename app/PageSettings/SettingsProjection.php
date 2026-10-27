@@ -3,18 +3,17 @@
 namespace App\PageSettings;
 
 use App\Blog\PublicArticleProjection;
-use App\Bonuses\BonusPublicProjection;
+use App\Bonuses\PublicBonusProjection;
 use App\Exchanges\ExchangePublicProjection;
 use App\Models\PageSetting;
 use App\Models\Tutorial;
-use App\Support\PublicText;
-use App\Tutorials\TutorialProjection;
+use App\Tutorials\PublicTutorialProjection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class SettingsProjection
 {
-    public function __construct(private SelectionCatalog $catalog, private SettingsMedia $media, private ExchangePublicProjection $exchanges, private BonusPublicProjection $bonuses, private TutorialProjection $tutorials, private PublicArticleProjection $articles) {}
+    public function __construct(private SelectionCatalog $catalog, private SettingsMedia $media, private ExchangePublicProjection $exchanges, private PublicBonusProjection $bonuses, private PublicTutorialProjection $tutorials, private PublicArticleProjection $articles) {}
 
     /** @return array<string, mixed> */
     public function admin(PageSetting $settings): array
@@ -104,13 +103,7 @@ class SettingsProjection
                 'href' => SettingsDefinition::MENU[$key][1].'/'.rawurlencode($record->slug)];
         }
         if ($record instanceof Tutorial) {
-            $detail = $this->tutorials->publicDetail($record);
-
-            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'href' => '/tutorials/'.rawurlencode($record->slug),
-                'description' => $record->description, 'cover_image' => $detail['display_cover_image'], 'category' => $detail['category'],
-                'duration_seconds' => $detail['duration_seconds'], 'youtube_url' => $detail['youtube_url'], 'youtube_video_id' => $record->youtube_video_id,
-                'aparat_url' => $detail['aparat_url'], 'aparat_video_id' => $detail['aparat_url'] === '' ? null : $record->aparat_video_id,
-                'default_provider' => $detail['default_provider'], 'duration_source' => $detail['duration_source'], 'published_at' => $detail['published_at']];
+            return $this->tutorials->summary($record);
         }
         if ($key === 'exchanges') {
             $card = $this->exchanges->card($record);
@@ -122,10 +115,7 @@ class SettingsProjection
                 'rating_average' => $card['rating_average'], 'rating_count' => $card['rating_count'], 'comment_count' => $card['comment_count']];
         }
         if ($key === 'bonuses') {
-            $card = $this->bonuses->card($record);
-
-            return [...array_intersect_key($card, array_flip(['id', 'slug', 'title', 'description', 'category', 'published_at', 'campaign', 'rating', 'rating_count'])),
-                'href' => '/bonuses/'.rawurlencode($record->slug), 'excerpt' => PublicText::plain($card['display_description']), 'cover_image' => $card['display_cover_image']];
+            return $this->bonuses->summary($record);
         }
 
         return $this->articles->summary($record);

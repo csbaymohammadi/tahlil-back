@@ -32,13 +32,13 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(PanelEnvelope::class);
-        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')]);
-        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')]);
+        $middleware->trimStrings(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/news/*', 'api/v1/exchanges', 'api/v1/exchanges/*', 'api/v1/brokers', 'api/v1/brokers/*', 'api/v1/stock-brokers', 'api/v1/stock-brokers/*', 'api/v1/gold-platforms', 'api/v1/gold-platforms/*', 'api/v1/prop-firms', 'api/v1/prop-firms/*', 'api/v1/tutorials', 'api/v1/tutorials/*', 'api/v1/search', 'api/v1/sitemap/*')]);
+        $middleware->convertEmptyStringsToNull(except: [fn (Request $request) => $request->is('api/v1/admin/*', 'api/v1/bonuses', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/news/*', 'api/v1/exchanges', 'api/v1/exchanges/*', 'api/v1/brokers', 'api/v1/brokers/*', 'api/v1/stock-brokers', 'api/v1/stock-brokers/*', 'api/v1/gold-platforms', 'api/v1/gold-platforms/*', 'api/v1/prop-firms', 'api/v1/prop-firms/*', 'api/v1/tutorials', 'api/v1/tutorials/*', 'api/v1/search', 'api/v1/sitemap/*')]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->dontReportDuplicates();
         $exceptions->report(function (Throwable $exception) {
-            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
+            if (app()->bound('request') && request()->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/news/*', 'api/v1/exchanges', 'api/v1/exchanges/*', 'api/v1/brokers', 'api/v1/brokers/*', 'api/v1/stock-brokers', 'api/v1/stock-brokers/*', 'api/v1/gold-platforms', 'api/v1/gold-platforms/*', 'api/v1/prop-firms', 'api/v1/prop-firms/*', 'api/v1/tutorials', 'api/v1/tutorials/*', 'api/v1/search', 'api/v1/sitemap/*')) {
                 app(RequestFailureReporter::class)->report($exception, request());
 
                 return false;
@@ -46,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
         $exceptions->dontFlash(['current_password', 'password', 'password_confirmation', 'new_password']);
         $exceptions->render(function (Throwable $exception, Request $request) {
-            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/search', 'api/v1/sitemap/*')) {
+            if (! $request->is('api/v1/admin/*', 'media/*', 'api/v1/bonuses', 'api/v1/bonuses/*', 'api/v1/comments/*', 'api/v1/page-settings', 'api/v1/analytics/*', 'api/v1/blog/*', 'api/v1/news/*', 'api/v1/exchanges', 'api/v1/exchanges/*', 'api/v1/brokers', 'api/v1/brokers/*', 'api/v1/stock-brokers', 'api/v1/stock-brokers/*', 'api/v1/gold-platforms', 'api/v1/gold-platforms/*', 'api/v1/prop-firms', 'api/v1/prop-firms/*', 'api/v1/tutorials', 'api/v1/tutorials/*', 'api/v1/search', 'api/v1/sitemap/*')) {
                 return null;
             }
             $fields = [];
@@ -97,6 +97,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 $publicCode = match (true) {
                     $request->is('api/v1/page-settings') => 'PUBLIC_CONFIGURATION_UNAVAILABLE',
                     $request->is('api/v1/blog/*') => 'BLOG_UNAVAILABLE',
+                    $request->is('api/v1/news/*') => 'NEWS_UNAVAILABLE',
+                    $request->is('api/v1/exchanges', 'api/v1/exchanges/*') => 'EXCHANGES_UNAVAILABLE',
+                    $request->is('api/v1/brokers', 'api/v1/brokers/*') => 'BROKERS_UNAVAILABLE',
+                    $request->is('api/v1/stock-brokers', 'api/v1/stock-brokers/*') => 'STOCK_BROKERS_UNAVAILABLE',
+                    $request->is('api/v1/gold-platforms', 'api/v1/gold-platforms/*') => 'GOLD_PLATFORMS_UNAVAILABLE',
+                    $request->is('api/v1/prop-firms', 'api/v1/prop-firms/*') => 'PROP_FIRMS_UNAVAILABLE',
+                    ($request->is('api/v1/bonuses', 'api/v1/bonuses/*') && ! $request->is('api/v1/bonuses/*/rating')) => 'BONUSES_UNAVAILABLE',
+                    $request->is('api/v1/tutorials', 'api/v1/tutorials/*') => 'TUTORIALS_UNAVAILABLE',
                     $request->is('api/v1/search') => 'SEARCH_UNAVAILABLE',
                     $request->is('api/v1/sitemap/*') => 'SITEMAP_UNAVAILABLE',
                     $request->is('api/v1/comments/*') => 'COMMENTS_UNAVAILABLE',

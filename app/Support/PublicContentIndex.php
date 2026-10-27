@@ -14,6 +14,7 @@ use App\Models\PropFirm;
 use App\Models\StockBrokerage;
 use App\Models\Tutorial;
 use App\PageSettings\SettingsMedia;
+use App\Tutorials\PublicTutorialProjection;
 use App\Tutorials\TutorialProviders;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -132,6 +133,9 @@ class PublicContentIndex
 
     public function safeImage(string $url, string $type): string
     {
+        if ($type === 'tutorials') {
+            return app(PublicTutorialProjection::class)->publicImage($url);
+        }
         $module = match ($type) {
             'articles' => 'blog', 'news' => 'news', 'tutorials' => 'tutorials', 'bonuses' => 'bonuses',
             'exchanges' => 'exchanges', default => 'platform_profiles',
@@ -181,9 +185,17 @@ class PublicContentIndex
         $category = $record->category?->trashed() ? null : $record->category;
         $author = $record instanceof Tutorial ? null : $record->author;
 
-        return hash('sha256', json_encode([
+        $values = [
             $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url']),
             $category?->only(['id', 'name']), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        ];
+        if ($record instanceof Tutorial) {
+            $duration = app(PublicTutorialProjection::class)->duration($record->loadMissing('durations'));
+            if ($duration['duration_seconds'] !== null) {
+                $values[] = $duration;
+            }
+        }
+
+        return hash('sha256', json_encode($values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 }

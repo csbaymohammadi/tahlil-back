@@ -11,9 +11,9 @@ use App\Support\PlatformProfileDefinition;
 class ResolvePlatformPublicItem
 {
     /** @return array{type: 'profile', profile: PlatformProfile}|array{type: 'redirect', status: int, path: string}|array{type: 'not_found'} */
-    public function resolve(PlatformProfileDefinition $definition, string $slug): array
+    public function resolve(PlatformProfileDefinition $definition, string $slug, bool $includeLegacy = true): array
     {
-        if ($definition->key === 'broker') {
+        if ($includeLegacy && $definition->key === 'broker') {
             $legacy = StockBrokerageLegacyPath::query()->where('source_slug', $slug)->first();
             if ($legacy) {
                 $stock = StockBrokerage::public()->find($legacy->stock_brokerage_id);

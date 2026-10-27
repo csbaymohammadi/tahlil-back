@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Support\PlatformText;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 use Throwable;
 
 class DiagnoseApplication extends Command
@@ -23,10 +25,17 @@ class DiagnoseApplication extends Command
             $failed = $failed || ! $passed;
         };
         $check('php_version', version_compare(PHP_VERSION, '8.3', '>='), PHP_VERSION);
-        foreach (['ctype', 'dom', 'fileinfo', 'gd', 'hash', 'mbstring', 'openssl', 'pdo', 'session', 'tokenizer', 'xml', 'zip'] as $extension) {
+        foreach (['ctype', 'dom', 'fileinfo', 'gd', 'hash', 'intl', 'mbstring', 'openssl', 'pdo', 'session', 'tokenizer', 'xml', 'zip'] as $extension) {
             $loaded = extension_loaded($extension);
             $check('extension_'.$extension, $loaded, $loaded ? 'loaded' : 'missing');
         }
+        try {
+            $sortKey = PlatformText::persianSortKey('آزمایش');
+            $check('persian_collation', $sortKey !== '', 'ICU fa_IR ordering available');
+        } catch (Throwable) {
+            $check('persian_collation', false, 'install/enable PHP intl with ICU fa_IR support');
+        }
+        $check('html_sanitizer', class_exists(HtmlSanitizerConfig::class), 'required runtime dependency');
         $key = config('app.key');
         if (is_string($key) && str_starts_with($key, 'base64:')) {
             $key = base64_decode(substr($key, 7), true);
@@ -42,6 +51,10 @@ class DiagnoseApplication extends Command
             $check('database_migrations', $pending === [], count($pending).' pending');
             $ready = Schema::hasTable('public_content_state') && (bool) DB::table('public_content_state')->where('id', 1)->value('ready');
             $check('public_discovery', $ready, $ready ? 'initialized; use public API reads to verify source freshness' : 'not initialized; run migrations and public-content:rebuild');
+            if (Schema::hasTable('tutorials')) {
+                $conflict = DB::table('tutorials')->where('slug', 'featured')->whereNull('deleted_at')->exists();
+                $check('tutorial_featured_slug', ! $conflict, $conflict ? 'reserved route conflicts with an existing tutorial; resolve before activation' : 'no reserved-route conflict');
+            }
         } catch (Throwable) {
             $check('database_readiness', false, 'unavailable; inspect the configured database and migrations');
         }

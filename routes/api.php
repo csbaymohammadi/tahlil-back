@@ -30,8 +30,12 @@ use App\Http\Controllers\BonusRatingController;
 use App\Http\Controllers\PageSettingsController;
 use App\Http\Controllers\PageViewController;
 use App\Http\Controllers\PublicBlogController;
+use App\Http\Controllers\PublicBonusController;
 use App\Http\Controllers\PublicCommentController;
+use App\Http\Controllers\PublicDirectoryController;
+use App\Http\Controllers\PublicNewsController;
 use App\Http\Controllers\PublicSearchController;
+use App\Http\Controllers\PublicTutorialController;
 use App\Http\Controllers\SitemapEntriesController;
 use App\Http\Middleware\BonusRatingRequest;
 use App\Http\Middleware\PanelRequest;
@@ -223,9 +227,29 @@ Route::prefix('v1')->middleware(PublicReadRequest::class)->group(function (): vo
     Route::get('blog/featured', [PublicBlogController::class, 'featured'])->name('public.blog.featured');
     Route::get('blog/articles/{slug}/related', [PublicBlogController::class, 'related'])->name('public.blog.related');
     Route::get('blog/articles/{slug}', [PublicBlogController::class, 'show'])->name('public.blog.show');
+    Route::get('news/articles', [PublicNewsController::class, 'index'])->name('public.news.index');
+    Route::get('news/featured', [PublicNewsController::class, 'featured'])->name('public.news.featured');
+    Route::get('news/articles/{slug}/latest', [PublicNewsController::class, 'latest'])->name('public.news.latest');
+    Route::get('news/articles/{slug}', [PublicNewsController::class, 'show'])->name('public.news.show');
+    Route::get('stock-brokers/legacy-routes/resolve', [PublicDirectoryController::class, 'legacy'])->name('public.stock-brokers.legacy');
+    foreach (['exchanges', 'brokers', 'stock-brokers', 'gold-platforms', 'prop-firms'] as $directory) {
+        Route::get($directory, [PublicDirectoryController::class, 'index'])->defaults('directory', $directory)->name('public.'.$directory.'.index');
+        Route::get($directory.'/{slug}/others', [PublicDirectoryController::class, 'others'])->defaults('directory', $directory)->name('public.'.$directory.'.others');
+        Route::get($directory.'/{slug}', [PublicDirectoryController::class, 'show'])->defaults('directory', $directory)->name('public.'.$directory.'.show');
+        foreach ([$directory, $directory.'/{slug}', $directory.'/{slug}/others'] as $path) {
+            Route::options($path, fn () => response()->noContent());
+        }
+    }
+    Route::get('bonuses', [PublicBonusController::class, 'index'])->name('public.bonuses.index');
+    Route::get('bonuses/{slug}/latest', [PublicBonusController::class, 'latest'])->name('public.bonuses.latest');
+    Route::get('bonuses/{slug}', [PublicBonusController::class, 'show'])->name('public.bonuses.show');
+    Route::get('tutorials', [PublicTutorialController::class, 'index'])->name('public.tutorials.index');
+    Route::get('tutorials/featured', [PublicTutorialController::class, 'featured'])->name('public.tutorials.featured');
+    Route::get('tutorials/{slug}/latest', [PublicTutorialController::class, 'latest'])->name('public.tutorials.latest');
+    Route::get('tutorials/{slug}', [PublicTutorialController::class, 'show'])->name('public.tutorials.show');
     Route::get('search', [PublicSearchController::class, 'index'])->name('public.search');
     Route::get('sitemap/entries', [SitemapEntriesController::class, 'index'])->name('public.sitemap');
-    foreach (['page-settings', 'blog/articles', 'blog/featured', 'blog/articles/{slug}', 'blog/articles/{slug}/related', 'search', 'sitemap/entries'] as $path) {
+    foreach (['tutorials', 'tutorials/featured', 'tutorials/{slug}', 'tutorials/{slug}/latest', 'bonuses', 'bonuses/{slug}', 'bonuses/{slug}/latest', 'news/articles', 'news/featured', 'news/articles/{slug}', 'news/articles/{slug}/latest', 'stock-brokers/legacy-routes/resolve', 'page-settings', 'blog/articles', 'blog/featured', 'blog/articles/{slug}', 'blog/articles/{slug}/related', 'search', 'sitemap/entries'] as $path) {
         Route::options($path, fn () => response()->noContent());
     }
 });
