@@ -2,6 +2,7 @@
 
 namespace App\Bonuses;
 
+use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
 use App\Models\Bonus;
@@ -37,9 +38,8 @@ class BonusMedia
     public function replace(Bonus $bonus, User $actor): void
     {
         $this->attach($bonus, $actor, 'cover_image', [$bonus->cover_image], 'image', 'cover_image');
-        preg_match_all('~<(img|video)\b[^>]*\bsrc=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\'][^>]*>~i', $bonus->content, $matches, PREG_SET_ORDER);
-        foreach (['image' => 'img', 'video' => 'video'] as $kind => $tag) {
-            $urls = array_column(array_filter($matches, fn (array $match): bool => strtolower($match[1]) === $tag), 2);
+        foreach (['image', 'video'] as $kind) {
+            $urls = app(BlogHtmlSanitizer::class)->managedSources($bonus->content, $kind);
             $this->attach($bonus, $actor, 'content-'.$kind, $urls, $kind, 'content');
         }
     }

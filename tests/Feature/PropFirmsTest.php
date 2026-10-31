@@ -54,7 +54,7 @@ class PropFirmsTest extends PanelTestCase
             'logo' => '',
             'website_url' => '',
             'status' => 'published',
-            'content' => '<h2>Review</h2><table><tbody><tr><td>Service</td></tr></tbody></table><p><img src="/images/example.png" alt="Example"></p>',
+            'content' => '<h2>Review</h2><table><tbody><tr><td>Service</td></tr></tbody></table><p><img src="https://service.tahlilex.com/images/example.png" alt="Example"></p>',
         ]))->assertCreated()
             ->assertJsonPath('data.kind', 'prop-firms')
             ->assertJsonPath('data.author.id', $actor->id)

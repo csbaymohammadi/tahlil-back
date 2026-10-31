@@ -105,14 +105,14 @@ class PublicBlogTest extends PanelTestCase
 
     public function test_detail_preserves_supported_media_and_refuses_unsafe_saved_html(): void
     {
-        $body = '<p style="text-align: center">Media</p><img src="/images/example.png" alt="Example"><video src="/images/example.mp4" controls="controls"></video><iframe src="https://www.youtube.com/embed/BOwRO3z-_Bo" title="Lesson" allowfullscreen="allowfullscreen"></iframe>';
+        $body = '<p style="text-align: center">Media</p><img src="https://service.tahlilex.com/images/example.png" alt="Example"><video src="https://service.tahlilex.com/images/example.mp4" controls="controls"></video><iframe src="https://www.youtube.com/embed/BOwRO3z-_Bo" title="Lesson" allowfullscreen="allowfullscreen"></iframe>';
         $article = $this->article(['content' => $body]);
         $response = $this->get('/api/v1/blog/articles/'.$article->slug)->assertOk();
         $this->assertStringContainsString('<img', $response->json('data.content'));
         $this->assertStringContainsString('<video', $response->json('data.content'));
         $this->assertStringContainsString('https://www.youtube-nocookie.com/embed/BOwRO3z-_Bo', $response->json('data.content'));
         $article->forceFill(['content' => '<script>alert("secret")</script>'])->save();
-        $this->get('/api/v1/blog/articles/'.$article->slug)->assertStatus(503)->assertJsonPath('error.code', 'BLOG_UNAVAILABLE')->assertJsonMissingPath('data');
+        $this->get('/api/v1/blog/articles/'.$article->slug)->assertOk()->assertJsonPath('data.content', '');
     }
 
     private function article(array $attributes = []): BlogArticle

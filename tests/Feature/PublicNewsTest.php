@@ -125,7 +125,7 @@ class PublicNewsTest extends PanelTestCase
         $this->get('/api/v1/news/featured')->assertOk()->assertJsonPath('data', []);
         $news = $this->news(['content' => '<script>alert(1)</script><p>Unsafe</p>']);
         $this->get('/api/v1/news/articles/'.$news->slug.'/latest')->assertOk()->assertJsonPath('data', []);
-        $this->get('/api/v1/news/articles/'.$news->slug)->assertServiceUnavailable()->assertJsonPath('error.code', 'NEWS_UNAVAILABLE');
+        $this->get('/api/v1/news/articles/'.$news->slug)->assertOk()->assertJsonPath('data.content', '<p>Unsafe</p>');
     }
 
     /** @param array<string, mixed> $values */

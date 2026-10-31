@@ -65,7 +65,7 @@ class PublicDirectoryProjection
         }
         $withoutIds = $this->outline->decorate($record->content, false)['content'];
         try {
-            $content = $this->sanitizer->sanitize($withoutIds, config($type === 'exchanges' ? 'exchanges.trusted_media_hosts' : 'platform_profiles.trusted_media_hosts', []), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
+            $content = $this->sanitizer->sanitizeForPublic($withoutIds, config($type === 'exchanges' ? 'exchanges.trusted_media_hosts' : 'platform_profiles.trusted_media_hosts', []), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
         } catch (PanelAuthException) {
             throw new PanelAuthException(503, $this->unavailableCode($type), 'The saved content cannot be displayed safely.');
         }

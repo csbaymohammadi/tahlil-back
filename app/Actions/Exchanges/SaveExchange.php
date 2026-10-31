@@ -12,6 +12,7 @@ use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\ExchangeSpecifications;
 use App\Support\ExchangeText;
+use App\Support\PanelMutationLock;
 use App\Support\PublicContentIndex;
 use App\Support\PublicText;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,8 @@ class SaveExchange
                 'founded_year', 'platform_type', 'markets', 'access', 'support', 'specifications', 'content', 'meta_description', 'category_id', 'status', 'title_sort_key',
             ]);
             $values = $this->values($input, $old, $creating, $content);
+            PanelMutationLock::acquire();
+            $this->html->validateReferences($values['content'], $actor);
             $this->assertCategory($values['category_id']);
             $this->assertSlugAvailable($values['slug'], $creating ? null : $exchange->id);
 
@@ -216,18 +219,13 @@ class SaveExchange
     /** @return list<int> */
     private function managedMediaIds(string $content, User $actor, string $kind): array
     {
-        preg_match_all('~<(img|video)\b[^>]*\bsrc=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\'][^>]*>~i', $content, $matches, PREG_SET_ORDER);
         $ids = [];
-        foreach ($matches as $match) {
-            if (($match[1] === 'video') !== ($kind === 'video')) {
-                continue;
-            }
+        foreach ($this->html->managedSources($content, $kind) as $url) {
             try {
-                $media = $this->media->resolveCanonical($match[2], $actor, $kind);
-            } catch (PanelAuthException|ValidationException) {
+                $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
+            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
-            $ids[] = $media->id;
         }
 
         return array_values(array_unique($ids));

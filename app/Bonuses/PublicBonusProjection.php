@@ -42,7 +42,7 @@ class PublicBonusProjection
     {
         $summary = $this->summary($bonus);
         try {
-            $content = $this->sanitizer->sanitize($bonus->content, config('bonuses.trusted_media_hosts', []), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
+            $content = $this->sanitizer->sanitizeForPublic($bonus->content, config('bonuses.trusted_media_hosts', []), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
         } catch (PanelAuthException) {
             throw new PanelAuthException(503, 'BONUSES_UNAVAILABLE', 'The saved content cannot be displayed safely.');
         }
@@ -52,7 +52,7 @@ class PublicBonusProjection
                 throw new PanelAuthException(503, 'BONUSES_UNAVAILABLE', 'The saved media is unavailable.');
             }
         }
-        $decorated = $this->outline->decorate($content);
+        $decorated = $this->outline->decorate($content, prefix: 'bonus');
         $labels = [$summary['campaign']['provider']['name'] ?? '', $summary['campaign']['provider']['english_name'] ?? '', $summary['category']['name'] ?? ''];
         $tags = [];
         foreach ($labels as $label) {

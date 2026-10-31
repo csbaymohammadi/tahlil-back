@@ -49,6 +49,8 @@ abstract class SavePlatformProfile
                 $old['specifications'] = $profile->specifications ?? [];
             }
             $values = $this->values($definition, $input, $old, $creating, $content);
+            PanelMutationLock::acquire();
+            $this->html->validateReferences($values['content'], $actor);
             $this->assertCategory($definition, $values['category_id']);
             $this->assertSlugAvailable($definition, $values['slug'], $creating ? null : $profile->getKey());
 
@@ -235,18 +237,13 @@ abstract class SavePlatformProfile
     /** @return list<int> */
     private function managedMediaIds(string $content, User $actor, string $kind): array
     {
-        preg_match_all('~<(img|video)\b[^>]*\bsrc=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\'][^>]*>~i', $content, $matches, PREG_SET_ORDER);
         $ids = [];
-        foreach ($matches as $match) {
-            if (($match[1] === 'video') !== ($kind === 'video')) {
-                continue;
-            }
+        foreach ($this->html->managedSources($content, $kind) as $url) {
             try {
-                $media = $this->media->resolveCanonical($match[2], $actor, $kind);
-            } catch (PanelAuthException|ValidationException) {
+                $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
+            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
-            $ids[] = $media->id;
         }
 
         return array_values(array_unique($ids));

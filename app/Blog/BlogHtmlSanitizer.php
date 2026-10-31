@@ -3,18 +3,22 @@
 namespace App\Blog;
 
 use App\Exceptions\PanelAuthException;
-use DOMDocument;
+use App\Media\MediaReferences;
+use App\Models\User;
 use DOMElement;
 use DOMNode;
+use Illuminate\Validation\ValidationException;
+use Masterminds\HTML5;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer as SymfonyHtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
+use Symfony\Component\HtmlSanitizer\Parser\MastermindsParser;
 
 class BlogHtmlSanitizer
 {
     private const ALLOWED_TAGS = [
         'p', 'br', 'h1', 'h2', 'h3', 'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'ul', 'ol', 'li', 'blockquote',
         'pre', 'code', 'hr', 'a', 'img', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col',
-        'video', 'iframe', 'div', 'figure',
+        'video', 'iframe', 'div', 'figure', 'figcaption', 'span',
     ];
 
     private const DANGEROUS_TAGS = ['script', 'style', 'form', 'object', 'embed', 'svg', 'math', 'base', 'meta', 'link', 'template', 'input', 'button', 'textarea'];
@@ -29,39 +33,17 @@ class BlogHtmlSanitizer
             $this->invalid('The article content exceeds its size or encoding limit.');
         }
 
-        $dom = new DOMDocument('1.0', 'UTF-8');
-        $previous = libxml_use_internal_errors(true);
-        try {
-            $loaded = $dom->loadHTML('<!doctype html><html><head><meta charset="utf-8"></head><body><main id="blog-content">'.$html.'</main></body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD);
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-        if (! $loaded) {
+        $root = (new MastermindsParser)->parse($html);
+        if (! $root) {
             $this->invalid('The article content could not be parsed.');
         }
-
-        $root = $dom->getElementById('blog-content');
-        $body = $dom->getElementsByTagName('body')->item(0);
-        if (! $root || ! $body || $root->parentNode !== $body) {
-            $this->invalid('The article content could not be parsed.');
-        }
-        foreach ($body->childNodes as $child) {
-            if ($child instanceof DOMElement && $child !== $root) {
-                $this->invalid('The article content contains markup outside its supported fragment.');
-            }
-            if (! $child instanceof DOMElement && trim($child->textContent) !== '') {
-                $this->invalid('The article content contains text outside its supported fragment.');
-            }
-        }
-
         $counts = ['nodes' => 0, 'cells' => 0];
         foreach ($root->childNodes as $child) {
-            $this->inspect($child, 0, $counts, $trustedHosts ?? config('blog.trusted_media_hosts', []), $strictLinks, $rootAssetPrefixes);
+            $this->inspect($child, 1, $counts, $trustedHosts ?? config('blog.trusted_media_hosts', []), $strictLinks, $rootAssetPrefixes);
         }
 
         $config = (new HtmlSanitizerConfig)
-            ->withMaxInputLength(1_048_576)
+            ->withMaxInputLength(-1)
             ->allowLinkSchemes(['http', 'https', 'mailto', 'tel'])
             ->allowRelativeLinks()
             ->allowMediaSchemes(['https'])
@@ -71,9 +53,16 @@ class BlogHtmlSanitizer
         }
         $canonicalInput = '';
         foreach ($root->childNodes as $child) {
-            $canonicalInput .= $dom->saveHTML($child);
+            $canonicalInput .= (new HTML5)->saveHTML($child);
+        }
+        if (strlen($canonicalInput) > 1_048_576) {
+            $this->invalid('The canonical content exceeds its size limit.');
         }
         $sanitized = (new SymfonyHtmlSanitizer($config))->sanitize($canonicalInput);
+
+        if (strlen($sanitized) > 1_048_576) {
+            $this->invalid('The canonical content exceeds its size limit.');
+        }
 
         if (! $this->isMeaningful($sanitized) && ! $allowEmpty) {
             $this->invalid('Add visible text or a supported image, video, or table block.');
@@ -82,14 +71,151 @@ class BlogHtmlSanitizer
         return $this->isMeaningful($sanitized) ? $sanitized : '';
     }
 
-    /** @param array{nodes: int, cells: int} $counts */
+    /** @return list<string> */
+    public function managedSources(string $html, string $kind): array
+    {
+        if (str_starts_with($html, '/media/')) {
+            return [$html];
+        }
+        $root = (new MastermindsParser)->parse($html);
+        $sources = [];
+        $walk = function (DOMNode $parent) use (&$walk, &$sources, $kind): void {
+            foreach ($parent->childNodes as $node) {
+                if ($node instanceof DOMElement) {
+                    $attributes = $kind === 'image' ? match ($node->tagName) {
+                        'img' => ['src'], 'video' => ['poster'], default => []
+                    } : ($node->tagName === 'video' ? ['src'] : []);
+                    foreach ($attributes as $attribute) {
+                        $url = $node->getAttribute($attribute);
+                        if (str_starts_with($url, '/media/')) {
+                            $sources[] = $url;
+                        }
+                    }
+                    $walk($node);
+                }
+            }
+        };
+        $walk($root);
+
+        return array_values(array_unique($sources));
+    }
+
+    public function validateReferences(string $html, User $actor): void
+    {
+        try {
+            foreach (['image', 'video'] as $kind) {
+                foreach ($this->managedSources($html, $kind) as $url) {
+                    app(MediaReferences::class)->resolveCanonical($url, $actor, $kind);
+                }
+            }
+        } catch (PanelAuthException|ValidationException) {
+            $this->invalid('Choose an accessible, ready media file of the required type.');
+        }
+    }
+
+    /** @param list<string>|null $trustedHosts
+     * @param  list<string>  $rootAssetPrefixes
+     */
+    public function sanitizeForPublic(string $html, ?array $trustedHosts = null, bool $strictLinks = false, array $rootAssetPrefixes = ['/images/'], bool $allowEmpty = true): string
+    {
+        if (strlen($html) > 2_097_152 || ! preg_match('//u', $html)) {
+            $this->invalid('The public content exceeds its processing limit.');
+        }
+        $root = (new MastermindsParser)->parse($html);
+        $elements = [];
+        $collect = function (DOMNode $parent, int $depth) use (&$collect, &$elements): void {
+            foreach ($parent->childNodes as $child) {
+                if ($child instanceof DOMElement) {
+                    if ($depth > 32 || count($elements) >= 20_000) {
+                        $this->invalid('The public content exceeds its processing limit.');
+                    }
+                    $elements[] = $child;
+                    $collect($child, $depth + 1);
+                }
+            }
+        };
+        $collect($root, 1);
+        foreach (array_reverse($elements) as $element) {
+            $tag = strtolower($element->tagName);
+            if (in_array($tag, self::DANGEROUS_TAGS, true)) {
+                $element->parentNode?->removeChild($element);
+
+                continue;
+            }
+            foreach (iterator_to_array($element->attributes) as $attribute) {
+                if (! in_array($attribute->name, $this->attributesFor($tag), true) || ($attribute->name === 'style' && ! $element->hasAttribute('data-content-button') && ! $this->safeStyle($tag, trim($attribute->value)))) {
+                    $element->removeAttribute($attribute->name);
+                }
+            }
+            foreach (['width' => 4096, 'height' => 4096, 'rowspan' => 50, 'colspan' => 50, 'span' => 50, 'start' => 100000] as $attribute => $maximum) {
+                if ($element->hasAttribute($attribute) && (! preg_match('/^[1-9][0-9]*$/D', $element->getAttribute($attribute)) || (int) $element->getAttribute($attribute) > $maximum)) {
+                    $element->removeAttribute($attribute);
+                }
+            }
+            if ($element->hasAttribute('dir') && ! in_array(strtolower($element->getAttribute('dir')), ['rtl', 'ltr', 'auto'], true)) {
+                $element->removeAttribute('dir');
+            }
+            if ($tag === 'a' && ! $element->hasAttribute('data-content-button')) {
+                foreach (ContentButton::ATTRIBUTES as $attribute) {
+                    $element->removeAttribute($attribute);
+                }
+            }
+            if ($tag === 'a' && $element->hasAttribute('target') && ! in_array($element->getAttribute('target'), ['_blank', '_self'], true)) {
+                $element->removeAttribute('target');
+            }
+            if ($tag === 'a' && $element->hasAttribute('data-content-button')) {
+                try {
+                    (new ContentButton)->normalize($element);
+                } catch (PanelAuthException) {
+                    foreach ([...ContentButton::ATTRIBUTES, 'style'] as $attribute) {
+                        $element->removeAttribute($attribute);
+                    }
+                }
+            }
+            try {
+                if ($tag === 'a' && ! $element->hasAttribute('data-content-button') && $element->hasAttribute('href')) {
+                    $this->validateLink($element->getAttribute('href'), $strictLinks, $rootAssetPrefixes);
+                    if (preg_match('~^https?://~i', $element->getAttribute('href'))) {
+                        $element->setAttribute('target', '_blank');
+                        $element->setAttribute('rel', 'noopener noreferrer');
+                    }
+                }
+                if (in_array($tag, ['img', 'video'], true)) {
+                    $this->validateMediaSource($element->getAttribute('src'), $trustedHosts ?? config('blog.trusted_media_hosts', []), $rootAssetPrefixes);
+                    if ($element->hasAttribute('poster')) {
+                        try {
+                            $this->validateMediaSource($element->getAttribute('poster'), $trustedHosts ?? config('blog.trusted_media_hosts', []), $rootAssetPrefixes);
+                        } catch (PanelAuthException) {
+                            $element->removeAttribute('poster');
+                        }
+                    }
+                }
+                if ($tag === 'iframe') {
+                    $this->normalizeYoutube($element);
+                }
+            } catch (PanelAuthException) {
+                if ($tag === 'a') {
+                    $element->removeAttribute('href');
+                } else {
+                    $element->parentNode?->removeChild($element);
+                }
+            }
+        }
+        $clean = '';
+        foreach ($root->childNodes as $child) {
+            $clean .= $root->ownerDocument->saveHTML($child);
+        }
+
+        return $this->sanitize($clean, $trustedHosts, $strictLinks, $rootAssetPrefixes, $allowEmpty);
+    }
+
     /** @param array{nodes: int, cells: int} $counts
      * @param  list<string>  $trustedHosts
      * @param  list<string>  $rootAssetPrefixes
      */
     private function inspect(DOMNode $node, int $depth, array &$counts, array $trustedHosts, bool $strictLinks, array $rootAssetPrefixes): void
     {
-        if ($depth > 32) {
+        if ($node instanceof DOMElement && $depth > 32) {
             $this->invalid('The article content is nested too deeply.');
         }
         if ($node instanceof DOMElement) {
@@ -98,6 +224,9 @@ class BlogHtmlSanitizer
                 $this->invalid('The article content contains too many document nodes.');
             }
             $tag = strtolower($node->tagName);
+            if (in_array($tag, ['h1', 'h2', 'h3'], true)) {
+                $node->removeAttribute('id');
+            }
             if (in_array($tag, self::DANGEROUS_TAGS, true)) {
                 $this->invalid('The article contains an unsupported active element.');
             }
@@ -105,9 +234,33 @@ class BlogHtmlSanitizer
                 $this->normalizeYoutube($node);
             }
             if ($tag === 'img' || $tag === 'video') {
-                $this->validateMediaSource($node->getAttribute('src'), $trustedHosts, $rootAssetPrefixes);
+                foreach ($tag === 'video' ? ['src', 'poster'] : ['src'] as $sourceAttribute) {
+                    if ($sourceAttribute === 'poster' && ! $node->hasAttribute('poster')) {
+                        continue;
+                    }
+                    $source = $node->getAttribute($sourceAttribute);
+                    $parts = parse_url($source);
+                    if (is_array($parts) && strtolower($parts['scheme'] ?? '') === 'https' && in_array(strtolower($parts['host'] ?? ''), $trustedHosts, true) && ! isset($parts['user']) && ! isset($parts['pass']) && (! isset($parts['port']) || $parts['port'] === 443) && ! isset($parts['query']) && ! isset($parts['fragment']) && str_starts_with($parts['path'] ?? '', '/media/')) {
+                        $source = $parts['path'];
+                        $node->setAttribute($sourceAttribute, $source);
+                    }
+                    $this->validateMediaSource($source, $trustedHosts, $rootAssetPrefixes);
+                }
             }
-            if ($tag === 'a' && $node->hasAttribute('href')) {
+            foreach (iterator_to_array($node->attributes) as $hint) {
+                if (($tag === 'div' && $hint->name === 'class' && $hint->value === 'tableWrapper') || (in_array($tag, ['td', 'th'], true) && $hint->name === 'colwidth' && preg_match('/^[0-9]+(?:,[0-9]+)*$/D', $hint->value)) || (in_array($tag, ['table', 'col'], true) && $hint->name === 'style' && preg_match('/^\s*(?:(?:width|min-width):\s*[0-9]+(?:px|%);?\s*)+$/D', $hint->value))) {
+                    $node->removeAttribute($hint->name);
+                }
+            }
+            $button = $tag === 'a' && $node->hasAttribute('data-content-button');
+            if ($tag === 'a' && ! $button) {
+                foreach (ContentButton::ATTRIBUTES as $attribute) {
+                    if ($node->hasAttribute($attribute)) {
+                        $this->invalid('Button metadata requires a valid marker.');
+                    }
+                }
+            }
+            if ($tag === 'a' && ! $button && $node->hasAttribute('href')) {
                 $this->validateLink($node->getAttribute('href'), $strictLinks, $rootAssetPrefixes);
                 if ($node->getAttribute('target') === '_blank') {
                     $node->setAttribute('rel', 'noopener noreferrer');
@@ -115,7 +268,7 @@ class BlogHtmlSanitizer
                     $this->invalid('Links may open only in the current tab or a protected new tab.');
                 }
             }
-            foreach ($node->attributes as $attribute) {
+            foreach (iterator_to_array($node->attributes) as $attribute) {
                 $name = strtolower($attribute->name);
                 $value = trim($attribute->value);
                 if (str_starts_with($name, 'on') || in_array($name, ['srcdoc', 'class', 'id'], true)) {
@@ -124,8 +277,12 @@ class BlogHtmlSanitizer
                 if (! in_array($name, $this->attributesFor($tag), true)) {
                     $this->invalid('The article contains an unsupported attribute.');
                 }
-                if ($name === 'style' && ! $this->safeStyle($tag, $value)) {
+                if ($name === 'style' && ! $button && ! $this->safeStyle($tag, $value)) {
                     $this->invalid('Only simple text alignment is allowed in article styles.');
+                }
+                if ($name === 'style' && ! $button) {
+                    preg_match('/text-align\s*:\s*(left|right|center|justify)/i', $value, $alignment);
+                    $node->setAttribute('style', 'text-align: '.strtolower($alignment[1]));
                 }
                 $columnWidth = $tag === 'col' && $name === 'width' && preg_match('/^(?:[1-9][0-9]{0,3}|100)%?$/D', $value) === 1;
                 if (in_array($name, ['width', 'height'], true) && ! $columnWidth && (! preg_match('/^[1-9][0-9]{0,3}$/D', $value) || (int) $value > 4096)) {
@@ -156,16 +313,19 @@ class BlogHtmlSanitizer
                     $this->invalid('The article tables contain too many cells.');
                 }
             }
-            if ($tag === 'tr' && $this->rowCount($node) > 200) {
-                $this->invalid('A table cannot contain more than 200 rows.');
-            }
             if ($tag === 'tr' && $this->columnCount($node) > 50) {
                 $this->invalid('A table cannot contain more than 50 columns.');
             }
         }
 
-        foreach ($node->childNodes as $child) {
+        foreach (iterator_to_array($node->childNodes) as $child) {
             $this->inspect($child, $depth + 1, $counts, $trustedHosts, $strictLinks, $rootAssetPrefixes);
+        }
+        if ($node instanceof DOMElement && $node->tagName === 'table') {
+            $this->validateGrid($node);
+        }
+        if ($node instanceof DOMElement && $node->tagName === 'a' && $node->hasAttribute('data-content-button')) {
+            (new ContentButton)->normalize($node);
         }
     }
 
@@ -178,7 +338,17 @@ class BlogHtmlSanitizer
             isset($parts['user']) || isset($parts['pass']) || ! preg_match('~^/embed/([A-Za-z0-9_-]{11})$~D', $parts['path'] ?? '', $match)) {
             $this->invalid('Only supported YouTube embed URLs are allowed.');
         }
-        parse_str($parts['query'] ?? '', $query);
+        if (isset($parts['fragment']) || (isset($parts['port']) && $parts['port'] !== 443)) {
+            $this->invalid('Unsupported YouTube URL components.');
+        }
+        $query = [];
+        foreach (($parts['query'] ?? '') === '' ? [] : explode('&', $parts['query']) as $parameter) {
+            $pair = explode('=', $parameter, 2);
+            if (count($pair) !== 2 || array_key_exists($pair[0], $query)) {
+                $this->invalid('Duplicate or malformed YouTube parameters.');
+            }
+            $query[$pair[0]] = $pair[1];
+        }
         if (array_diff(array_keys($query), ['start', 'end', 'controls', 'rel'])) {
             $this->invalid('The YouTube embed URL has unsupported parameters.');
         }
@@ -192,6 +362,9 @@ class BlogHtmlSanitizer
                 $this->invalid('The YouTube embed URL has an invalid display parameter.');
             }
         }
+        $iframe->setAttribute('loading', 'lazy');
+        $iframe->setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+        $iframe->setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
         ksort($query);
         $iframe->setAttribute('src', 'https://www.youtube-nocookie.com/embed/'.$match[1].($query ? '?'.http_build_query($query) : ''));
     }
@@ -199,14 +372,26 @@ class BlogHtmlSanitizer
     /** @param list<string> $trustedHosts */
     private function validateMediaSource(string $source, array $trustedHosts, array $rootAssetPrefixes): void
     {
-        if ($source === '') {
+        if ($source === '' || preg_match('~\.(?:svg|html?|xhtml)(?:[?#]|$)~i', $source) || str_contains($source, '\\') || preg_match('/[\x00-\x20\x7f]/', $source)) {
             $this->invalid('Every image or video needs a supported source.');
         }
-        if ($this->isSafeRootAsset($source, $rootAssetPrefixes) || $this->isManagedMediaUrl($source)) {
+        if ($this->isManagedMediaUrl($source)) {
+            return;
+        }
+        if ($this->isSafeRootAsset($source, $rootAssetPrefixes)) {
+            $base = realpath(public_path());
+            $file = realpath(public_path(ltrim($source, '/')));
+            if ($base === false || $file === false || ! str_starts_with($file, $base.DIRECTORY_SEPARATOR) || ! is_file($file)) {
+                $this->invalid('Choose an existing approved static media file.');
+            }
+
             return;
         }
         $parts = parse_url($source);
         $host = strtolower($parts['host'] ?? '');
+        if (str_starts_with($parts['path'] ?? '', '/media/') || ! (new ContentButton)->safeDestination($source) || preg_match('~\.(?:svg|html?|xhtml)$~i', rawurldecode($parts['path'] ?? ''))) {
+            $this->invalid('The media location is not canonical or safe.');
+        }
         if (! is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https' || isset($parts['user']) || isset($parts['pass']) ||
             (isset($parts['port']) && (int) $parts['port'] !== 443) || ! in_array($host, $trustedHosts, true)) {
             $this->invalid('The image or video must use an approved HTTPS media location.');
@@ -257,14 +442,55 @@ class BlogHtmlSanitizer
             preg_match('/^text-align\s*:\s*(left|right|center|justify)\s*;?$/iD', $style) === 1;
     }
 
-    private function rowCount(DOMElement $row): int
+    private function validateGrid(DOMElement $table): void
     {
-        $table = $row->parentNode;
-        while ($table instanceof DOMElement && strtolower($table->tagName) !== 'table') {
-            $table = $table->parentNode;
+        $total = 0;
+        $groups = iterator_to_array($table->childNodes);
+        $directRows = array_filter($groups, fn (DOMNode $node): bool => $node instanceof DOMElement && $node->tagName === 'tr');
+        if ($directRows !== []) {
+            $group = $table->ownerDocument->createElement('tbody');
+            $table->insertBefore($group, reset($directRows));
+            foreach ($directRows as $row) {
+                $group->appendChild($row);
+            }
+            $groups = iterator_to_array($table->childNodes);
         }
-
-        return $table instanceof DOMElement ? $table->getElementsByTagName('tr')->length : 0;
+        foreach ($groups as $group) {
+            if (! $group instanceof DOMElement || ! in_array($group->tagName, ['thead', 'tbody', 'tfoot'], true)) {
+                continue;
+            }
+            $rows = array_values(array_filter(iterator_to_array($group->childNodes), fn (DOMNode $node): bool => $node instanceof DOMElement && $node->tagName === 'tr'));
+            $total += count($rows);
+            $grid = [];
+            foreach ($rows as $r => $row) {
+                $column = 0;
+                foreach ($row->childNodes as $cell) {
+                    if (! $cell instanceof DOMElement || ! in_array($cell->tagName, ['td', 'th'], true)) {
+                        continue;
+                    }
+                    while (isset($grid[$r][$column])) {
+                        $column++;
+                    }
+                    $width = (int) ($cell->getAttribute('colspan') ?: 1);
+                    $height = (int) ($cell->getAttribute('rowspan') ?: 1);
+                    if ($column + $width > 50 || $r + $height > count($rows)) {
+                        $this->invalid('Table spans exceed the supported grid.');
+                    }
+                    for ($y = $r; $y < $r + $height; $y++) {
+                        for ($x = $column; $x < $column + $width; $x++) {
+                            if (isset($grid[$y][$x])) {
+                                $this->invalid('Table spans overlap.');
+                            }
+                            $grid[$y][$x] = true;
+                        }
+                    }
+                    $column += $width;
+                }
+            }
+        }
+        if ($total > 200) {
+            $this->invalid('A table cannot contain more than 200 rows.');
+        }
     }
 
     private function columnCount(DOMElement $row): int
@@ -290,10 +516,10 @@ class BlogHtmlSanitizer
     private function attributesFor(string $tag): array
     {
         return match ($tag) {
-            'a' => ['href', 'title', 'target', 'rel'],
+            'a' => ['href', 'title', 'target', 'rel', 'style', ...ContentButton::ATTRIBUTES],
             'img' => ['src', 'alt', 'width', 'height', 'title'],
-            'video' => ['src', 'title', 'controls', 'preload', 'playsinline', 'width', 'height'],
-            'iframe' => ['src', 'title', 'width', 'height', 'allowfullscreen', 'loading'],
+            'video' => ['poster', 'src', 'title', 'controls', 'preload', 'playsinline', 'width', 'height'],
+            'iframe' => ['src', 'title', 'width', 'height', 'allowfullscreen', 'loading', 'sandbox', 'referrerpolicy'],
             'p', 'h1', 'h2', 'h3' => ['style', 'dir'],
             'td', 'th' => ['style', 'colspan', 'rowspan', 'dir'],
             'col' => ['span', 'width'],

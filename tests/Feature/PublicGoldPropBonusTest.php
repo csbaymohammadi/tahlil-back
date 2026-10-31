@@ -118,6 +118,6 @@ class PublicGoldPropBonusTest extends PanelTestCase
         $this->get('/api/v1/bonuses/'.$bonus->slug)->assertServiceUnavailable()->assertJsonPath('error.code', 'BONUSES_UNAVAILABLE');
         DB::table('bonus_rating_aggregates')->insert(['bonus_id' => $bonus->id]);
         $bonus->forceFill(['content' => '<script>alert(1)</script>'])->save();
-        $this->get('/api/v1/bonuses/'.$bonus->slug)->assertServiceUnavailable()->assertJsonPath('error.code', 'BONUSES_UNAVAILABLE');
+        $this->get('/api/v1/bonuses/'.$bonus->slug)->assertOk()->assertJsonPath('data.content', '');
     }
 }

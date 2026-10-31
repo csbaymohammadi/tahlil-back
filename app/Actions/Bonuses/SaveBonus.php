@@ -42,6 +42,7 @@ class SaveBonus
                 $values[$field] = is_string($value) ? trim($value) : $value;
             }
             $values['content'] = $content ?? $values['content'];
+            $this->html->validateReferences($values['content'], $actor);
             if ($values['category_id'] !== null && ! BonusCategory::lockForUpdate()->whereKey($values['category_id'])->exists()) {
                 throw ValidationException::withMessages(['category_id' => ['Choose a live bonus category or null.']]);
             }

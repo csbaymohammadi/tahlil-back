@@ -41,7 +41,7 @@ class PublicArticleProjection
         $summary = $this->summary($article);
         $withoutIds = $this->outline->decorate($article->content, false)['content'];
         try {
-            $content = $this->sanitizer->sanitize($withoutIds, config($news ? 'news.trusted_media_hosts' : 'blog.trusted_media_hosts', []), rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
+            $content = $this->sanitizer->sanitizeForPublic($withoutIds, config($news ? 'news.trusted_media_hosts' : 'blog.trusted_media_hosts', []), rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
         } catch (PanelAuthException $exception) {
             throw new PanelAuthException(503, $news ? 'NEWS_UNAVAILABLE' : 'BLOG_UNAVAILABLE', 'The saved content cannot be displayed safely.');
         }

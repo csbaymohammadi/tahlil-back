@@ -12,7 +12,7 @@ use App\Models\BlogCategory;
 use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\BlogText;
-use App\Support\PanelIds;
+use App\Support\PanelMutationLock;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +43,8 @@ class SaveArticle
 
             $old = $creating ? [] : $article->only(['title', 'title_normalized', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status', 'scheduled_for']);
             $values = $this->values($input, $old, $creating, $content);
+            PanelMutationLock::acquire();
+            $this->html->validateReferences($values['content'], $actor);
             $this->validateResult($values);
             if ($values['category_id'] !== null && (! is_int($values['category_id']) || $values['category_id'] < 1 || ! BlogCategory::query()->lockForUpdate()->whereKey($values['category_id'])->exists())) {
                 $values['category_id'] = null;
@@ -281,12 +283,6 @@ class SaveArticle
                 $this->warn($warnings, 'cover_image', 'COVER_IMAGE_IGNORED', 'تصویر جلد با مقاله سازگار نیست و مقاله بدون تصویر جلد ذخیره شد.');
             }
         }
-        if (preg_match_all('~(?:src)=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\']~i', $content, $matches)) {
-            foreach (array_unique($matches[1]) as $url) {
-                $isVideo = preg_match('~\.(?:mp4|webm)$~i', $url) === 1;
-                $this->media->resolveCanonical($url, $actor, $isVideo ? 'video' : 'image');
-            }
-        }
     }
 
     /** @param list<array{field: string, code: string, message: string}> $warnings */
@@ -298,24 +294,13 @@ class SaveArticle
     /** @return list<int> */
     private function managedMediaIds(string $value, User $actor, string $kind): array
     {
-        $sources = [];
-        if (preg_match_all('~(?:src)=["\'](/media/[1-9][0-9]{0,15}/[a-z0-9.-]+)["\']~i', $value, $matches)) {
-            $sources = $matches[1];
-        } elseif (preg_match('~^/media/[1-9][0-9]{0,15}/[a-z0-9.-]+$~D', $value)) {
-            $sources = [$value];
-        }
         $ids = [];
-        foreach (array_unique($sources) as $url) {
-            $isVideo = preg_match('~\.(?:mp4|webm)$~i', $url) === 1;
-            if (($kind === 'video') !== $isVideo) {
-                continue;
+        foreach ($this->html->managedSources($value, $kind) as $url) {
+            try {
+                $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
+            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
+                throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
-            if (! preg_match('~^/media/([1-9][0-9]{0,15})/~D', $url, $match)) {
-                continue;
-            }
-            $id = PanelIds::parse($match[1]);
-            $this->media->resolveCanonical($url, $actor, $kind);
-            $ids[] = $id;
         }
 
         return array_values(array_unique($ids));

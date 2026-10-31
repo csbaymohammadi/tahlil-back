@@ -140,7 +140,7 @@ class PublicDirectoriesTest extends PanelTestCase
         $this->get('/api/v1/'.$type.'?q=%FF')->assertUnprocessable()->assertJsonValidationErrors('q', 'error.fields');
         $this->call('GET', '/api/v1/'.$type, [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}')->assertUnprocessable()->assertJsonPath('error.code', 'VALIDATION_FAILED');
         $parent->forceFill(['content' => '<script>alert(1)</script><p>Review</p>'])->save();
-        $this->get('/api/v1/'.$type.'/'.$parent->slug)->assertServiceUnavailable()->assertJsonPath('error.code', $unavailable);
+        $this->get('/api/v1/'.$type.'/'.$parent->slug)->assertOk()->assertJsonPath('data.content', '<p>Review</p>');
         DB::table($parent->getTable())->where('id', $parent->id)->update(['title_sort_key' => null]);
         $this->get('/api/v1/'.$type.'?sort=alphabetical')->assertServiceUnavailable()->assertJsonPath('error.code', $unavailable);
     }

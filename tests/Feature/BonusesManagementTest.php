@@ -260,7 +260,7 @@ class BonusesManagementTest extends PanelTestCase
     public function test_supported_html_media_and_exact_content_byte_limit_round_trip_canonically(): void
     {
         $this->panel(User::factory()->panel()->create());
-        $content = '<h2>Conditions</h2><p style="text-align: right" dir="rtl"><a href="https://example.com/terms" target="_blank">Terms</a></p><table><tbody><tr><td colspan="2">Fee</td></tr></tbody></table><video src="/images/bonuses/demo.mp4" controls="controls" playsinline="playsinline"></video><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?controls=1"></iframe>';
+        $content = '<h2>Conditions</h2><p style="text-align: right" dir="rtl"><a href="https://example.com/terms" target="_blank">Terms</a></p><table><tbody><tr><td colspan="2">Fee</td></tr></tbody></table><video src="https://service.tahlilex.com/images/bonuses/demo.mp4" controls="controls" playsinline="playsinline"></video><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?controls=1"></iframe>';
         $response = $this->postJson(self::BASE.'/items', $this->payload(['content' => $content]))->assertCreated();
         $canonical = $response->json('data.content');
         $this->assertStringContainsString('<table>', $canonical);
