@@ -78,6 +78,49 @@ class CategoryAssignments
         return $record->categories->map(fn (Model $category): array => ['id' => (int) $category->id, 'name' => $category->name, ...($category->getAttribute('key') !== null ? ['key' => $category->key] : [])])->all();
     }
 
+    /** @return Collection<int, Model> */
+    public static function live(Model $record): Collection
+    {
+        return $record->categories->filter(fn (Model $category): bool => ! $category->trashed())->unique('id')->values();
+    }
+
+    /** @return array{category_id: list<int>, category: list<array{id: int, name: string, key?: string}>} */
+    public static function publicFields(Model $record): array
+    {
+        $categories = self::live($record)->map(function (Model $category): array {
+            $key = $category->getAttribute('key');
+            if ($key === null && ($category instanceof Models\BlogCategory || $category instanceof Models\NewsCategory || $category instanceof Models\BrokerCategory || $category instanceof Models\ExchangeCategory)) {
+                $key = 'category-'.$category->id;
+            }
+
+            return ['id' => (int) $category->id, 'name' => $category->name, ...($key !== null ? ['key' => $key] : [])];
+        })->all();
+
+        return ['category_id' => array_column($categories, 'id'), 'category' => $categories];
+    }
+
+    public static function liveQuery(Builder $query): Builder
+    {
+        return $query->whereNull($query->getModel()->qualifyColumn('deleted_at'));
+    }
+
+    /** @return array{counts: array<int, int>, all: int, uncategorized: int} */
+    public static function publicCounts(Builder $matching): array
+    {
+        $model = $matching->getModel();
+        $categoryClass = self::MODELS[$model::class];
+        $table = self::table($model);
+        $categoryTable = (new $categoryClass)->getTable();
+        $records = (clone $matching)->reorder()->select($model->qualifyColumn('id'));
+        $counts = DB::table($table)->join($categoryTable, $categoryTable.'.id', '=', $table.'.category_id')
+            ->whereNull($categoryTable.'.deleted_at')->whereIn($table.'.record_id', $records)
+            ->groupBy($table.'.category_id')->selectRaw($table.'.category_id, COUNT(DISTINCT '.$table.'.record_id) AS aggregate')
+            ->get()->mapWithKeys(fn (object $row): array => [(int) $row->category_id => (int) $row->aggregate])->all();
+
+        return ['counts' => $counts, 'all' => (clone $matching)->count(),
+            'uncategorized' => (clone $matching)->whereDoesntHave('categories', self::liveQuery(...))->count()];
+    }
+
     /** @param class-string<Model> $recordClass */
     public function replaceCategory(string $recordClass, int $source, ?int $target, int $actorId): int
     {

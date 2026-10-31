@@ -4,6 +4,7 @@ namespace App\Exchanges;
 
 use App\Comments\CommentCounts;
 use App\Models\Exchange;
+use App\Support\CategoryAssignments;
 use App\Support\ExchangeSpecifications;
 
 class ExchangePublicProjection
@@ -20,7 +21,7 @@ class ExchangePublicProjection
             'logo' => $exchange->logo,
             'founded_year' => $exchange->founded_year,
             'platform_type' => $exchange->platform_type,
-            'category' => $this->category($exchange),
+            ...CategoryAssignments::publicFields($exchange),
             'rating_average' => null,
             'rating_count' => 0,
             'comment_count' => app(CommentCounts::class)->for($exchange),
@@ -48,16 +49,6 @@ class ExchangePublicProjection
             'published_at' => $exchange->published_at?->utc()->toISOString(),
             'updated_at' => $exchange->updated_at?->utc()->toISOString(),
         ];
-    }
-
-    /** @return array{id: int, name: string, key: string}|null */
-    private function category(Exchange $exchange): ?array
-    {
-        if (! $exchange->category || $exchange->category->trashed()) {
-            return null;
-        }
-
-        return ['id' => $exchange->category->id, 'name' => $exchange->category->name, 'key' => $exchange->category->key];
     }
 
     private function excerpt(string $html, int $limit = 300): string

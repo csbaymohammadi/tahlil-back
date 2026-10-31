@@ -92,7 +92,7 @@ class MultipleCategoriesTest extends PanelTestCase
     }
 
     #[DataProvider('domains')]
-    public function test_public_projection_remains_single_category_and_follows_first_selection(string $model, string $category): void
+    public function test_public_projection_preserves_all_selected_categories_in_order(string $model, string $category): void
     {
         $this->panel(User::factory()->panel()->create());
         [$first, $second] = $category::factory()->count(2)->create()->all();
@@ -112,11 +112,11 @@ class MultipleCategoriesTest extends PanelTestCase
             DB::table($table)->insert(['slug' => $record->slug, $foreign => $record->id, 'was_public' => true, 'created_at' => now()]);
         }
         $response = $this->get($public)->assertOk();
-        $response->assertJsonPath('data.category.id', $first->id);
-        $this->assertArrayNotHasKey(0, $response->json('data.category'));
+        $response->assertJsonPath('data.category_id', [$first->id, $second->id])->assertJsonPath('data.category.0.id', $first->id)->assertJsonPath('data.category.1.id', $second->id);
+        $this->assertCount(2, $response->json('data.category'));
         $base = '/api/v1/admin/'.$module.'/'.($module === 'blog' ? 'articles' : 'items');
         $this->patchJson($base.'/'.$record->id, ['expected_version' => $record->version, 'category_id' => [$second->id, $first->id]])->assertOk();
-        $this->get($public)->assertOk()->assertJsonPath('data.category.id', $second->id);
+        $this->get($public)->assertOk()->assertJsonPath('data.category_id', [$second->id, $first->id]);
     }
 
     public function test_backfill_is_repeatable_and_preserves_legacy_editorial_data(): void

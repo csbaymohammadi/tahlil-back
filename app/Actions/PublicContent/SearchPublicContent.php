@@ -2,6 +2,7 @@
 
 namespace App\Actions\PublicContent;
 
+use App\Support\CategoryAssignments;
 use App\Support\PublicContentIndex;
 use App\Support\PublicText;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,16 @@ class SearchPublicContent
             $page = (int) ($input['page'] ?? 1);
             $size = (int) ($input['per_page'] ?? 20);
             $rows = $page > max(1, ceil($total / $size)) ? collect() : $query->orderByDesc('published_at')->orderBy('type')->orderByDesc('record_id')->offset(($page - 1) * $size)->limit($size)->get();
+
+            foreach ($rows->groupBy('type') as $recordType => $group) {
+                $model = PublicContentIndex::TYPES[$recordType];
+                $records = $model::query()->select('id')->with('categories')->whereIn('id', $group->pluck('record_id'))->get()->keyBy('id');
+                foreach ($group as $row) {
+                    $fields = CategoryAssignments::publicFields($records->get($row->record_id));
+                    $row->category_id = $fields['category_id'];
+                    $row->category = $fields['category'];
+                }
+            }
 
             return ['data' => $rows,
                 'meta' => ['page' => $page, 'per_page' => $size, 'total' => $total, 'total_pages' => (int) ceil($total / $size)],

@@ -8,6 +8,8 @@ use App\Exceptions\PanelAuthException;
 use App\Http\Requests\PublicBlogRequest;
 use App\Http\Resources\PublicArticleResource;
 use App\Models\BlogArticle;
+use App\Support\CategoryAssignments;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -46,10 +48,10 @@ class PublicBlogController extends Controller
                 return $this->unresolved($result, true);
             }
             $parent = $result['article']->load('category');
-            $categoryId = $parent->category && ! $parent->category->trashed() ? $parent->category_id : null;
+            $categoryIds = CategoryAssignments::live($parent)->modelKeys();
             $query = BlogArticle::public()->whereKeyNot($parent->id)->with(['category', 'author.avatar']);
-            if ($categoryId !== null) {
-                $query->orderByRaw('CASE WHEN category_id = ? THEN 0 ELSE 1 END', [$categoryId]);
+            if ($categoryIds !== []) {
+                $query->withExists(['categories as shares_category' => fn (Builder $category) => CategoryAssignments::liveQuery($category)->whereKey($categoryIds)])->orderByDesc('shares_category');
             }
 
             return $this->collection($request, $query->orderByDesc('published_at')->orderByDesc('id')->limit(6)->get());

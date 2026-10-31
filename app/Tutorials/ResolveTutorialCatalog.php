@@ -4,6 +4,7 @@ namespace App\Tutorials;
 
 use App\Models\Tutorial;
 use App\Models\TutorialCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PlatformText;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -23,15 +24,14 @@ class ResolveTutorialCatalog
             $pattern = '%'.addcslashes($search, '\\%_').'%';
             $query->where(fn (Builder $nested) => $nested->where('title_public_normalized', 'like', $pattern)
                 ->orWhere('description_public_normalized', 'like', $pattern)
-                ->orWhereHas('category', fn (Builder $category) => $category->whereNull('deleted_at')->where('public_name_normalized', 'like', $pattern)));
+                ->orWhereHas('categories', fn (Builder $category) => $category->whereNull('deleted_at')->where('public_name_normalized', 'like', $pattern)));
         });
         $allTotal = (clone $query)->count();
-        $counts = (clone $query)->reorder()->selectRaw('category_id, COUNT(*) AS aggregate')->groupBy('category_id')->get()
-            ->mapWithKeys(fn (Tutorial $tutorial): array => [$tutorial->category_id ?? 'uncategorized' => (int) $tutorial->aggregate]);
+        $counts = collect(CategoryAssignments::publicCounts($query)['counts']);
         $categories = TutorialCategory::orderBy('name_normalized')->orderBy('id')->get();
         $category = $categories->firstWhere('key', $categoryKey);
         if ($category) {
-            $query->where('category_id', $category->id);
+            $query->whereHas('categories', fn (Builder $candidate) => CategoryAssignments::liveQuery($candidate)->whereKey($category->id));
         }
         $total = (clone $query)->count();
         $items = $query->orderByDesc('published_at')->orderByDesc('id')->offset(($page - 1) * 9)->limit(9)->get();

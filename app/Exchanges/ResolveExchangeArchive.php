@@ -4,9 +4,9 @@ namespace App\Exchanges;
 
 use App\Models\Exchange;
 use App\Models\ExchangeCategory;
+use App\Support\CategoryAssignments;
 use App\Support\ExchangeText;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -34,23 +34,11 @@ class ResolveExchangeArchive
                 $nested->where('title_public_normalized', 'like', $pattern)
                     ->orWhere('english_public_normalized', 'like', $pattern)
                     ->orWhere('description_public_normalized', 'like', $pattern)
-                    ->orWhereHas('category', fn (Builder $category) => $category->where('public_name_normalized', 'like', $pattern));
+                    ->orWhereHas('categories', fn (Builder $category) => $category->whereNull($category->getModel()->qualifyColumn('deleted_at'))->where('public_name_normalized', 'like', $pattern));
             });
         });
         $allCount = (clone $matching)->count();
-        $counts = DB::table('exchanges')
-            ->selectRaw('category_id, COUNT(*) AS aggregate')
-            ->where('status', 'published')->whereNull('deleted_at')
-            ->when($search !== '', function ($query) use ($search): void {
-                $pattern = '%'.addcslashes($search, '\\%_').'%';
-                $query->where(function ($nested) use ($pattern): void {
-                    $nested->where('title_public_normalized', 'like', $pattern)
-                        ->orWhere('english_public_normalized', 'like', $pattern)
-                        ->orWhere('description_public_normalized', 'like', $pattern)
-                        ->orWhereIn('category_id', ExchangeCategory::query()->select('id')->where('public_name_normalized', 'like', $pattern));
-                });
-            })
-            ->groupBy('category_id')->get()->mapWithKeys(fn (object $row): array => [$row->category_id === null ? 'uncategorized' : (string) $row->category_id => (int) $row->aggregate]);
+        $counts = collect(CategoryAssignments::publicCounts($matching)['counts']);
 
         $options = collect([['id' => null, 'key' => 'all', 'name' => 'All', 'count' => $allCount]]);
         $options = $options->concat(ExchangeCategory::query()->orderBy('name_normalized')->orderBy('id')->get()->map(fn (ExchangeCategory $category): array => [
@@ -67,7 +55,7 @@ class ResolveExchangeArchive
         }
         $query = clone $matching;
         if ($selectedCategory) {
-            $query->where('category_id', $selectedCategory->id);
+            $query->whereHas('categories', fn (Builder $category) => CategoryAssignments::liveQuery($category)->whereKey($selectedCategory->id));
         }
 
         $total = (clone $query)->count();

@@ -74,7 +74,7 @@ class PublicNewsTest extends PanelTestCase
             ->assertHeader('Access-Control-Allow-Origin', 'https://new-frontend.example')
             ->assertJsonPath('data.reading_minutes', null)->assertJsonPath('data.description', '')
             ->assertJsonPath('data.author_profile.bio', 'Public biography')->assertJsonPath('data.author.id', $author->id)
-            ->assertJsonPath('data.category.key', 'category-'.$category->id)->assertJsonPath('data.tags', ['گزارش'])
+            ->assertJsonPath('data.category.0.key', 'category-'.$category->id)->assertJsonPath('data.tags', ['گزارش'])
             ->assertJsonPath('data.comment_count', 1)->assertJsonMissingPath('data.status')->assertJsonMissingPath('data.version');
         $this->assertSame(['news-heading-1', 'news-heading-2', 'news-heading-3'], array_column($r->json('data.outline'), 'id'));
         $this->assertSame([2, 2, 3], array_column($r->json('data.outline'), 'level'));

@@ -4,6 +4,7 @@ namespace App\Bonuses;
 
 use App\Models\Bonus;
 use App\Models\BonusCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PlatformText;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Validator;
@@ -27,10 +28,9 @@ class ResolveBonusArchive
         $items = [];
         if ($needle === '') {
             $allTotal = (clone $query)->reorder()->count();
-            $counts = Bonus::public()->selectRaw('category_id, COUNT(*) AS aggregate')->groupBy('category_id')->get()
-                ->mapWithKeys(fn (Bonus $bonus): array => [$bonus->category_id ?? 'uncategorized' => (int) $bonus->aggregate])->all();
+            $counts = CategoryAssignments::publicCounts(Bonus::public())['counts'];
             if ($selected) {
-                $query->where('category_id', $selected->id);
+                $query->whereHas('categories', fn (Builder $category) => CategoryAssignments::liveQuery($category)->whereKey($selected->id));
             }
             $total = (clone $query)->reorder()->count();
             $items = $query->offset(($page - 1) * 9)->limit(9)->get()->map(fn (Bonus $bonus): array => $this->projection->card($bonus))->all();
@@ -38,14 +38,15 @@ class ResolveBonusArchive
             foreach ($query->lazy(200) as $bonus) {
                 $card = $this->projection->card($bonus);
                 $provider = $card['campaign']['provider'];
-                $haystack = PlatformText::public(implode(' ', [$bonus->title, $card['display_description'], $provider['name'] ?? '', $provider['english_name'] ?? '', $card['campaign']['amount_display']]));
+                $haystack = PlatformText::public(implode(' ', [$bonus->title, $card['display_description'], $provider['name'] ?? '', $provider['english_name'] ?? '', $card['campaign']['amount_display'], ...array_column($card['category'], 'name')]));
                 if ($needle !== '' && ! str_contains($haystack, $needle)) {
                     continue;
                 }
                 $allTotal++;
-                $key = $card['category']['id'] ?? 'uncategorized';
-                $counts[$key] = ($counts[$key] ?? 0) + 1;
-                if ($selected && $bonus->category_id !== $selected->id) {
+                foreach ($card['category_id'] ?: ['uncategorized'] as $key) {
+                    $counts[$key] = ($counts[$key] ?? 0) + 1;
+                }
+                if ($selected && ! in_array($selected->id, $card['category_id'], true)) {
                     continue;
                 }
                 $total++;

@@ -7,6 +7,7 @@ use App\Bonuses\PublicBonusProjection;
 use App\Exchanges\ExchangePublicProjection;
 use App\Models\PageSetting;
 use App\Models\Tutorial;
+use App\Support\CategoryAssignments;
 use App\Tutorials\PublicTutorialProjection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -98,7 +99,7 @@ class SettingsProjection
         if ($area === 'menu') {
             $module = $key === 'exchanges' ? 'exchanges' : 'platform_profiles';
 
-            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
+            return [...CategoryAssignments::publicFields($record), 'id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
                 'logo' => $this->media->publicDomainImage((string) $record->logo, $module) ? $record->logo : '',
                 'href' => SettingsDefinition::MENU[$key][1].'/'.rawurlencode($record->slug)];
         }
@@ -108,7 +109,7 @@ class SettingsProjection
         if ($key === 'exchanges') {
             $card = $this->exchanges->card($record);
 
-            return ['id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
+            return [...CategoryAssignments::publicFields($record), 'id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
                 'href' => '/exchanges/'.rawurlencode($record->slug),
                 'logo' => $this->media->publicDomainImage((string) $record->logo, 'exchanges') ? $record->logo : '',
                 'founding_year' => (string) $record->founded_year, 'platform_label' => (string) $record->platform_type,

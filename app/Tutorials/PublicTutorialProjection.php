@@ -5,6 +5,7 @@ namespace App\Tutorials;
 use App\Media\MediaAccess;
 use App\Models\Media;
 use App\Models\Tutorial;
+use App\Support\CategoryAssignments;
 use Illuminate\Validation\ValidationException;
 
 class PublicTutorialProjection
@@ -52,12 +53,11 @@ class PublicTutorialProjection
     public function summary(Tutorial $tutorial): array
     {
         $aparat = $this->validSource($tutorial, 'aparat');
-        $category = $tutorial->category?->trashed() ? null : $tutorial->category;
         $cover = $this->publicImage($tutorial->cover_image);
 
         return ['id' => (int) $tutorial->id, 'slug' => $tutorial->slug, 'title' => $tutorial->title,
             'href' => '/tutorials/'.rawurlencode($tutorial->slug), 'description' => $tutorial->description,
-            'cover_image' => $cover, 'category' => $category ? ['id' => (int) $category->id, 'name' => $category->name, 'key' => $category->key] : null,
+            'cover_image' => $cover, ...CategoryAssignments::publicFields($tutorial),
             'youtube_url' => 'https://www.youtube.com/watch?v='.$tutorial->youtube_video_id, 'youtube_video_id' => $tutorial->youtube_video_id,
             'aparat_url' => $aparat ? 'https://www.aparat.com/v/'.$tutorial->aparat_video_id : '', 'aparat_video_id' => $aparat ? $tutorial->aparat_video_id : null,
             'default_provider' => $aparat ? 'aparat' : 'youtube', ...$this->duration($tutorial),

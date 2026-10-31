@@ -5,7 +5,9 @@ namespace App\Actions\Bonuses;
 use App\Bonuses\PublicBonusProjection;
 use App\Models\Bonus;
 use App\Models\BonusCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PublicText;
+use Illuminate\Database\Eloquent\Builder;
 
 class ReadPublicBonusArchive
 {
@@ -26,15 +28,12 @@ class ReadPublicBonusArchive
         $items = [];
         $records = Bonus::public()->with(['category', 'campaign.exchange', 'ratingAggregate'])->orderByDesc('published_at')->orderByDesc('id');
         if ($search === '') {
-            $groups = Bonus::public()->selectRaw('category_id, COUNT(*) AS aggregate')->groupBy('category_id')->get();
-            $all = (int) $groups->sum('aggregate');
-            foreach ($groups as $group) {
-                $live = $categories->firstWhere('id', $group->category_id);
-                $key = $live?->id ?? 0;
-                $counts[$key] = ($counts[$key] ?? 0) + (int) $group->aggregate;
-            }
+            $categoryCounts = CategoryAssignments::publicCounts(Bonus::public());
+            $all = $categoryCounts['all'];
+            $counts = $categoryCounts['counts'];
+            $counts[0] = $categoryCounts['uncategorized'];
             if ($selected) {
-                $records->where('category_id', $selected->id);
+                $records->whereHas('categories', fn (Builder $category) => CategoryAssignments::liveQuery($category)->whereKey($selected->id));
             }
             $total = $selected ? ($counts[$selected->id] ?? 0) : $all;
             $items = $records->offset(($page - 1) * 9)->limit(9)->get()->map(fn (Bonus $bonus): array => $this->projection->summary($bonus))->all();
@@ -42,14 +41,15 @@ class ReadPublicBonusArchive
             foreach ($records->lazy(100) as $bonus) {
                 $card = $this->projection->summary($bonus);
                 $provider = $card['campaign']['provider'];
-                $fields = [$bonus->title, $bonus->description !== '' ? $bonus->description : $card['excerpt'], $provider['name'] ?? '', $provider['english_name'] ?? '', $card['campaign']['amount_display']];
+                $fields = [$bonus->title, $bonus->description !== '' ? $bonus->description : $card['excerpt'], $provider['name'] ?? '', $provider['english_name'] ?? '', $card['campaign']['amount_display'], ...array_column($card['category'], 'name')];
                 if ($search !== '' && ! collect($fields)->contains(fn (string $field): bool => str_contains(PublicText::normalize($field), $search))) {
                     continue;
                 }
                 $all++;
-                $categoryId = $card['category']['id'] ?? 0;
-                $counts[$categoryId] = ($counts[$categoryId] ?? 0) + 1;
-                if ($selected && $categoryId !== $selected->id) {
+                foreach ($card['category_id'] ?: [0] as $categoryId) {
+                    $counts[$categoryId] = ($counts[$categoryId] ?? 0) + 1;
+                }
+                if ($selected && ! in_array($selected->id, $card['category_id'], true)) {
                     continue;
                 }
                 $total++;

@@ -23,7 +23,6 @@ class PublicDirectoryProjection
     public function summary(Exchange|Broker|StockBrokerage|GoldPlatform|PropFirm $record): array
     {
         $type = $this->type($record);
-        $category = $record->category?->trashed() ? null : $record->category;
         $data = [
             'id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title,
             'english_name' => $record->english_name,
@@ -31,10 +30,10 @@ class PublicDirectoryProjection
             'href' => '/'.$type.'/'.rawurlencode($record->slug),
             'description' => $record->description,
             'excerpt' => PublicText::plain($record->description !== '' ? $record->description : $record->content),
-            'category' => $category ? ['id' => (int) $category->id, 'name' => $category->name, ...(in_array($type, ['exchanges', 'brokers'], true) ? ['key' => $category->key ?? 'category-'.$category->id] : [])] : null,
+            ...CategoryAssignments::publicFields($record),
         ];
         if ($record instanceof Broker) {
-            return [...$data, 'filter_keys' => array_values(array_unique(array_filter(['forex', $category ? ($category->key ?? 'category-'.$category->id) : null]))), 'markets' => $record->markets];
+            return [...$data, 'filter_keys' => array_values(array_unique(['forex', ...array_column($data['category'], 'key')])), 'markets' => $record->markets];
         }
 
         return [...$data, ...(in_array($type, ['stock-brokers', 'gold-platforms', 'prop-firms'], true) ? ['kind' => $type] : []),

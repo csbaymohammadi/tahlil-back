@@ -9,6 +9,7 @@ use App\Exceptions\PanelAuthException;
 use App\Media\MediaAccess;
 use App\Models\Bonus;
 use App\Models\Media;
+use App\Support\CategoryAssignments;
 use App\Support\PublicText;
 
 class PublicBonusProjection
@@ -22,7 +23,6 @@ class PublicBonusProjection
         if (! $aggregate || $aggregate->rating_count < 0 || $aggregate->rating_revision < 0 || ($aggregate->rating_count === 0 && $aggregate->vote_sum !== 0) || ($aggregate->rating_count > 0 && ($aggregate->vote_sum < $aggregate->rating_count || $aggregate->vote_sum > 5 * $aggregate->rating_count))) {
             throw new PanelAuthException(503, 'BONUSES_UNAVAILABLE', 'The rating aggregate is unavailable.');
         }
-        $category = $bonus->category?->trashed() ? null : $bonus->category;
         $campaign = $this->existing->campaign($bonus);
         if ($campaign['provider']) {
             $campaign['provider']['logo'] = $this->publicImage($campaign['provider']['logo']);
@@ -32,7 +32,7 @@ class PublicBonusProjection
             'href' => '/bonuses/'.rawurlencode($bonus->slug), 'description' => $bonus->description,
             'excerpt' => PublicText::plain($bonus->description !== '' ? $bonus->description : $bonus->content),
             'cover_image' => $this->publicImage($bonus->cover_image),
-            'category' => $category ? ['id' => (int) $category->id, 'name' => $category->name, 'key' => $category->key] : null,
+            ...CategoryAssignments::publicFields($bonus),
             'reading_minutes' => $bonus->reading_minutes, 'published_at' => $bonus->published_at?->utc()->toISOString(),
             'campaign' => $campaign, ...$aggregate->projection()];
     }
@@ -53,7 +53,7 @@ class PublicBonusProjection
             }
         }
         $decorated = $this->outline->decorate($content, prefix: 'bonus');
-        $labels = [$summary['campaign']['provider']['name'] ?? '', $summary['campaign']['provider']['english_name'] ?? '', $summary['category']['name'] ?? ''];
+        $labels = [$summary['campaign']['provider']['name'] ?? '', $summary['campaign']['provider']['english_name'] ?? '', ...array_column($summary['category'], 'name')];
         $tags = [];
         foreach ($labels as $label) {
             if (is_string($label) && trim($label) !== '' && strip_tags($label) === $label) {

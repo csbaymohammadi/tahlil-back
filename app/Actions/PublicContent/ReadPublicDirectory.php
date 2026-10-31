@@ -10,6 +10,7 @@ use App\Models\ExchangeCategory;
 use App\Models\GoldPlatform;
 use App\Models\PropFirm;
 use App\Models\StockBrokerage;
+use App\Support\CategoryAssignments;
 use App\Support\PublicDirectoryProjection;
 use App\Support\PublicReadSnapshot;
 use App\Support\PublicText;
@@ -40,7 +41,7 @@ class ReadPublicDirectory
                         $query->orWhereRaw("markets_public_normalized LIKE ? ESCAPE '!'", [$pattern]);
                     }
                     if (in_array($type, ['exchanges', 'brokers'], true)) {
-                        $query->orWhereHas('category', fn (Builder $category) => $category->whereNull('deleted_at')->whereRaw("public_name_normalized LIKE ? ESCAPE '!'", [$pattern]));
+                        $query->orWhereHas('categories', fn (Builder $category) => $category->whereNull('deleted_at')->whereRaw("public_name_normalized LIKE ? ESCAPE '!'", [$pattern]));
                     }
                 });
             }
@@ -54,7 +55,7 @@ class ReadPublicDirectory
             $effective = ($selected ? ($selected->key ?? 'category-'.$selected->id) : null) ?? ($type === 'brokers' && ($filters['category'] ?? null) === 'forex' ? 'forex' : null);
             $query = clone $matching;
             if ($selected) {
-                $query->where('category_id', $selected->id);
+                $query->whereHas('categories', fn (Builder $category): Builder => CategoryAssignments::liveQuery($category)->whereKey($selected->id));
             }
             $total = (clone $query)->count();
             if ($sort === 'alphabetical') {
@@ -71,12 +72,11 @@ class ReadPublicDirectory
             if (! in_array($type, ['exchanges', 'brokers'], true)) {
                 return $result;
             }
-            $groups = (clone $matching)->selectRaw('category_id, COUNT(*) AS aggregate')->groupBy('category_id')->get();
-            $counts = $groups->mapWithKeys(fn ($row): array => [(string) $row->category_id => (int) $row->aggregate]);
-            $all = (int) $groups->sum('aggregate');
-            $categorized = (int) $categories->sum(fn ($category): int => $counts->get((string) $category->id, 0));
+            $categoryCounts = CategoryAssignments::publicCounts($matching);
+            $counts = collect($categoryCounts['counts']);
+            $all = $categoryCounts['all'];
 
-            return [...$result, 'facets' => ['all_count' => $all, ...($type === 'brokers' ? ['forex_count' => $all] : []), 'uncategorized_count' => $all - $categorized,
+            return [...$result, 'facets' => ['all_count' => $all, ...($type === 'brokers' ? ['forex_count' => $all] : []), 'uncategorized_count' => $categoryCounts['uncategorized'],
                 'categories' => $categories->map(fn ($category): array => ['id' => (int) $category->id, 'name' => $category->name, 'key' => $category->key ?? 'category-'.$category->id, 'count' => $counts->get((string) $category->id, 0)])->all()]];
         });
     }

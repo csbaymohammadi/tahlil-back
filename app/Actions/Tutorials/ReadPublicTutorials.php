@@ -4,6 +4,7 @@ namespace App\Actions\Tutorials;
 
 use App\Models\Tutorial;
 use App\Models\TutorialCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PublicText;
 use App\Tutorials\PublicTutorialProjection;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,15 +32,17 @@ class ReadPublicTutorials
             if (! $this->projection->eligible($tutorial)) {
                 continue;
             }
-            $category = $tutorial->category?->trashed() ? null : $tutorial->category;
-            $fields = [$tutorial->title, $tutorial->description, $category?->name ?? ''];
+            $liveCategories = CategoryAssignments::live($tutorial);
+            $assignedIds = $liveCategories->modelKeys();
+            $fields = [$tutorial->title, $tutorial->description, ...$liveCategories->pluck('name')->all()];
             if ($search !== '' && ! collect($fields)->contains(fn (string $field): bool => str_contains(PublicText::normalize($field), $search))) {
                 continue;
             }
             $all++;
-            $categoryId = $category?->id ?? 0;
-            $counts[$categoryId] = ($counts[$categoryId] ?? 0) + 1;
-            if ($selected && $categoryId !== $selected->id) {
+            foreach ($assignedIds ?: [0] as $assignedId) {
+                $counts[$assignedId] = ($counts[$assignedId] ?? 0) + 1;
+            }
+            if ($selected && ! in_array($selected->id, $assignedIds, true)) {
                 continue;
             }
             $total++;

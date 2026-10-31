@@ -4,6 +4,7 @@ namespace App\Actions\News;
 
 use App\Models\NewsCategory;
 use App\Models\NewsItem;
+use App\Support\CategoryAssignments;
 use App\Support\PublicReadSnapshot;
 use App\Support\PublicText;
 use Illuminate\Validation\ValidationException;
@@ -28,18 +29,21 @@ class ReadPublicNewsArchive
             $all = $uncategorized = $total = 0;
             $ids = [];
             foreach (NewsItem::public()->select(['id', 'title', 'description', 'content', 'category_id', 'published_at'])->with('category')->orderByDesc('published_at')->orderByDesc('id')->lazy(25) as $item) {
-                $category = $item->category?->trashed() ? null : $item->category;
+                $liveCategories = CategoryAssignments::live($item);
+                $assignedIds = $liveCategories->modelKeys();
                 $text = PublicText::plain($item->description !== '' ? $item->description : $item->content, $item->description !== '' ? mb_strlen($item->description) : 300);
-                if ($search !== '' && ! collect([$item->title, $text, $category?->name ?? ''])->contains(fn (string $value): bool => str_contains(PublicText::normalize($value), $search))) {
+                if ($search !== '' && ! collect([$item->title, $text, ...$liveCategories->pluck('name')->all()])->contains(fn (string $value): bool => str_contains(PublicText::normalize($value), $search))) {
                     continue;
                 }
                 $all++;
-                if ($category === null) {
+                if ($assignedIds === []) {
                     $uncategorized++;
                 } else {
-                    $counts[$category->id]++;
+                    foreach ($assignedIds as $assignedId) {
+                        $counts[$assignedId]++;
+                    }
                 }
-                if ($categoryId !== null && $category?->id !== $categoryId) {
+                if ($categoryId !== null && ! in_array($categoryId, $assignedIds, true)) {
                     continue;
                 }
                 if ($total >= ($page - 1) * 6 && count($ids) < 6) {

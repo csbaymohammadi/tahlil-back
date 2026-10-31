@@ -7,6 +7,7 @@ use App\Models\Bonus;
 use App\Models\BonusCampaign;
 use App\Models\Exchange;
 use App\PlatformProfiles\PublicContentOutline;
+use App\Support\CategoryAssignments;
 use App\Support\PlatformText;
 
 class BonusPublicProjection
@@ -34,14 +35,13 @@ class BonusPublicProjection
         $description = $bonus->description !== '' ? $bonus->description : $this->excerpt($bonus->content);
         $fallback = (string) config('bonuses.fallback_cover');
         $cover = $bonus->cover_image !== '' ? $bonus->cover_image : $fallback;
-        $category = $bonus->category?->trashed() ? null : $bonus->category;
 
         return [
             'id' => $bonus->id, 'content_type' => 'bonus', 'title' => $bonus->title, 'slug' => $bonus->slug,
             'public_path' => '/bonuses/'.$bonus->slug, 'description' => $bonus->description, 'display_description' => $description,
             'cover_image' => $bonus->cover_image, 'display_cover_image' => $this->media->approvedImage($cover) ? $cover : '',
             'reading_minutes' => $bonus->reading_minutes, 'published_at' => $bonus->published_at?->utc()->toISOString(),
-            'category' => $category ? ['id' => $category->id, 'name' => $category->name, 'key' => $category->key] : null,
+            ...CategoryAssignments::publicFields($bonus),
             'campaign' => $this->campaign($bonus), ...$bonus->ratingAggregate->projection(), 'comment_count' => app(CommentCounts::class)->for($bonus),
         ];
     }
@@ -51,7 +51,7 @@ class BonusPublicProjection
     {
         $card = $this->card($bonus);
         $decorated = $this->outline->decorate($bonus->content);
-        $labels = [$card['campaign']['provider']['name'] ?? '', $card['category']['name'] ?? '', ...config('bonuses.keywords', [])];
+        $labels = [$card['campaign']['provider']['name'] ?? '', ...array_column($card['category'], 'name'), ...config('bonuses.keywords', [])];
         $keywords = [];
         foreach ($labels as $label) {
             if (! is_string($label) || strip_tags($label) !== $label || trim($label) === '') {

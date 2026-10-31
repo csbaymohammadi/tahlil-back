@@ -59,7 +59,7 @@ class PublicBlogTest extends PanelTestCase
         SiteComment::factory()->create(['section' => 'blog', 'parent_id' => $article->id, 'visibility' => 'hidden']);
         $response = $this->get('/api/v1/blog/articles/'.$article->slug)->assertOk()
             ->assertJsonPath('data.href', '/blog/'.$article->slug)->assertJsonPath('data.reading_minutes', null)
-            ->assertJsonPath('data.category.key', 'category-'.$category->id)->assertJsonPath('data.author.name', 'نام عمومی')
+            ->assertJsonPath('data.category.0.key', 'category-'.$category->id)->assertJsonPath('data.author.name', 'نام عمومی')
             ->assertJsonPath('data.author_profile.bio', 'زندگینامه')->assertJsonPath('data.comment_count', 1)
             ->assertJsonPath('data.tags', ['راهنما'])->assertJsonMissingPath('data.version')->assertJsonMissingPath('data.status');
         $this->assertSame(['article-heading-1', 'article-heading-2', 'article-heading-3'], array_column($response->json('data.outline'), 'id'));

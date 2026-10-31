@@ -40,7 +40,6 @@ class PublicContentIndex
 
             return;
         }
-        $category = $record->category?->trashed() ? null : $record->category;
         $description = PublicText::plain($record->description !== '' ? $record->description : ($record->content ?? ''));
         $searchDescription = $record->description !== '' ? PublicText::plain($record->description, mb_strlen($record->description)) : $description;
         $campaign = $record instanceof Bonus ? $this->bonuses->campaign($record) : null;
@@ -62,7 +61,7 @@ class PublicContentIndex
             'title_normalized' => PublicText::normalize($record->title),
             'english_normalized' => PublicText::normalize((string) ($record->english_name ?? '')),
             'description_normalized' => PublicText::normalize($searchDescription),
-            'category_normalized' => PublicText::normalize($category?->name ?? ''),
+            'category_normalized' => implode(' ', CategoryAssignments::live($record)->map(fn (Model $category): string => PublicText::normalize($category->name))->all()),
             'provider_normalized' => PublicText::normalize($campaign['provider']['name'] ?? ''),
             'provider_english_normalized' => PublicText::normalize($campaign['provider']['english_name'] ?? ''),
             'amount_normalized' => PublicText::normalize($campaign['amount_display'] ?? ''),
@@ -163,17 +162,16 @@ class PublicContentIndex
     /** @return list<string> */
     private function relations(string $type): array
     {
-        return ['category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['campaign.exchange'] : [])];
+        return ['categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['campaign.exchange'] : [])];
     }
 
     private function sourceStamp(Model $record): string
     {
-        $category = $record->category;
         $author = $record instanceof Tutorial ? null : $record->author;
 
         return hash('sha256', json_encode([
             $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id']),
-            $category?->only(['id', 'name', 'version', 'deleted_at']),
+            $record->categories->map(fn (Model $category): array => $category->only(['id', 'name', 'key', 'version', 'deleted_at']))->all(),
             $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']),
             $record instanceof Bonus ? $this->bonuses->campaign($record) : null,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
@@ -182,12 +180,11 @@ class PublicContentIndex
     /** @param array<string, mixed>|null $campaign */
     private function fingerprint(Model $record, ?array $campaign): string
     {
-        $category = $record->category?->trashed() ? null : $record->category;
         $author = $record instanceof Tutorial ? null : $record->author;
 
         $values = [
             $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url']),
-            $category?->only(['id', 'name']), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
+            CategoryAssignments::publicFields($record), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
         ];
         if ($record instanceof Tutorial) {
             $duration = app(PublicTutorialProjection::class)->duration($record->loadMissing('durations'));

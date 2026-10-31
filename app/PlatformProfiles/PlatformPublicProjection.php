@@ -4,6 +4,7 @@ namespace App\PlatformProfiles;
 
 use App\Comments\CommentCounts;
 use App\Models\PlatformProfile;
+use App\Support\CategoryAssignments;
 use App\Support\PlatformProfileDefinition;
 
 class PlatformPublicProjection
@@ -13,10 +14,6 @@ class PlatformPublicProjection
     /** @return array<string, mixed> */
     public function card(PlatformProfile $profile, PlatformProfileDefinition $definition): array
     {
-        $category = $profile->relationLoaded('category') ? $profile->category : null;
-        if ($category?->trashed()) {
-            $category = null;
-        }
         $description = $profile->description !== '' ? $profile->description : $this->excerpt($profile->content);
         $card = [
             'id' => $profile->id,
@@ -27,7 +24,7 @@ class PlatformPublicProjection
             'description' => $description,
             'logo' => $profile->logo,
             'founded_year' => $profile->founded_year,
-            'category' => $category ? ['id' => $category->id, 'name' => $category->name, ...($definition->hasCategoryKeys ? ['key' => $category->key] : [])] : null,
+            ...CategoryAssignments::publicFields($profile),
             'rating_average' => null,
             'rating_count' => 0,
             'comment_count' => app(CommentCounts::class)->for($profile),
@@ -35,7 +32,7 @@ class PlatformPublicProjection
         if ($definition->key === 'broker') {
             $card['markets'] = $profile->markets;
             $card['platforms'] = $profile->platforms;
-            $card['filter_keys'] = array_values(array_unique(array_filter(['forex', $category?->key])));
+            $card['filter_keys'] = array_values(array_unique(['forex', ...array_column($card['category'], 'key')]));
         } elseif ($definition->kind !== null) {
             $card['kind'] = $definition->kind;
             $card['platform_label'] = $definition->platformLabel;

@@ -7,6 +7,7 @@ use App\Models\BlogArticle;
 use App\Models\NewsItem;
 use App\PageSettings\SettingsMedia;
 use App\Profile\PublicAuthor;
+use App\Support\CategoryAssignments;
 use App\Support\PublicText;
 
 class PublicArticleProjection
@@ -17,7 +18,6 @@ class PublicArticleProjection
     public function summary(BlogArticle|NewsItem $article): array
     {
         $news = $article instanceof NewsItem;
-        $category = $article->category?->trashed() ? null : $article->category;
         $author = $this->authors->record($article->author);
         $cover = (string) $article->cover_image;
 
@@ -27,7 +27,7 @@ class PublicArticleProjection
             'cover_image' => $cover !== '' && $this->media->publicDomainImage($cover, $news ? 'news' : 'blog') ? $cover : '',
             'description' => $article->description,
             'excerpt' => PublicText::plain($article->description !== '' ? $article->description : $article->content),
-            'category' => $category ? ['id' => (int) $category->id, 'name' => $category->name, 'key' => $category->key ?? 'category-'.$category->id] : null,
+            ...CategoryAssignments::publicFields($article),
             'author' => $author ? ['id' => (int) $author['id'], 'name' => $author['name']] : null,
             'reading_minutes' => $article->reading_minutes === null ? null : (int) $article->reading_minutes,
             'published_at' => $article->published_at?->utc()->toISOString(),
@@ -50,7 +50,7 @@ class PublicArticleProjection
             'updated_at' => $article->updated_at?->utc()->toISOString(), 'meta_description' => $article->meta_description,
             'seo_description' => PublicText::plain($article->meta_description !== '' ? $article->meta_description : $summary['excerpt'], 500),
             'author_profile' => $this->authors->record($article->author),
-            'tags' => $summary['category'] ? [$summary['category']['name']] : [],
+            'tags' => array_values(array_unique(array_column($summary['category'], 'name'))),
             'comment_count' => (int) $article->comment_count,
         ];
     }

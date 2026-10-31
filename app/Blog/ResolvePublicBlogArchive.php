@@ -4,6 +4,7 @@ namespace App\Blog;
 
 use App\Models\BlogArticle;
 use App\Models\BlogCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PublicText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -28,19 +29,21 @@ class ResolvePublicBlogArchive
             $all = $uncategorized = $total = 0;
             $ids = [];
             foreach (BlogArticle::public()->select(['id', 'title', 'description', 'content', 'category_id', 'published_at'])->with('category')->orderByDesc('published_at')->orderByDesc('id')->lazy(25) as $article) {
-                $liveCategory = $article->category?->trashed() ? null : $article->category;
-                $fields = [$article->title, PublicText::plain($article->description !== '' ? $article->description : $article->content, $article->description !== '' ? mb_strlen($article->description) : 300), $liveCategory?->name ?? ''];
+                $liveCategories = CategoryAssignments::live($article);
+                $fields = [$article->title, PublicText::plain($article->description !== '' ? $article->description : $article->content, $article->description !== '' ? mb_strlen($article->description) : 300), ...$liveCategories->pluck('name')->all()];
                 if ($search !== '' && count(array_filter($fields, fn (string $value): bool => str_contains(PublicText::blog($value), $search))) === 0) {
                     continue;
                 }
                 $all++;
-                $category = $liveCategory?->id;
-                if ($category === null) {
+                $assignedIds = $liveCategories->modelKeys();
+                if ($assignedIds === []) {
                     $uncategorized++;
                 } else {
-                    $counts[$category]++;
+                    foreach ($assignedIds as $assignedId) {
+                        $counts[$assignedId]++;
+                    }
                 }
-                if ($categoryId !== null && $category !== $categoryId) {
+                if ($categoryId !== null && ! in_array($categoryId, $assignedIds, true)) {
                     continue;
                 }
                 if ($total >= ($page - 1) * 6 && count($ids) < 6) {
