@@ -20,7 +20,7 @@ class ExchangeCategoryController extends Controller
     {
         $filters = Validator::make($request->query(), ['q' => ['sometimes', 'string', 'max:200']])->validate();
         $search = ExchangeText::panel((string) ($filters['q'] ?? ''));
-        $categories = ExchangeCategory::query()->withCount('exchanges')
+        $categories = ExchangeCategory::query()->withCount('assignedRecords as exchanges_count')
             ->when($search !== '', fn ($query) => $query->where('name_normalized', 'like', '%'.addcslashes($search, '\\%_').'%'))
             ->orderBy('name_normalized')->orderBy('id')->get();
 
@@ -32,7 +32,7 @@ class ExchangeCategoryController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $category = ExchangeCategory::query()->withCount('exchanges')->find(PanelIds::parse($id));
+        $category = ExchangeCategory::query()->withCount('assignedRecords as exchanges_count')->find(PanelIds::parse($id));
         if (! $category) {
             throw new PanelAuthException(404, 'CATEGORY_NOT_FOUND', 'The exchange category was not found.');
         }

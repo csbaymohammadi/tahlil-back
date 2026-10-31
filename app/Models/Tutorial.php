@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Tutorial extends Model
 {
+    use HasCategories;
     use HasFactory, SoftDeletes;
 
     protected $guarded = ['*'];

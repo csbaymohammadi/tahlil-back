@@ -61,6 +61,8 @@ return Application::configure(basePath: dirname(__DIR__))
                     [$code, $field] = ['USERNAME_TAKEN', 'username'];
                 } elseif (str_contains($detail, 'users.email') || str_contains($detail, 'users_email_unique')) {
                     [$code, $field] = ['EMAIL_TAKEN', 'email'];
+                } elseif (preg_match('/(?:[a-z_]+_categories[._](?:name_normalized|key)|(?:gold|prop|bonus|tutorial)_cat_(?:name|key)(?:_norm)?_uq)/', $detail) === 1) {
+                    [$code, $field] = ['CATEGORY_NAME_TAKEN', 'name'];
                 } elseif (str_contains($detail, 'name_normalized')) {
                     [$code, $field] = ['ROLE_NAME_TAKEN', 'name'];
                 } elseif (str_contains($detail, 'blog_slug_ownership.slug')) {
@@ -83,9 +85,9 @@ return Application::configure(basePath: dirname(__DIR__))
             } elseif ($exception instanceof MissingAppKeyException) {
                 [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Application configuration is temporarily unavailable.'];
             } elseif ($exception instanceof QueryException || $exception instanceof PDOException || $exception instanceof LockTimeoutException || $exception instanceof DecryptException || $exception instanceof RedisException || $exception instanceof ConnectionException) {
-                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.'];
+                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', $request->is('api/v1/admin/*/categories*') ? 'The service is temporarily unavailable.' : 'Authentication is temporarily unavailable.'];
             } elseif ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 503) {
-                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', 'Authentication is temporarily unavailable.'];
+                [$status, $code, $message] = [503, 'SERVICE_UNAVAILABLE', $request->is('api/v1/admin/*/categories*') ? 'The service is temporarily unavailable.' : 'Authentication is temporarily unavailable.'];
             } elseif ($exception instanceof PostTooLargeException) {
                 [$status, $code, $message] = [413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.'];
             } elseif ($exception instanceof HttpExceptionInterface && in_array($exception->getStatusCode(), [404, 405], true)) {

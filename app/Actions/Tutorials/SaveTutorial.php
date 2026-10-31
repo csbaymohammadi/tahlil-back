@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\TutorialRequest;
 use App\Models\PanelSession;
 use App\Models\Tutorial;
 use App\Models\TutorialCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformText;
 use App\Tutorials\TutorialEvents;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveTutorial
 {
-    public function __construct(private RevokeSessions $sessions, private TutorialProviders $providers, private TutorialMedia $media, private TutorialEvents $events) {}
+    public function __construct(private RevokeSessions $sessions, private TutorialProviders $providers, private TutorialMedia $media, private TutorialEvents $events, private CategoryAssignments $categoryAssignments) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): Tutorial
@@ -34,6 +35,8 @@ class SaveTutorial
             if (! $creating && $tutorial->version !== $input['expected_version']) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'Fetch the current tutorial before retrying.');
             }
+            $categoryIds = $this->categoryAssignments->prepare($tutorial, $input);
+            $categoriesChanged = $tutorial->categories->modelKeys() !== $categoryIds;
             $values = $creating ? ['description' => '', 'aparat_url' => ''] : $tutorial->only(TutorialRequest::EDITABLE);
             foreach (array_intersect_key($input, array_flip(TutorialRequest::EDITABLE)) as $field => $value) {
                 $values[$field] = is_string($value) ? trim($value) : $value;
@@ -56,6 +59,9 @@ class SaveTutorial
                     $changed[] = $field;
                 }
             }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
+            }
             if (! $creating && $changed === []) {
                 return $tutorial->fresh(['category', 'durations']);
             }
@@ -72,6 +78,7 @@ class SaveTutorial
                 $values += ['created_by' => $actor->id, 'published_at' => now()];
             }
             $tutorial->forceFill($values)->save();
+            $this->categoryAssignments->sync($tutorial, $categoryIds);
             if ($creating) {
                 $preferred = 'youtube-'.$tutorial->youtube_video_id;
                 $slug = $preferred;

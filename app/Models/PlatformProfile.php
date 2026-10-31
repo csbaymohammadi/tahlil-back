@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 abstract class PlatformProfile extends Model
 {
+    use HasCategories;
     use HasFactory;
     use HasPublicComments;
     use SoftDeletes;

@@ -29,7 +29,7 @@ class ContentHtmlContractTest extends PanelTestCase
     {
         $this->panel(User::factory()->panel()->create());
         $base = '/api/v1/admin/'.$module.'/'.($module === 'blog' ? 'articles' : 'items');
-        $payload = ['title' => 'Contract', 'slug' => 'contract', 'content' => '<h1 style="text-align: right">Heading</h1>'.$this->button().str_replace(['medium', 'center', '#008BC5'], ['large', 'left', '#112233'], $this->button('دکمه دوم')), 'status' => 'published', 'category_id' => null];
+        $payload = ['title' => 'Contract', 'slug' => 'contract', 'content' => '<h1 style="text-align: right">Heading</h1>'.$this->button().str_replace(['medium', 'center', '#008BC5'], ['large', 'left', '#112233'], $this->button('دکمه دوم')), 'status' => 'published', 'category_id' => []];
         if (! in_array($module, ['blog', 'news', 'bonuses'], true)) {
             $payload += ['english_name' => 'Contract', 'logo' => '/images/example.png', 'website_url' => 'https://example.com'];
         }
@@ -117,7 +117,7 @@ class ContentHtmlContractTest extends PanelTestCase
     {
         $this->panel(User::factory()->panel()->create());
         $base = '/api/v1/admin/blog/articles';
-        $created = $this->postJson($base, ['title' => 'Atomic', 'slug' => 'atomic', 'content' => $this->button(), 'status' => 'published'])->assertCreated();
+        $created = $this->postJson($base, ['category_id' => [], 'title' => 'Atomic', 'slug' => 'atomic', 'content' => $this->button(), 'status' => 'published'])->assertCreated();
         $id = $created->json('data.id');
         $old = $this->get($base.'/'.$id)->json('data.content');
         $outbox = DB::table('blog_outbox')->count();

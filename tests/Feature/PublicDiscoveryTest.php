@@ -85,9 +85,9 @@ class PublicDiscoveryTest extends PanelTestCase
     {
         $this->panel(User::factory()->panel()->create());
         $this->artisan('public-content:rebuild')->assertSuccessful();
-        $article = $this->postJson('/api/v1/admin/blog/articles', ['title' => 'First publication', 'slug' => 'first-publication', 'content' => '<p>Original body</p>', 'status' => 'published'])->assertCreated();
+        $article = $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'First publication', 'slug' => 'first-publication', 'content' => '<p>Original body</p>', 'status' => 'published'])->assertCreated();
         $id = $article->json('data.id');
-        $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Second publication', 'slug' => 'second-publication', 'status' => 'published'])->assertCreated();
+        $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'Second publication', 'slug' => 'second-publication', 'status' => 'published'])->assertCreated();
         $this->get('/api/v1/search?q=First')->assertOk()->assertJsonPath('meta.total', 1);
         $initial = DB::table('public_content_entries')->where('type', 'articles')->where('record_id', $id)->first();
         $first = $this->get('/api/v1/sitemap/entries?type=articles&limit=1')->assertOk();
@@ -124,8 +124,8 @@ class PublicDiscoveryTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $category = $this->postJson('/api/v1/admin/blog/categories', ['name' => 'UniqueFacet'])->assertCreated();
         $categoryId = $category->json('data.id');
-        $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Category target', 'slug' => 'category-target', 'status' => 'published', 'category_id' => $categoryId])->assertCreated();
-        $scheduled = $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Scheduled target', 'slug' => 'scheduled-target', 'status' => 'scheduled', 'scheduled_for' => now()->addMinute()->toISOString()])->assertCreated();
+        $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Category target', 'slug' => 'category-target', 'status' => 'published', 'category_id' => [$categoryId]])->assertCreated();
+        $scheduled = $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'Scheduled target', 'slug' => 'scheduled-target', 'status' => 'scheduled', 'scheduled_for' => now()->addMinute()->toISOString()])->assertCreated();
         $this->artisan('public-content:rebuild')->assertSuccessful();
         $this->get('/api/v1/search?q=UniqueFacet')->assertOk()->assertJsonPath('meta.total', 1);
         $this->delete('/api/v1/admin/blog/categories/'.$categoryId.'?expected_version=1')->assertOk();
@@ -192,7 +192,7 @@ class PublicDiscoveryTest extends PanelTestCase
         $index = \Mockery::mock(PublicContentIndex::class);
         $index->shouldReceive('sync')->andThrow(new \RuntimeException('projection unavailable'));
         $this->app->instance(PublicContentIndex::class, $index);
-        $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Atomic article', 'slug' => 'atomic-article', 'status' => 'published'])->assertStatus(500);
+        $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'Atomic article', 'slug' => 'atomic-article', 'status' => 'published'])->assertStatus(500);
         $this->assertDatabaseMissing('blog_articles', ['slug' => 'atomic-article']);
         $this->assertDatabaseMissing('blog_slug_ownership', ['slug' => 'atomic-article']);
         $this->assertDatabaseCount('blog_outbox', 0);
@@ -224,8 +224,8 @@ class PublicDiscoveryTest extends PanelTestCase
         $this->freezeTime();
         $this->panel(User::factory()->panel()->create());
         $this->artisan('public-content:rebuild')->assertSuccessful();
-        $article = $this->postJson('/api/v1/admin/blog/articles', ['title' => 'First', 'slug' => 'frozen-first', 'status' => 'published', 'content' => '<p>Before</p>'])->assertCreated();
-        $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Second', 'slug' => 'frozen-second', 'status' => 'published'])->assertCreated();
+        $article = $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'First', 'slug' => 'frozen-first', 'status' => 'published', 'content' => '<p>Before</p>'])->assertCreated();
+        $this->postJson('/api/v1/admin/blog/articles', ['category_id' => [], 'title' => 'Second', 'slug' => 'frozen-second', 'status' => 'published'])->assertCreated();
         $first = $this->get('/api/v1/sitemap/entries?limit=1')->assertOk();
         $this->patchJson('/api/v1/admin/blog/articles/'.$article->json('data.id'), ['expected_version' => 1, 'content' => '<p>After</p>'])->assertOk();
         $this->get('/api/v1/sitemap/entries?limit=1&cursor='.urlencode($first->json('meta.next_cursor')))->assertConflict()->assertJsonPath('error.code', 'SITEMAP_CURSOR_STALE');

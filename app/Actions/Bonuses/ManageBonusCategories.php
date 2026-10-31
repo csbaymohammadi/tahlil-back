@@ -8,6 +8,7 @@ use App\Exceptions\PanelAuthException;
 use App\Models\Bonus;
 use App\Models\BonusCategory;
 use App\Models\PanelSession;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformText;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class ManageBonusCategories
 {
-    public function __construct(private RevokeSessions $sessions, private BonusEvents $events) {}
+    public function __construct(private RevokeSessions $sessions, private BonusEvents $events, private CategoryAssignments $categoryAssignments) {}
 
     public function create(PanelSession $session, string $name, string $requestId): BonusCategory
     {
@@ -48,7 +49,7 @@ class ManageBonusCategories
             $actor = $this->sessions->currentUser($session);
             $category = BonusCategory::lockForUpdate()->find($id);
             $this->assertCategory($category, $expectedVersion);
-            $count = Bonus::where('category_id', $id)->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Bonus::class, $id, null, $actor->id);
             $category->delete();
             $this->events->audit('bonus_category_deleted', $requestId, $actor->id, $id, ['affected_count' => $count], 'category');
             $this->events->publicChange('bonus_category_changed', $requestId, null, ['category_id' => $id, 'affected_count' => $count]);
@@ -71,7 +72,7 @@ class ManageBonusCategories
             $source = $categories->get($sourceId);
             $this->assertCategory($source, $sourceVersion);
             $this->assertCategory($categories->get($targetId), $targetVersion);
-            $count = Bonus::where('category_id', $sourceId)->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Bonus::class, $sourceId, $targetId, $actor->id);
             $source->delete();
             $result = ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_count' => $count];
             $this->events->audit('bonus_categories_merged', $requestId, $actor->id, $sourceId, $result, 'category');

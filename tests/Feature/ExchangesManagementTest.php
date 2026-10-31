@@ -34,12 +34,12 @@ class ExchangesManagementTest extends PanelTestCase
         $specifications['spot_trading'] = 'yes';
 
         $created = $this->postJson(self::BASE.'/items', $this->payload([
-            'category_id' => $category->id,
+            'category_id' => [$category->id],
             'specifications' => $specifications,
         ]));
         $created->assertCreated()
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.id', $category->id)
+            ->assertJsonPath('data.category.0.id', $category->id)
             ->assertJsonPath('data.title', 'صرافی نمونه')
             ->assertJsonPath('data.english_name', 'Example Exchange')
             ->assertJsonPath('data.logo', '/images/exchanges/example.png')
@@ -178,7 +178,7 @@ class ExchangesManagementTest extends PanelTestCase
         $target = $this->postJson(self::BASE.'/categories', ['name' => 'International'])->assertCreated();
         $targetId = $target->json('data.id');
 
-        $exchange = $this->postJson(self::BASE.'/items', $this->payload(['category_id' => $sourceId]))->assertCreated();
+        $exchange = $this->postJson(self::BASE.'/items', $this->payload(['category_id' => [$sourceId]]))->assertCreated();
         $exchangeId = $exchange->json('data.id');
         $this->postJson(self::BASE.'/categories/'.$sourceId.'/merge', [
             'expected_version' => 1, 'target_category_id' => $targetId, 'target_expected_version' => 1,
@@ -281,7 +281,7 @@ class ExchangesManagementTest extends PanelTestCase
             'description' => 'A sample exchange.', 'logo' => '/images/exchanges/example.png',
             'website_url' => 'https://exchange.example/', 'founded_year' => '2022',
             'platform_type' => 'Centralized exchange', 'markets' => 'Spot and futures', 'access' => 'Web and mobile',
-            'support' => 'Online support', 'category_id' => null,
+            'support' => 'Online support', 'category_id' => [],
             'content' => '<h2>Overview</h2><p>A review of this exchange.</p>',
             'meta_description' => 'An overview.', 'status' => 'draft',
         ], $overrides);

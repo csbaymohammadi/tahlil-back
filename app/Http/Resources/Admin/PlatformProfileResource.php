@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Admin;
 
 use App\Models\PlatformProfile;
+use App\Support\CategoryAssignments;
 use App\Support\PlatformProfileDefinition;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -19,10 +20,6 @@ class PlatformProfileResource extends JsonResource
     {
         /** @var PlatformProfile $profile */
         $profile = $this->resource;
-        $category = $profile->relationLoaded('category') ? $profile->category : null;
-        if ($category?->trashed()) {
-            $category = null;
-        }
         $author = $profile->relationLoaded('author') ? $profile->author : null;
         $path = $profile->status === 'published' ? $this->definition->publicPath.$profile->slug : null;
         $data = [
@@ -44,8 +41,8 @@ class PlatformProfileResource extends JsonResource
         $data += [
             'status' => $profile->status,
             'author' => $author ? ['id' => $author->id, 'name' => $author->name] : null,
-            'category_id' => $category?->id,
-            'category' => $category ? $this->categoryArray($category) : null,
+            'category_id' => $profile->categories->modelKeys(),
+            'category' => CategoryAssignments::projection($profile),
             'created_at' => $profile->created_at?->utc()->toISOString(),
             'updated_at' => $profile->updated_at?->utc()->toISOString(),
             'published_at' => $profile->published_at?->utc()->toISOString(),
@@ -60,16 +57,5 @@ class PlatformProfileResource extends JsonResource
         }
 
         return $data;
-    }
-
-    /** @return array<string, int|string> */
-    private function categoryArray(object $category): array
-    {
-        $result = ['id' => $category->id, 'name' => $category->name];
-        if ($this->definition->hasCategoryKeys) {
-            $result['key'] = $category->key;
-        }
-
-        return $result;
     }
 }

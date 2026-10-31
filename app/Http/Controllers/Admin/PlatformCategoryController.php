@@ -27,7 +27,7 @@ abstract class PlatformCategoryController extends Controller
         $search = PlatformText::panel((string) ($filters['q'] ?? ''));
         $definition = $this->definition();
         $categoryClass = $definition->categoryModel;
-        $categories = $categoryClass::query()->withCount('profiles')->when($search !== '', function (Builder $query) use ($search): void {
+        $categories = $categoryClass::query()->withCount('assignedRecords as profiles_count')->when($search !== '', function (Builder $query) use ($search): void {
             $query->where('name_normalized', 'like', '%'.addcslashes($search, '\\%_').'%');
         })->orderBy('name_normalized')->orderBy('id')->get();
 
@@ -41,7 +41,7 @@ abstract class PlatformCategoryController extends Controller
     {
         $definition = $this->definition();
         $categoryClass = $definition->categoryModel;
-        $category = $categoryClass::query()->withCount('profiles')->find(PanelIds::parse($id));
+        $category = $categoryClass::query()->withCount('assignedRecords as profiles_count')->find(PanelIds::parse($id));
         if (! $category) {
             throw new PanelAuthException(404, 'CATEGORY_NOT_FOUND', 'The category was not found.');
         }
@@ -58,7 +58,7 @@ abstract class PlatformCategoryController extends Controller
         /** @var PlatformCategory $category */
         $category = app($managerClass)->create($session, trim($input['name']), (string) $request->attributes->get('request_id'));
         $definition = $this->definition();
-        $category->loadCount('profiles');
+        $category->loadCount('assignedRecords as profiles_count');
 
         return response()->json(['data' => (new PlatformCategoryResource($category, $definition))->resolve($request), 'request_id' => $request->attributes->get('request_id')], 201)
             ->header('Location', '/api/v1/admin/'.$definition->slug.'/categories/'.$category->id);

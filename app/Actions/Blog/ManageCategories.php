@@ -8,13 +8,14 @@ use App\Models\BlogArticle;
 use App\Models\BlogCategory;
 use App\Models\PanelSession;
 use App\Support\BlogText;
+use App\Support\CategoryAssignments;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ManageCategories
 {
-    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     public function create(PanelSession $session, string $name, string $requestId): BlogCategory
     {
@@ -48,10 +49,7 @@ class ManageCategories
             if ($category->version !== $expectedVersion) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The category has changed. Fetch it before retrying.');
             }
-            $count = BlogArticle::query()->where('category_id', $id)->whereNull('deleted_at')->count();
-            BlogArticle::query()->where('category_id', $id)->whereNull('deleted_at')->update([
-                'category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now(),
-            ]);
+            $count = $this->categoryAssignments->replaceCategory(BlogArticle::class, $id, null, $actor->id);
             $category->delete();
             $this->audit($requestId, $actor->id, $id, 'blog_category_deleted', ['affected_articles_count' => $count]);
             $this->outbox($requestId, 'blog_category_changed', ['category_id' => $id, 'affected_articles_count' => $count]);
@@ -77,10 +75,7 @@ class ManageCategories
             if ($source->version !== $sourceVersion || $target->version !== $targetVersion) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'A category has changed. Fetch both categories before retrying.');
             }
-            $count = BlogArticle::query()->where('category_id', $sourceId)->whereNull('deleted_at')->count();
-            BlogArticle::query()->where('category_id', $sourceId)->whereNull('deleted_at')->update([
-                'category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now(),
-            ]);
+            $count = $this->categoryAssignments->replaceCategory(BlogArticle::class, $sourceId, $targetId, $actor->id);
             $source->delete();
             $this->audit($requestId, $actor->id, $sourceId, 'blog_categories_merged', ['target_category_id' => $targetId, 'moved_articles_count' => $count]);
             $this->outbox($requestId, 'blog_categories_merged', ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_articles_count' => $count]);

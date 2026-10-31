@@ -22,7 +22,7 @@ class NewsCategoryController extends Controller
     {
         $query = Validator::make($request->query(), ['q' => ['sometimes', 'string', 'max:200']])->validate();
         $search = BlogText::normalize((string) ($query['q'] ?? ''));
-        $categories = NewsCategory::query()->when($search !== '', function (Builder $builder) use ($search): void {
+        $categories = NewsCategory::query()->withCount('assignedRecords')->when($search !== '', function (Builder $builder) use ($search): void {
             $builder->where('name_normalized', 'like', '%'.addcslashes($search, '\\%_').'%');
         })->orderBy('name_normalized')->orderBy('id')->get();
 
@@ -31,7 +31,7 @@ class NewsCategoryController extends Controller
 
     public function show(Request $request, string $id): JsonResponse
     {
-        $category = NewsCategory::query()->find(PanelIds::parse($id));
+        $category = NewsCategory::query()->withCount('assignedRecords')->find(PanelIds::parse($id));
         if (! $category) {
             throw new PanelAuthException(404, 'CATEGORY_NOT_FOUND', 'The category was not found.');
         }

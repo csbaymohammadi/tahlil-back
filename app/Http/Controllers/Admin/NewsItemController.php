@@ -25,6 +25,7 @@ class NewsItemController extends Controller
             'page' => ['sometimes', 'regex:/^[1-9][0-9]*$/D', 'integer', 'max:9007199254740991'],
             'per_page' => ['sometimes', 'regex:/^[1-9][0-9]*$/D', 'integer', Rule::in([10, 20, 50])],
             'q' => ['sometimes', 'string', 'max:200'],
+            'category_id' => ['sometimes', 'integer', 'min:1', 'max:9007199254740991'],
         ])->validate();
         $page = (int) ($query['page'] ?? 1);
         $perPage = (int) ($query['per_page'] ?? 10);
@@ -32,9 +33,12 @@ class NewsItemController extends Controller
         $newsItems = NewsItem::query()->with(['author', 'category'])->when($search !== '', function (Builder $builder) use ($search): void {
             $pattern = '%'.addcslashes($search, '\\%_').'%';
             $builder->where(function (Builder $builder) use ($pattern): void {
-                $builder->where('title_normalized', 'like', $pattern)->orWhere('author_name_normalized', 'like', $pattern);
+                $builder->where('title_normalized', 'like', $pattern)->orWhere('author_name_normalized', 'like', $pattern)->orWhereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->where('name_normalized', 'like', $pattern)->whereNull($categoryQuery->getModel()->qualifyColumn('deleted_at')));
             });
         });
+        if (isset($query['category_id'])) {
+            $newsItems->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereKey((int) $query['category_id'])->whereNull($categoryQuery->getModel()->qualifyColumn('deleted_at')));
+        }
         $total = (clone $newsItems)->count();
         $items = $newsItems->orderByDesc('created_at')->orderByDesc('id')->offset(($page - 1) * $perPage)->limit($perPage)->get();
 

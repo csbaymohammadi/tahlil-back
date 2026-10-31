@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class NewsCategory extends Model
 {
+    use HasAssignedRecords;
+
     /** @use HasFactory<NewsCategoryFactory> */
     use HasFactory, SoftDeletes;
 

@@ -24,15 +24,14 @@ class NewsManagementTest extends PanelTestCase
         $actor = User::factory()->panel()->create(['name' => 'مدیر نمونه']);
         $this->panel($actor);
         $category = NewsCategory::factory()->create(['name' => 'راهنما']);
-        $payload = [
-            'title' => 'قیمت بازار چیست؟', 'slug' => 'market-price-guide', 'description' => '', 'cover_image' => '',
-            'content' => '<h2>راهنما</h2><p>متن <strong>مهم</strong> مقاله</p>', 'category_id' => $category->id,
+        $payload = ['title' => 'قیمت بازار چیست؟', 'slug' => 'market-price-guide', 'description' => '', 'cover_image' => '',
+            'content' => '<h2>راهنما</h2><p>متن <strong>مهم</strong> مقاله</p>', 'category_id' => [$category->id],
             'reading_minutes' => 5, 'meta_description' => '', 'status' => 'draft', 'scheduled_for' => null,
         ];
         $created = $this->postJson(self::BASE.'/items', $payload);
         $created->assertCreated()
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.id', $category->id)
+            ->assertJsonPath('data.category.0.id', $category->id)
             ->assertJsonPath('data.version', 1)
             ->assertHeader('Location', self::BASE.'/items/1');
         $id = $created->json('data.id');
@@ -53,15 +52,14 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $this->postJson(self::BASE.'/items', ['title' => 'Blank draft', 'slug' => 'blank-draft'])
+        $this->postJson(self::BASE.'/items', ['category_id' => [], 'title' => 'Blank draft', 'slug' => 'blank-draft'])
             ->assertCreated()
             ->assertJsonPath('data.content', '')
             ->assertJsonPath('data.reading_minutes', null)
             ->assertJsonPath('warnings', []);
 
-        $payload = [
-            'title' => 'Safe title', 'slug' => 'safe-title', 'content' => '<script>alert(1)</script>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'draft',
+        $payload = ['title' => 'Safe title', 'slug' => 'safe-title', 'content' => '<script>alert(1)</script>',
+            'category_id' => [], 'reading_minutes' => 4, 'status' => 'draft',
         ];
         $this->postJson(self::BASE.'/items', $payload)->assertUnprocessable()
             ->assertJsonPath('error.fields.content.0', 'مقدار «محتوا» قابل‌استفاده نیست.');
@@ -91,9 +89,9 @@ class NewsManagementTest extends PanelTestCase
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
 
-        $this->postJson(self::BASE.'/items', ['slug' => 'valid-slug'])->assertUnprocessable()
+        $this->postJson(self::BASE.'/items', ['category_id' => [], 'slug' => 'valid-slug'])->assertUnprocessable()
             ->assertJsonPath('error.fields.title.0', 'عنوان خبر الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.');
-        $this->postJson(self::BASE.'/items', ['title' => 'عنوان معتبر', 'slug' => 'عنوان-نامعتبر'])
+        $this->postJson(self::BASE.'/items', ['category_id' => [], 'title' => 'عنوان معتبر', 'slug' => 'عنوان-نامعتبر'])
             ->assertUnprocessable()
             ->assertJsonPath('error.fields.slug.0', 'عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید؛ طول آن حداکثر ۲۰۰ نویسه باشد.');
         $this->assertDatabaseCount('news_items', 0);
@@ -103,24 +101,23 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $response = $this->postJson(self::BASE.'/items', [
-            'title' => 'Optional values',
+        $response = $this->postJson(self::BASE.'/items', ['title' => 'Optional values',
             'slug' => 'optional-values',
             'description' => ['not a string'],
             'cover_image' => 42,
             'content' => null,
-            'category_id' => 'not-an-id',
+            'category_id' => [],
             'reading_minutes' => 'not a number',
             'meta_description' => str_repeat('م', 501),
         ])->assertCreated()
             ->assertJsonPath('data.description', '')
             ->assertJsonPath('data.cover_image', '')
             ->assertJsonPath('data.content', '')
-            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.category_id', [])
             ->assertJsonPath('data.reading_minutes', null);
 
         $this->assertSame(
-            ['description', 'cover_image', 'meta_description', 'category_id', 'reading_minutes'],
+            ['description', 'cover_image', 'meta_description', 'reading_minutes'],
             array_column($response->json('warnings'), 'field'),
         );
         $this->assertSame(1, NewsItem::query()->firstOrFail()->version);
@@ -130,21 +127,21 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $id = $this->postJson(self::BASE.'/items', ['title' => 'Patch draft', 'slug' => 'patch-draft'])
+        $id = $this->postJson(self::BASE.'/items', ['category_id' => [], 'title' => 'Patch draft', 'slug' => 'patch-draft'])
             ->assertCreated()->json('data.id');
 
         $response = $this->patchJson(self::BASE.'/items/'.$id, [
             'expected_version' => 1,
             'description' => ['not a string'],
-            'category_id' => 999999,
+            'category_id' => [],
             'reading_minutes' => 'not a number',
         ])->assertOk()
             ->assertJsonPath('data.version', 1)
             ->assertJsonPath('data.description', '')
-            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.category_id', [])
             ->assertJsonPath('data.reading_minutes', null);
 
-        $this->assertSame(['description', 'category_id', 'reading_minutes'], array_column($response->json('warnings'), 'field'));
+        $this->assertSame(['description', 'reading_minutes'], array_column($response->json('warnings'), 'field'));
     }
 
     public function test_category_names_are_normalized_and_delete_uncategorizes_articles(): void
@@ -154,8 +151,7 @@ class NewsManagementTest extends PanelTestCase
         $created = $this->postJson(self::BASE.'/categories', ['name' => 'مدير يک'])->assertCreated()->assertJsonPath('data.version', 1);
         $id = $created->json('data.id');
         $this->postJson(self::BASE.'/categories', ['name' => 'مدیر یک'])->assertConflict()->assertJsonPath('error.code', 'CATEGORY_NAME_TAKEN');
-        $this->postJson(self::BASE.'/items', [
-            'title' => 'Article', 'slug' => 'article', 'content' => '<p>Content</p>', 'category_id' => $id,
+        $this->postJson(self::BASE.'/items', ['title' => 'Article', 'slug' => 'article', 'content' => '<p>Content</p>', 'category_id' => [$id],
             'reading_minutes' => 5, 'status' => 'draft',
         ])->assertCreated();
         $this->delete(self::BASE.'/categories/'.$id.'?expected_version=1')->assertOk()
@@ -172,9 +168,8 @@ class NewsManagementTest extends PanelTestCase
         $this->panel($actor);
         $source = NewsCategory::factory()->create();
         $target = NewsCategory::factory()->create();
-        $this->postJson(self::BASE.'/items', [
-            'title' => 'Scheduled article', 'slug' => 'scheduled-article', 'content' => '<p>Content</p>',
-            'category_id' => $source->id, 'reading_minutes' => 5, 'status' => 'draft',
+        $this->postJson(self::BASE.'/items', ['title' => 'Scheduled article', 'slug' => 'scheduled-article', 'content' => '<p>Content</p>',
+            'category_id' => [$source->id], 'reading_minutes' => 5, 'status' => 'draft',
         ])->assertCreated();
         $response = $this->postJson(self::BASE.'/categories/'.$source->id.'/merge', [
             'expected_version' => 1, 'target_category_id' => $target->id, 'target_expected_version' => 1,
@@ -190,9 +185,8 @@ class NewsManagementTest extends PanelTestCase
         $this->freezeTime();
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $response = $this->postJson(self::BASE.'/items', [
-            'title' => 'Future article', 'slug' => 'future-article', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 3, 'status' => 'scheduled',
+        $response = $this->postJson(self::BASE.'/items', ['title' => 'Future article', 'slug' => 'future-article', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 3, 'status' => 'scheduled',
             'scheduled_for' => now()->addMinutes(2)->utc()->toISOString(),
         ]);
         $response->assertCreated()->assertJsonPath('data.public_path', null);
@@ -213,9 +207,8 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $created = $this->postJson(self::BASE.'/items', [
-            'title' => 'Public article', 'slug' => 'public-article', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'published',
+        $created = $this->postJson(self::BASE.'/items', ['title' => 'Public article', 'slug' => 'public-article', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'published',
         ]);
         $created->assertCreated();
         $id = $created->json('data.id');
@@ -233,9 +226,8 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create(['name' => 'نویسنده قدیمی']);
         $this->panel($actor);
-        $this->postJson(self::BASE.'/items', [
-            'title' => 'Public author article', 'slug' => 'public-author-article', 'content' => '<p>Public content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'published',
+        $this->postJson(self::BASE.'/items', ['title' => 'Public author article', 'slug' => 'public-author-article', 'content' => '<p>Public content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'published',
         ])->assertCreated();
 
         $actor->forceFill(['name' => 'نویسنده تازه'])->save();
@@ -252,16 +244,14 @@ class NewsManagementTest extends PanelTestCase
         $blogCategory = BlogCategory::factory()->create();
         $blogItem = BlogArticle::factory()->create(['slug' => 'shared-slug', 'category_id' => null]);
 
-        $created = $this->postJson(self::BASE.'/items', [
-            'title' => 'Independent news', 'slug' => $blogItem->slug, 'content' => '<p>News copy</p>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'draft',
+        $created = $this->postJson(self::BASE.'/items', ['title' => 'Independent news', 'slug' => $blogItem->slug, 'content' => '<p>News copy</p>',
+            'category_id' => [], 'reading_minutes' => 4, 'status' => 'draft',
         ])->assertCreated();
 
         $this->assertSame($blogItem->id, $created->json('data.id'));
-        $this->postJson(self::BASE.'/items', [
-            'title' => 'Wrong domain category', 'slug' => 'wrong-domain-category', 'content' => '<p>News copy</p>',
-            'category_id' => $blogCategory->id, 'reading_minutes' => 4, 'status' => 'draft',
-        ])->assertCreated()->assertJsonPath('data.category_id', null)->assertJsonPath('warnings.0.code', 'CATEGORY_IGNORED');
+        $this->postJson(self::BASE.'/items', ['title' => 'Wrong domain category', 'slug' => 'wrong-domain-category', 'content' => '<p>News copy</p>',
+            'category_id' => [$blogCategory->id], 'reading_minutes' => 4, 'status' => 'draft',
+        ])->assertUnprocessable()->assertJsonStructure(['error' => ['fields' => ['category_id.0']]]);
         $this->assertDatabaseHas('blog_categories', ['id' => $blogCategory->id]);
     }
 
@@ -269,17 +259,14 @@ class NewsManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $first = $this->postJson(self::BASE.'/items', [
-            'title' => 'First public news', 'slug' => 'first-public-news', 'content' => '<p>First</p>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'published',
+        $first = $this->postJson(self::BASE.'/items', ['title' => 'First public news', 'slug' => 'first-public-news', 'content' => '<p>First</p>',
+            'category_id' => [], 'reading_minutes' => 4, 'status' => 'published',
         ])->assertCreated()->json('data.id');
-        $draft = $this->postJson(self::BASE.'/items', [
-            'title' => 'Private news', 'slug' => 'private-news', 'content' => '<p>Private</p>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'draft',
+        $draft = $this->postJson(self::BASE.'/items', ['title' => 'Private news', 'slug' => 'private-news', 'content' => '<p>Private</p>',
+            'category_id' => [], 'reading_minutes' => 4, 'status' => 'draft',
         ])->assertCreated()->json('data.id');
-        $second = $this->postJson(self::BASE.'/items', [
-            'title' => 'Second public news', 'slug' => 'second-public-news', 'content' => '<p>Second</p>',
-            'category_id' => null, 'reading_minutes' => 4, 'status' => 'published',
+        $second = $this->postJson(self::BASE.'/items', ['title' => 'Second public news', 'slug' => 'second-public-news', 'content' => '<p>Second</p>',
+            'category_id' => [], 'reading_minutes' => 4, 'status' => 'published',
         ])->assertCreated()->json('data.id');
 
         config(['news.featured_ids' => [$draft, $first, $first, 999999]]);

@@ -56,7 +56,8 @@ class ExchangeRequest extends FormRequest
             'access' => ['sometimes', 'string', 'max:1500'],
             'support' => ['sometimes', 'string', 'max:1500'],
             'specifications' => ['sometimes'],
-            'category_id' => [$create ? 'present' : 'sometimes', 'nullable', 'integer:strict', 'min:1', 'max:9007199254740991'],
+            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list'],
+            'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'content' => [...$required, 'string', 'max:1048576'],
             'meta_description' => ['sometimes', 'string', 'max:500'],
             'status' => [...$required, 'string', Rule::in(['draft', 'published'])],
@@ -66,6 +67,10 @@ class ExchangeRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $raw = json_decode($this->getContent());
+            if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
+                $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
             foreach (array_diff(array_keys($this->all()), array_keys($this->rules())) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
             }

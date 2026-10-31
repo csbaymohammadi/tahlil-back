@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ExchangeCategory extends Model
 {
+    use HasAssignedRecords;
+
     /** @use HasFactory<ExchangeCategoryFactory> */
     use HasFactory, SoftDeletes;
 

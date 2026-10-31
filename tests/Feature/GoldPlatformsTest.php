@@ -43,7 +43,7 @@ class GoldPlatformsTest extends PanelTestCase
         $specifications['asset_storage'] = "Insured storage\nTerms apply";
 
         $created = $this->postJson(self::GOLD.'/items', $this->payload([
-            'category_id' => $category->id,
+            'category_id' => [$category->id],
             'specifications' => $specifications,
             'logo' => '',
             'website_url' => '',
@@ -52,7 +52,7 @@ class GoldPlatformsTest extends PanelTestCase
         ]))->assertCreated()
             ->assertJsonPath('data.kind', 'gold-platforms')
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.name', 'Gold Services')
+            ->assertJsonPath('data.category.0.name', 'Gold Services')
             ->assertJsonPath('data.logo', '')
             ->assertJsonPath('data.website_url', '')
             ->assertJsonPath('data.specifications.melted_gold_trading', 'yes')
@@ -131,8 +131,8 @@ class GoldPlatformsTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $this->assertCount(24, GoldPlatformSpecifications::FIELDS);
         $stockCategory = StockBrokerageCategory::factory()->create(['id' => 999]);
-        $this->postJson(self::GOLD.'/items', $this->payload(['category_id' => $stockCategory->id]))
-            ->assertUnprocessable()->assertJsonPath('error.fields.category_id.0', 'Choose a live category in this platform domain or null.');
+        $this->postJson(self::GOLD.'/items', $this->payload(['category_id' => [$stockCategory->id]]))
+            ->assertUnprocessable()->assertJsonStructure(['error' => ['fields' => ['category_id.0']]]);
         $this->postJson(self::GOLD.'/items', $this->payload(['kind' => 'stock-brokers']))
             ->assertUnprocessable()->assertJsonPath('error.fields.kind.0', 'This field is not accepted.');
         $unknownSpecification = $this->postJson(self::GOLD.'/items', $this->payload(['specifications' => ['online_trading' => 'yes']]))
@@ -160,7 +160,7 @@ class GoldPlatformsTest extends PanelTestCase
         $stock = $this->postJson('/api/v1/admin/stock-brokers/items', [
             'title' => 'Example Brokerage', 'english_name' => 'Example Brokerage', 'slug' => $slug,
             'description' => 'Stock profile', 'logo' => '', 'website_url' => '', 'founded_year' => '',
-            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => null,
+            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => [],
             'content' => '<p>Stock review content</p>', 'meta_description' => '', 'status' => 'published',
         ])->assertCreated();
 
@@ -333,11 +333,11 @@ class GoldPlatformsTest extends PanelTestCase
      */
     private function payload(array $overrides = []): array
     {
-        return array_replace_recursive([
+        return array_replace([
             'title' => 'Example Gold Platform', 'english_name' => 'Example Gold Platform',
             'slug' => 'example-gold-platform', 'description' => 'A gold platform profile',
             'logo' => '', 'website_url' => '', 'founded_year' => '',
-            'specifications' => GoldPlatformSpecifications::empty(), 'category_id' => GoldPlatformCategory::factory()->create()->id,
+            'specifications' => GoldPlatformSpecifications::empty(), 'category_id' => [GoldPlatformCategory::factory()->create()->id],
             'content' => '<h2>Overview</h2><p>A review of this platform.</p>', 'meta_description' => '', 'status' => 'draft',
         ], $overrides);
     }

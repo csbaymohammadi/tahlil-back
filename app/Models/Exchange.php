@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Exchange extends Model
 {
+    use HasCategories;
+
     /** @use HasFactory<ExchangeFactory> */
     use HasFactory, SoftDeletes;
 

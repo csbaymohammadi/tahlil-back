@@ -204,7 +204,7 @@ class BonusesConcurrencyTest extends TestCase
             $target = BonusCategory::factory()->create();
             $bonus = Bonus::factory()->create();
             $results = $this->race([
-                fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'category_id' => $source->id], 'req_assign'),
+                fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'category_id' => [$source->id]], 'req_assign'),
                 fn () => $operation === 'merge'
                     ? app(ManageBonusCategories::class)->merge($session, $source->id, $target->id, 1, 1, 'req_merge')
                     : app(ManageBonusCategories::class)->delete($session, $source->id, 1, 'req_category_delete'),
@@ -218,7 +218,7 @@ class BonusesConcurrencyTest extends TestCase
     public function test_concurrent_slug_and_version_checks_allow_only_one_winning_mutation(): void
     {
         $session = (new PanelSessions)->create(User::factory()->panel()->create())['record'];
-        $payload = ['title' => 'Concurrent Bonus', 'slug' => 'concurrent-bonus', 'content' => '<p>Conditions</p>', 'category_id' => null, 'reading_minutes' => 5, 'status' => 'draft'];
+        $payload = ['title' => 'Concurrent Bonus', 'slug' => 'concurrent-bonus', 'content' => '<p>Conditions</p>', 'category_id' => [], 'reading_minutes' => 5, 'status' => 'draft'];
         $results = $this->race([
             fn () => app(SaveBonus::class)->handle($session, null, $payload, 'req_create_a'),
             fn () => app(SaveBonus::class)->handle($session, null, $payload, 'req_create_b'),

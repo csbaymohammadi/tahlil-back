@@ -74,7 +74,7 @@ class DirectorySearchRebuildTest extends PanelTestCase
             $record = $class::factory()->published()->create(['description' => '', 'content' => '<p>Original body</p>']);
             $fields = $type === 'exchanges' ? ['title', 'english_name', 'slug', 'description', 'logo', 'website_url', 'founded_year', 'platform_type', 'markets', 'access', 'support', 'specifications', 'content', 'meta_description', 'category_id', 'status'] :
                 ($type === 'brokers' ? PlatformProfileDefinition::forex() : PlatformProfileDefinition::stock())->editableFields();
-            $payload = ['expected_version' => 1, ...$record->only($fields), 'content' => '<p>UniqueBodyNeedle</p>'];
+            $payload = ['expected_version' => 1, ...$record->only($fields), 'category_id' => $record->categories->modelKeys(), 'content' => '<p>UniqueBodyNeedle</p>'];
             $this->patchJson('/api/v1/admin/'.$type.'/items/'.$record->id, $payload)->assertOk();
             $record->refresh();
             $this->assertSame('', $record->description);

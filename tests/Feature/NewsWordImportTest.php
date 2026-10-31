@@ -190,7 +190,7 @@ class NewsWordImportTest extends PanelTestCase
             ->assertJsonPath('data.record.cover_image', '')
             ->assertJsonPath('data.record.content', '')
             ->assertJsonPath('data.record.meta_description', '')
-            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.category_id', [])
             ->assertJsonPath('data.record.reading_minutes', null)
             ->assertJsonPath('data.record.status', 'draft')
             ->assertJsonPath('warnings', []);
@@ -235,7 +235,7 @@ class NewsWordImportTest extends PanelTestCase
         ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => '52061baf-1b02-4a92-9873-d86db4ab8cb7'])->assertCreated()
             ->assertJsonPath('data.record.description', '')
             ->assertJsonPath('data.record.meta_description', '')
-            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.category_id', [])
             ->assertJsonPath('data.record.reading_minutes', null);
 
         $this->assertCount(4, $response->json('warnings'));

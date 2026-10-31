@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BlogArticle extends Model
 {
+    use HasCategories;
+
     /** @use HasFactory<BlogArticleFactory> */
     use HasFactory, SoftDeletes;
 

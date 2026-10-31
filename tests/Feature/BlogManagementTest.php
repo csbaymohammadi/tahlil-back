@@ -21,15 +21,14 @@ class BlogManagementTest extends PanelTestCase
         $actor = User::factory()->panel()->create(['name' => 'مدیر نمونه']);
         $this->panel($actor);
         $category = BlogCategory::factory()->create(['name' => 'راهنما']);
-        $payload = [
-            'title' => 'قیمت بازار چیست؟', 'slug' => 'market-price-guide', 'description' => '', 'cover_image' => '',
-            'content' => '<h2>راهنما</h2><p>متن <strong>مهم</strong> مقاله</p>', 'category_id' => $category->id,
+        $payload = ['title' => 'قیمت بازار چیست؟', 'slug' => 'market-price-guide', 'description' => '', 'cover_image' => '',
+            'content' => '<h2>راهنما</h2><p>متن <strong>مهم</strong> مقاله</p>', 'category_id' => [$category->id],
             'reading_minutes' => 5, 'meta_description' => '', 'status' => 'draft', 'scheduled_for' => null,
         ];
         $created = $this->postJson(self::BASE.'/articles', $payload);
         $created->assertCreated()
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.id', $category->id)
+            ->assertJsonPath('data.category.0.id', $category->id)
             ->assertJsonPath('data.version', 1)
             ->assertHeader('Location', self::BASE.'/articles/1');
         $id = $created->json('data.id');
@@ -50,7 +49,7 @@ class BlogManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $payload = [
+        $payload = ['category_id' => [],
             'title' => 'Safe title', 'slug' => 'safe-title', 'content' => '<script>alert(1)</script>',
             'status' => 'draft',
         ];
@@ -75,21 +74,20 @@ class BlogManagementTest extends PanelTestCase
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
 
-        $minimal = $this->postJson(self::BASE.'/articles', ['title' => 'پیش‌نویس خالی', 'slug' => 'empty-draft'])
+        $minimal = $this->postJson(self::BASE.'/articles', ['category_id' => [], 'title' => 'پیش‌نویس خالی', 'slug' => 'empty-draft'])
             ->assertCreated()->assertJsonPath('data.status', 'draft')->assertJsonPath('data.content', '')
             ->assertJsonPath('data.reading_minutes', null)->assertJsonPath('warnings', []);
         $this->assertDatabaseHas('blog_articles', ['id' => $minimal->json('data.id'), 'reading_minutes' => null]);
 
-        $response = $this->postJson(self::BASE.'/articles', [
-            'title' => 'مقاله با بخش‌های اختیاری', 'slug' => 'optional-fields-article',
+        $response = $this->postJson(self::BASE.'/articles', ['title' => 'مقاله با بخش‌های اختیاری', 'slug' => 'optional-fields-article',
             'description' => ['نامعتبر'], 'meta_description' => str_repeat('م', 600),
             'cover_image' => 'javascript:alert(1)', 'content' => null,
-            'category_id' => 'دسته ناشناخته', 'reading_minutes' => 'نامشخص',
-        ])->assertCreated()->assertJsonPath('data.content', '')->assertJsonPath('data.category_id', null)
+            'category_id' => [], 'reading_minutes' => 'نامشخص',
+        ])->assertCreated()->assertJsonPath('data.content', '')->assertJsonPath('data.category_id', [])
             ->assertJsonPath('data.reading_minutes', null)->assertJsonPath('data.description', '');
         $warnings = $response->json('warnings');
-        $this->assertCount(4, $warnings);
-        $this->assertSame(['description', 'category_id', 'reading_minutes', 'cover_image'], array_column($warnings, 'field'));
+        $this->assertCount(3, $warnings);
+        $this->assertSame(['description', 'reading_minutes', 'cover_image'], array_column($warnings, 'field'));
         foreach ($warnings as $warning) {
             $this->assertDoesNotMatchRegularExpression('/[A-Za-z]/', $warning['message']);
         }
@@ -101,7 +99,7 @@ class BlogManagementTest extends PanelTestCase
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
 
-        $response = $this->postJson(self::BASE.'/articles', ['title' => '', 'slug' => 'Upper Case'])
+        $response = $this->postJson(self::BASE.'/articles', ['category_id' => [], 'title' => '', 'slug' => 'Upper Case'])
             ->assertUnprocessable()
             ->assertJsonPath('error.fields.title.0', 'عنوان مقاله الزامی است و حداکثر می‌تواند ۲۰۰ نویسه باشد.')
             ->assertJsonPath('error.fields.slug.0', 'عنوان انگلیسی را با حروف کوچک لاتین، عدد و خط تیره وارد کنید؛ طول آن حداکثر ۲۰۰ نویسه باشد.')
@@ -117,8 +115,7 @@ class BlogManagementTest extends PanelTestCase
         $created = $this->postJson(self::BASE.'/categories', ['name' => 'مدير يک'])->assertCreated()->assertJsonPath('data.version', 1);
         $id = $created->json('data.id');
         $this->postJson(self::BASE.'/categories', ['name' => 'مدیر یک'])->assertConflict()->assertJsonPath('error.code', 'CATEGORY_NAME_TAKEN');
-        $this->postJson(self::BASE.'/articles', [
-            'title' => 'Article', 'slug' => 'article', 'content' => '<p>Content</p>', 'category_id' => $id,
+        $this->postJson(self::BASE.'/articles', ['title' => 'Article', 'slug' => 'article', 'content' => '<p>Content</p>', 'category_id' => [$id],
             'reading_minutes' => 5, 'status' => 'draft',
         ])->assertCreated();
         $this->delete(self::BASE.'/categories/'.$id.'?expected_version=1')->assertOk()
@@ -135,9 +132,8 @@ class BlogManagementTest extends PanelTestCase
         $this->panel($actor);
         $source = BlogCategory::factory()->create();
         $target = BlogCategory::factory()->create();
-        $this->postJson(self::BASE.'/articles', [
-            'title' => 'Scheduled article', 'slug' => 'scheduled-article', 'content' => '<p>Content</p>',
-            'category_id' => $source->id, 'reading_minutes' => 5, 'status' => 'draft',
+        $this->postJson(self::BASE.'/articles', ['title' => 'Scheduled article', 'slug' => 'scheduled-article', 'content' => '<p>Content</p>',
+            'category_id' => [$source->id], 'reading_minutes' => 5, 'status' => 'draft',
         ])->assertCreated();
         $response = $this->postJson(self::BASE.'/categories/'.$source->id.'/merge', [
             'expected_version' => 1, 'target_category_id' => $target->id, 'target_expected_version' => 1,
@@ -153,9 +149,8 @@ class BlogManagementTest extends PanelTestCase
         $this->freezeTime();
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $response = $this->postJson(self::BASE.'/articles', [
-            'title' => 'Future article', 'slug' => 'future-article', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 3, 'status' => 'scheduled',
+        $response = $this->postJson(self::BASE.'/articles', ['title' => 'Future article', 'slug' => 'future-article', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 3, 'status' => 'scheduled',
             'scheduled_for' => now()->addMinutes(2)->utc()->toISOString(),
         ]);
         $response->assertCreated()->assertJsonPath('data.public_path', null);
@@ -176,9 +171,8 @@ class BlogManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create();
         $this->panel($actor);
-        $created = $this->postJson(self::BASE.'/articles', [
-            'title' => 'Public article', 'slug' => 'public-article', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'published',
+        $created = $this->postJson(self::BASE.'/articles', ['title' => 'Public article', 'slug' => 'public-article', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'published',
         ]);
         $created->assertCreated();
         $id = $created->json('data.id');
@@ -196,9 +190,8 @@ class BlogManagementTest extends PanelTestCase
     {
         $actor = User::factory()->panel()->create(['name' => 'نویسنده قدیمی']);
         $this->panel($actor);
-        $this->postJson(self::BASE.'/articles', [
-            'title' => 'Public author article', 'slug' => 'public-author-article', 'content' => '<p>Public content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'published',
+        $this->postJson(self::BASE.'/articles', ['title' => 'Public author article', 'slug' => 'public-author-article', 'content' => '<p>Public content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'published',
         ])->assertCreated();
 
         $actor->forceFill(['name' => 'نویسنده تازه'])->save();

@@ -22,7 +22,7 @@ class BonusCategoryController extends Controller
         $filters = Validator::make($request->query(), ['q' => ['sometimes', 'string', 'max:200']])->validate();
         $search = PlatformText::panel((string) ($filters['q'] ?? ''));
         $categoryClass = BonusCategory::class;
-        $categories = $categoryClass::query()->withCount('bonuses')->when($search !== '', function (Builder $query) use ($search): void {
+        $categories = $categoryClass::query()->withCount('assignedRecords as bonuses_count')->when($search !== '', function (Builder $query) use ($search): void {
             $query->where('name_normalized', 'like', '%'.addcslashes($search, '\\%_').'%');
         })->orderBy('name_normalized')->orderBy('id')->get();
 
@@ -35,7 +35,7 @@ class BonusCategoryController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $categoryClass = BonusCategory::class;
-        $category = $categoryClass::query()->withCount('bonuses')->find(PanelIds::parse($id));
+        $category = $categoryClass::query()->withCount('assignedRecords as bonuses_count')->find(PanelIds::parse($id));
         if (! $category) {
             throw new PanelAuthException(404, 'CATEGORY_NOT_FOUND', 'The category was not found.');
         }
@@ -51,7 +51,7 @@ class BonusCategoryController extends Controller
         $session = $request->attributes->get('panel_session');
         /** @var BonusCategory $category */
         $category = app($managerClass)->create($session, trim($input['name']), (string) $request->attributes->get('request_id'));
-        $category->loadCount('bonuses');
+        $category->loadCount('assignedRecords as bonuses_count');
 
         return response()->json(['data' => (new BonusCategoryResource($category))->resolve($request), 'request_id' => $request->attributes->get('request_id')], 201)
             ->header('Location', '/api/v1/admin/bonuses/categories/'.$category->id);

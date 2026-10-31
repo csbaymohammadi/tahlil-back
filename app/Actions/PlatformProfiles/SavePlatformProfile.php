@@ -9,6 +9,7 @@ use App\Media\MediaReferences;
 use App\Models\PanelSession;
 use App\Models\PlatformProfile;
 use App\Models\User;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
 use App\Support\PlatformText;
@@ -19,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 abstract class SavePlatformProfile
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -44,6 +45,8 @@ abstract class SavePlatformProfile
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The profile has changed. Fetch it before retrying.');
             }
 
+            $categoryIds = $this->categoryAssignments->prepare($profile, $input);
+            $categoriesChanged = $profile->categories->modelKeys() !== $categoryIds;
             $old = $creating ? [] : $profile->getAttributes();
             if (! $creating) {
                 $old['specifications'] = $profile->specifications ?? [];
@@ -64,6 +67,9 @@ abstract class SavePlatformProfile
                 } elseif ($creating || $this->canonical($field, $profile->getAttribute($field)) !== $this->canonical($field, $values[$field])) {
                     $changed[] = $field;
                 }
+            }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
             }
             if (! $creating && $changed === []) {
                 /** @var PlatformProfile $unchanged */
@@ -94,6 +100,7 @@ abstract class SavePlatformProfile
                 }
             }
             $profile->save();
+            $this->categoryAssignments->sync($profile, $categoryIds);
 
             $foreignKey = $definition->profileForeignKey;
             if ($creating) {
@@ -241,7 +248,7 @@ abstract class SavePlatformProfile
         foreach ($this->html->managedSources($content, $kind) as $url) {
             try {
                 $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
-            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
+            } catch (PanelAuthException|ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
         }

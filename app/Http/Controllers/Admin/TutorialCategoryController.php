@@ -21,7 +21,7 @@ class TutorialCategoryController extends Controller
         $filters = Validator::make($request->query(), ['q' => ['sometimes', 'string', 'max:200']])->validate();
         $search = PlatformText::panel((string) ($filters['q'] ?? ''));
         $categoryClass = TutorialCategory::class;
-        $categories = $categoryClass::query()->withCount('tutorials')->when($search !== '', function (Builder $query) use ($search): void {
+        $categories = $categoryClass::query()->withCount('assignedRecords as tutorials_count')->when($search !== '', function (Builder $query) use ($search): void {
             $query->where('name_normalized', 'like', '%'.addcslashes($search, '\\%_').'%');
         })->orderBy('name_normalized')->orderBy('id')->get();
 
@@ -34,7 +34,7 @@ class TutorialCategoryController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $categoryClass = TutorialCategory::class;
-        $category = $categoryClass::query()->withCount('tutorials')->find(PanelIds::parse($id));
+        $category = $categoryClass::query()->withCount('assignedRecords as tutorials_count')->find(PanelIds::parse($id));
         if (! $category) {
             throw new PanelAuthException(404, 'CATEGORY_NOT_FOUND', 'The category was not found.');
         }
@@ -50,7 +50,7 @@ class TutorialCategoryController extends Controller
         $session = $request->attributes->get('panel_session');
         /** @var TutorialCategory $category */
         $category = app($managerClass)->create($session, trim($input['name']), (string) $request->attributes->get('request_id'));
-        $category->loadCount('tutorials');
+        $category->loadCount('assignedRecords as tutorials_count');
 
         return response()->json(['data' => $this->representation($category), 'request_id' => $request->attributes->get('request_id')], 201)
             ->header('Location', '/api/v1/admin/tutorials/categories/'.$category->id);

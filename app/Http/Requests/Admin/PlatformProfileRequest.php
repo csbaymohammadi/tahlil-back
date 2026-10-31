@@ -57,7 +57,8 @@ abstract class PlatformProfileRequest extends FormRequest
             'website_url' => [$definition->websiteRequired ? ($create ? 'required' : 'sometimes') : 'sometimes', 'string', 'max:2048'],
             'founded_year' => ['sometimes', 'string', 'regex:/^(?:|[0-9]{4})$/D'],
             'specifications' => ['sometimes'],
-            'category_id' => [$create ? 'present' : 'sometimes', 'nullable', 'integer:strict', 'min:1', 'max:9007199254740991'],
+            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list'],
+            'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'content' => [...$required, 'string'],
             'meta_description' => ['sometimes', 'string', 'max:500'],
             'status' => [...$required, 'string', Rule::in(['draft', 'published'])],
@@ -72,15 +73,15 @@ abstract class PlatformProfileRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $raw = json_decode($this->getContent());
+            if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
+                $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
             $definition = $this->definition();
             $data = $this->all();
             $keys = array_keys($this->rules());
             foreach (array_diff(array_keys($data), $keys) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
-            }
-
-            if (array_key_exists('category_id', $data) && $data['category_id'] !== null && ! is_int($data['category_id'])) {
-                $validator->errors()->add('category_id', 'Choose an integer category ID or null.');
             }
 
             foreach (['title', 'english_name', 'description', 'founded_year', ...$definition->summaryFields, 'meta_description'] as $field) {

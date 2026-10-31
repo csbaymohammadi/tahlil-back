@@ -24,9 +24,8 @@ class BlogMutationConcurrencyTest extends PanelTestCase
         $this->requireMysqlConcurrencyEnvironment();
         $actor = User::factory()->panel()->create();
         $session = (new PanelSessions)->create($actor);
-        $payload = [
-            'title' => 'Concurrent article', 'slug' => 'concurrent-article', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'draft',
+        $payload = ['title' => 'Concurrent article', 'slug' => 'concurrent-article', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'draft',
         ];
 
         $results = $this->dispatchConcurrently($session, [
@@ -47,15 +46,14 @@ class BlogMutationConcurrencyTest extends PanelTestCase
         $actor = User::factory()->panel()->create();
         $session = $this->panel($actor);
         $category = BlogCategory::factory()->create(['name' => 'Concurrent category', 'name_normalized' => 'concurrent category']);
-        $created = $this->postJson('/api/v1/admin/blog/articles', [
-            'title' => 'Article assigned concurrently', 'slug' => 'article-assigned-concurrently', 'content' => '<p>Content</p>',
-            'category_id' => null, 'reading_minutes' => 5, 'status' => 'draft',
+        $created = $this->postJson('/api/v1/admin/blog/articles', ['title' => 'Article assigned concurrently', 'slug' => 'article-assigned-concurrently', 'content' => '<p>Content</p>',
+            'category_id' => [], 'reading_minutes' => 5, 'status' => 'draft',
         ])->assertCreated();
         $articleId = $created->json('data.id');
 
         $results = $this->dispatchConcurrently($session, [
             ['label' => 'assignment', 'method' => 'PATCH', 'path' => '/api/v1/admin/blog/articles/'.$articleId, 'payload' => [
-                'expected_version' => 1, 'category_id' => $category->id,
+                'expected_version' => 1, 'category_id' => [$category->id],
             ]],
             ['label' => 'deletion', 'method' => 'DELETE', 'path' => '/api/v1/admin/blog/categories/'.$category->id.'?expected_version=1'],
         ]);

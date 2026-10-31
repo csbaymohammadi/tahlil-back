@@ -26,7 +26,8 @@ class NewsItemRequest extends FormRequest
             'description' => ['sometimes'],
             'cover_image' => ['sometimes'],
             'content' => ['sometimes'],
-            'category_id' => ['sometimes'],
+            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list'],
+            'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'reading_minutes' => ['sometimes'],
             'meta_description' => ['sometimes'],
             'status' => ['sometimes', 'string', Rule::in(['draft', 'published', 'scheduled'])],
@@ -37,6 +38,10 @@ class NewsItemRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $raw = json_decode($this->getContent());
+            if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
+                $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
             foreach (array_diff(array_keys($this->all()), array_keys($this->rules())) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
             }

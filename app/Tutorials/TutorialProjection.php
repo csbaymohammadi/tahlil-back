@@ -3,13 +3,14 @@
 namespace App\Tutorials;
 
 use App\Models\Tutorial;
+use App\Support\CategoryAssignments;
 
 class TutorialProjection
 {
     public function __construct(private TutorialProviders $providers, private TutorialMedia $media) {}
 
     /** @return array<string, mixed> */
-    public function record(Tutorial $tutorial): array
+    public function record(Tutorial $tutorial, bool $panel = false): array
     {
         $aparat = $this->providers->validId('aparat', $tutorial->aparat_video_id);
         $default = $aparat ? 'aparat' : 'youtube';
@@ -28,8 +29,8 @@ class TutorialProjection
 
         return [
             ...$tutorial->only(['id', 'title', 'description', 'slug', 'youtube_url', 'youtube_video_id', 'aparat_url', 'aparat_video_id', 'cover_image', 'version']),
-            'default_provider' => $default, 'category_id' => $category?->id,
-            'category' => $category ? ['id' => $category->id, 'name' => $category->name, 'key' => $category->key] : null,
+            'default_provider' => $default, 'category_id' => $panel ? $tutorial->categories->modelKeys() : $category?->id,
+            'category' => $panel ? CategoryAssignments::projection($tutorial) : ($category ? ['id' => $category->id, 'name' => $category->name, 'key' => $category->key] : null),
             'duration_seconds' => $duration?->seconds, 'duration_source' => $duration?->provider,
             'created_at' => $tutorial->created_at?->utc()->toISOString(), 'updated_at' => $tutorial->updated_at?->utc()->toISOString(),
             'published_at' => $tutorial->published_at?->utc()->toISOString(), 'public_path' => '/tutorials/'.$tutorial->slug,

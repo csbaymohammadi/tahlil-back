@@ -10,6 +10,7 @@ use App\Models\Exchange;
 use App\Models\ExchangeCategory;
 use App\Models\PanelSession;
 use App\Models\User;
+use App\Support\CategoryAssignments;
 use App\Support\ExchangeSpecifications;
 use App\Support\ExchangeText;
 use App\Support\PanelMutationLock;
@@ -20,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveExchange
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): Exchange
@@ -40,6 +41,8 @@ class SaveExchange
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The exchange has changed. Fetch it before retrying.');
             }
 
+            $categoryIds = $this->categoryAssignments->prepare($exchange, $input);
+            $categoriesChanged = $exchange->categories->modelKeys() !== $categoryIds;
             $old = $creating ? [] : $exchange->only([
                 'title', 'title_normalized', 'title_public_normalized', 'english_name', 'english_name_normalized', 'english_public_normalized', 'slug', 'description', 'description_normalized', 'description_public_normalized', 'logo', 'website_url',
                 'founded_year', 'platform_type', 'markets', 'access', 'support', 'specifications', 'content', 'meta_description', 'category_id', 'status', 'title_sort_key',
@@ -55,6 +58,9 @@ class SaveExchange
                 if ($creating || $this->canonical($field, $exchange->getAttribute($field)) !== $this->canonical($field, $value)) {
                     $changed[] = $field;
                 }
+            }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
             }
             if (! $creating && $changed === []) {
                 return $exchange->fresh(['author', 'category']);
@@ -79,6 +85,7 @@ class SaveExchange
                 }
             }
             $exchange->save();
+            $this->categoryAssignments->sync($exchange, $categoryIds);
 
             if ($creating) {
                 DB::table('exchange_slug_ownership')->insert(['slug' => $values['slug'], 'exchange_id' => $exchange->id, 'was_public' => $isPublished, 'created_at' => now()]);
@@ -223,7 +230,7 @@ class SaveExchange
         foreach ($this->html->managedSources($content, $kind) as $url) {
             try {
                 $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
-            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
+            } catch (PanelAuthException|ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
         }

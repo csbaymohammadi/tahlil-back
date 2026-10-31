@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class NewsItem extends Model
 {
+    use HasCategories;
+
     /** @use HasFactory<NewsItemFactory> */
     use HasFactory, SoftDeletes;
 

@@ -6,16 +6,18 @@ use App\Actions\Auth\RevokeSessions;
 use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Models\PlatformCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformProfileDefinition;
 use App\Support\PlatformText;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 abstract class ManagePlatformCategories
 {
-    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -43,7 +45,7 @@ abstract class ManagePlatformCategories
                 'version' => 1,
             ];
             if ($definition->hasCategoryKeys) {
-                $attributes['key'] = null;
+                $attributes['key'] = 'pending-'.Str::uuid();
             }
             $category->forceFill($attributes)->save();
             if ($definition->hasCategoryKeys) {
@@ -71,8 +73,7 @@ abstract class ManagePlatformCategories
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The category has changed. Fetch it before retrying.');
             }
             $profileClass = $definition->profileModel;
-            $affected = $profileClass::query()->where('category_id', $id)->whereNull('deleted_at');
-            $count = $affected->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory($profileClass, $id, null, $actor->id);
             $category->delete();
             $this->audit($definition, $requestId, $actor->id, $id, $definition->eventPrefix.'_category_deleted', ['affected_count' => $count]);
             $this->outbox($definition, $requestId, null, $definition->eventPrefix.'_category_changed', ['category_id' => $id, 'affected_count' => $count]);
@@ -102,8 +103,7 @@ abstract class ManagePlatformCategories
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'A category has changed. Fetch both before retrying.');
             }
             $profileClass = $definition->profileModel;
-            $affected = $profileClass::query()->where('category_id', $sourceId)->whereNull('deleted_at');
-            $count = $affected->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory($profileClass, $sourceId, $targetId, $actor->id);
             $source->delete();
             $details = ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_count' => $count];
             $this->audit($definition, $requestId, $actor->id, $sourceId, $definition->eventPrefix.'_categories_merged', $details);

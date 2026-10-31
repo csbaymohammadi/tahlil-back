@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\BonusRequest;
 use App\Models\Bonus;
 use App\Models\BonusCategory;
 use App\Models\PanelSession;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformText;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveBonus
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private BonusMedia $media, private BonusEvents $events) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private BonusMedia $media, private BonusEvents $events, private CategoryAssignments $categoryAssignments) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): Bonus
@@ -37,6 +38,8 @@ class SaveBonus
             if (! $creating && $bonus->version !== $input['expected_version']) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'Fetch the current bonus before retrying.');
             }
+            $categoryIds = $this->categoryAssignments->prepare($bonus, $input);
+            $categoriesChanged = $bonus->categories->modelKeys() !== $categoryIds;
             $values = $creating ? ['description' => '', 'cover_image' => '', 'meta_description' => ''] : $bonus->only(BonusRequest::EDITABLE);
             foreach (array_intersect_key($input, array_flip(BonusRequest::EDITABLE)) as $field => $value) {
                 $values[$field] = is_string($value) ? trim($value) : $value;
@@ -56,6 +59,9 @@ class SaveBonus
                     $changed[] = $field;
                 }
             }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
+            }
             if (! $creating && $changed === []) {
                 return $bonus->fresh(['author', 'category', 'campaign.exchange', 'ratingAggregate']);
             }
@@ -73,6 +79,7 @@ class SaveBonus
                 $values['published_at'] = now();
             }
             $bonus->forceFill($values)->save();
+            $this->categoryAssignments->sync($bonus, $categoryIds);
             if ($creating) {
                 DB::table('bonus_campaigns')->insert(['bonus_id' => $bonus->id]);
                 DB::table('bonus_rating_aggregates')->insert(['bonus_id' => $bonus->id]);

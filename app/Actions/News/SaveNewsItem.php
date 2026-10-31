@@ -6,12 +6,12 @@ use App\Actions\Auth\RevokeSessions;
 use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
-use App\Models\NewsCategory;
 use App\Models\NewsItem;
 use App\Models\PanelSession;
 use App\Models\User;
 use App\News\NewsItemSaveResult;
 use App\Support\BlogText;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Carbon;
@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveNewsItem
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): NewsItemSaveResult
@@ -43,15 +43,13 @@ class SaveNewsItem
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The news item has changed. Fetch it before retrying.');
             }
 
+            $categoryIds = $this->categoryAssignments->prepare($newsItem, $input);
+            $categoriesChanged = $newsItem->categories->modelKeys() !== $categoryIds;
             $old = $creating ? [] : $newsItem->only(['title', 'title_normalized', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status', 'scheduled_for']);
             $values = $this->values($input, $old, $creating, $content);
             PanelMutationLock::acquire();
             $this->html->validateReferences($values['content'], $actor);
             $this->validateResult($values);
-            if ($values['category_id'] !== null && (! is_int($values['category_id']) || $values['category_id'] < 1 || ! NewsCategory::query()->lockForUpdate()->whereKey($values['category_id'])->exists())) {
-                $values['category_id'] = null;
-                $this->warn($warnings, 'category_id', 'CATEGORY_IGNORED', 'دسته‌بندی قابل‌استفاده نبود و خبر بدون دسته‌بندی ذخیره شد.');
-            }
             if ($values['reading_minutes'] !== null && (! is_int($values['reading_minutes']) || $values['reading_minutes'] < 1 || $values['reading_minutes'] > 1440)) {
                 $values['reading_minutes'] = null;
                 $this->warn($warnings, 'reading_minutes', 'READING_TIME_IGNORED', 'زمان مطالعه قابل‌استفاده نبود و خالی ذخیره شد.');
@@ -63,6 +61,9 @@ class SaveNewsItem
                 if ($creating || $this->canonicalValue($field, $newsItem->getAttribute($field)) !== $this->canonicalValue($field, $values[$field])) {
                     $changed[] = $field;
                 }
+            }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
             }
             if (! $creating && $changed === []) {
                 return new NewsItemSaveResult($newsItem->fresh(['author', 'category']), $warnings);
@@ -98,6 +99,7 @@ class SaveNewsItem
                 }
             }
             $newsItem->save();
+            $this->categoryAssignments->sync($newsItem, $categoryIds);
 
             if ($creating) {
                 DB::table('news_slug_ownership')->insert(['slug' => $values['slug'], 'news_item_id' => $newsItem->id, 'was_public' => $isPublished, 'created_at' => now()]);
@@ -305,7 +307,7 @@ class SaveNewsItem
         foreach ($this->html->managedSources($value, $kind) as $url) {
             try {
                 $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
-            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
+            } catch (PanelAuthException|ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
         }

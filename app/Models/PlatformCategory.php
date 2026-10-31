@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 abstract class PlatformCategory extends Model
 {
+    use HasAssignedRecords;
     use HasFactory;
     use SoftDeletes;
 

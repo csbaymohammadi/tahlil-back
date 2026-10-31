@@ -41,7 +41,8 @@ class BonusRequest extends FormRequest
             'description' => ['sometimes', 'string', 'max:2000'],
             'cover_image' => ['sometimes', 'string', 'max:2048'],
             'content' => [$required, 'string'],
-            'category_id' => [$create ? 'present' : 'sometimes', 'nullable', 'integer:strict', 'min:1', 'max:9007199254740991'],
+            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list'],
+            'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'reading_minutes' => [$required, 'integer:strict', 'min:1', 'max:1440'],
             'meta_description' => ['sometimes', 'string', 'max:500'],
             'status' => [$required, 'string', Rule::in(['draft', 'published'])],
@@ -51,6 +52,10 @@ class BonusRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $raw = json_decode($this->getContent());
+            if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
+                $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
             foreach (array_diff(array_keys($this->all()), [...self::EDITABLE, ...($this->isMethod('PATCH') ? ['expected_version'] : [])]) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
             }
@@ -68,8 +73,8 @@ class BonusRequest extends FormRequest
                     $validator->errors()->add($field, 'Enter plain text without HTML markup.');
                 }
             }
-            foreach (['reading_minutes', 'category_id'] as $field) {
-                if (array_key_exists($field, $this->all()) && ! ($field === 'category_id' && $this->input($field) === null) && ! is_int($this->input($field))) {
+            foreach (['reading_minutes'] as $field) {
+                if (array_key_exists($field, $this->all()) && ! is_int($this->input($field))) {
                     $validator->errors()->add($field, 'Enter an integer value.');
                 }
             }

@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Admin;
 
 use App\Models\Exchange;
+use App\Support\CategoryAssignments;
 use App\Support\ExchangeSpecifications;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -34,8 +35,8 @@ class ExchangeResource extends JsonResource
             'support' => $exchange->support,
             'status' => $exchange->status,
             'author' => $exchange->author ? ['id' => $exchange->author->id, 'name' => $exchange->author->name] : null,
-            'category_id' => $exchange->category_id,
-            'category' => $exchange->category && ! $exchange->category->trashed() ? ['id' => $exchange->category->id, 'name' => $exchange->category->name, 'key' => $exchange->category->key] : null,
+            'category_id' => $exchange->categories->modelKeys(),
+            'category' => CategoryAssignments::projection($exchange),
             'created_at' => $exchange->created_at?->utc()->toISOString(),
             'updated_at' => $exchange->updated_at?->utc()->toISOString(),
             'published_at' => $exchange->published_at?->utc()->toISOString(),

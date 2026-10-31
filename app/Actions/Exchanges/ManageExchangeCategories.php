@@ -7,6 +7,7 @@ use App\Exceptions\PanelAuthException;
 use App\Models\Exchange;
 use App\Models\ExchangeCategory;
 use App\Models\PanelSession;
+use App\Support\CategoryAssignments;
 use App\Support\ExchangeText;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 
 class ManageExchangeCategories
 {
-    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     public function create(PanelSession $session, string $name, string $requestId): ExchangeCategory
     {
@@ -54,9 +55,7 @@ class ManageExchangeCategories
             if ($category->version !== $expectedVersion) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The category has changed. Fetch it before retrying.');
             }
-            $affected = Exchange::query()->where('category_id', $id)->whereNull('deleted_at');
-            $count = (clone $affected)->count();
-            $affected->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Exchange::class, $id, null, $actor->id);
             $category->delete();
             $this->audit($requestId, $actor->id, $id, 'exchange_category_deleted', ['affected_exchange_count' => $count]);
             $this->outbox($requestId, null, 'exchange_category_changed', ['category_id' => $id, 'affected_exchange_count' => $count]);
@@ -82,9 +81,7 @@ class ManageExchangeCategories
             if ($source->version !== $sourceVersion || $target->version !== $targetVersion) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'A category has changed. Fetch both before retrying.');
             }
-            $affected = Exchange::query()->where('category_id', $sourceId)->whereNull('deleted_at');
-            $count = (clone $affected)->count();
-            $affected->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Exchange::class, $sourceId, $targetId, $actor->id);
             $source->delete();
             $this->audit($requestId, $actor->id, $sourceId, 'exchange_categories_merged', ['target_category_id' => $targetId, 'moved_exchange_count' => $count]);
             $this->outbox($requestId, null, 'exchange_categories_merged', ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_exchange_count' => $count]);

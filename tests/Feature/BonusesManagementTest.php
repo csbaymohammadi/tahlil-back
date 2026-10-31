@@ -59,8 +59,8 @@ class BonusesManagementTest extends PanelTestCase
         foreach ([
             ['reading_minutes' => 0], ['reading_minutes' => 1441], ['reading_minutes' => '5'], ['reading_minutes' => 2.5], ['reading_minutes' => true],
             ['title' => str_repeat('ش', 201)], ['slug' => 'bad--slug'], ['title' => '<b>Title</b>'],
-            ['description' => null], ['description' => str_repeat('x', 2001)], ['cover_image' => null], ['category_id' => ''],
-            ['category_id' => '1'], ['meta_description' => str_repeat('x', 501)], ['status' => 'scheduled'],
+            ['description' => null], ['description' => str_repeat('x', 2001)], ['cover_image' => null], ['category_id' => ['']],
+            ['category_id' => ['1']], ['meta_description' => str_repeat('x', 501)], ['status' => 'scheduled'],
             ['cover_image' => '//evil.test/x.png'], ['cover_image' => '/images/../x.png'], ['cover_image' => 'https://evil.test/a.png'],
             ['cover_image' => 'https://service.tahlilex.com/%2e%2e/private.png'], ['cover_image' => 'data:image/png;base64,AAA'], ['content' => '<p>&nbsp;</p>'], ['content' => '<table><tr><td></td></tr></table>'],
             ['content' => '<p onclick="evil()">Text</p>'], ['content' => '<svg></svg>'],
@@ -165,7 +165,7 @@ class BonusesManagementTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $exchange = Exchange::factory()->published()->create(['slug' => 'shared-slug']);
         $foreignCategory = ExchangeCategory::factory()->create(['id' => 999]);
-        $this->postJson(self::BASE.'/items', $this->payload(['category_id' => $foreignCategory->id]))->assertUnprocessable();
+        $this->postJson(self::BASE.'/items', $this->payload(['category_id' => [$foreignCategory->id]]))->assertUnprocessable();
         $this->postJson(self::BASE.'/items', $this->payload(['slug' => 'draft-alias']))->assertCreated();
         $this->patchJson(self::BASE.'/items/1', ['expected_version' => 1, 'slug' => 'shared-slug', 'status' => 'published'])->assertOk();
         $this->assertSame('not_found', app(ResolvePublicBonus::class)->handle('draft-alias')['type']);
@@ -275,7 +275,7 @@ class BonusesManagementTest extends PanelTestCase
     /** @param array<string, mixed> $overrides @return array<string, mixed> */
     private function payload(array $overrides = []): array
     {
-        return array_replace(['title' => 'Example Campaign', 'slug' => 'example-campaign', 'category_id' => null, 'reading_minutes' => 5,
+        return array_replace(['title' => 'Example Campaign', 'slug' => 'example-campaign', 'category_id' => [], 'reading_minutes' => 5,
             'content' => '<h2>Overview</h2><p>Read the campaign conditions.</p>', 'status' => 'draft'], $overrides);
     }
 }

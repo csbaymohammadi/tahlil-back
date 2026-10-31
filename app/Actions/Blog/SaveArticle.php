@@ -8,10 +8,10 @@ use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
 use App\Models\BlogArticle;
-use App\Models\BlogCategory;
 use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\BlogText;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PublicContentIndex;
 use Illuminate\Support\Carbon;
@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveArticle
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): BlogArticleSaveResult
@@ -41,15 +41,13 @@ class SaveArticle
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The article has changed. Fetch it before retrying.');
             }
 
+            $categoryIds = $this->categoryAssignments->prepare($article, $input);
+            $categoriesChanged = $article->categories->modelKeys() !== $categoryIds;
             $old = $creating ? [] : $article->only(['title', 'title_normalized', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status', 'scheduled_for']);
             $values = $this->values($input, $old, $creating, $content);
             PanelMutationLock::acquire();
             $this->html->validateReferences($values['content'], $actor);
             $this->validateResult($values);
-            if ($values['category_id'] !== null && (! is_int($values['category_id']) || $values['category_id'] < 1 || ! BlogCategory::query()->lockForUpdate()->whereKey($values['category_id'])->exists())) {
-                $values['category_id'] = null;
-                $this->warn($warnings, 'category_id', 'CATEGORY_IGNORED', 'دسته‌بندی قابل‌استفاده نیست و مقاله بدون دسته‌بندی ذخیره شد.');
-            }
             if ($values['reading_minutes'] !== null && (! is_int($values['reading_minutes']) || $values['reading_minutes'] < 1 || $values['reading_minutes'] > 1440)) {
                 $values['reading_minutes'] = null;
                 $this->warn($warnings, 'reading_minutes', 'READING_TIME_IGNORED', 'زمان مطالعه قابل‌استفاده نیست و خالی ذخیره شد.');
@@ -61,6 +59,9 @@ class SaveArticle
                 if ($creating || $this->canonicalValue($field, $article->getAttribute($field)) !== $this->canonicalValue($field, $values[$field])) {
                     $changed[] = $field;
                 }
+            }
+            if ($categoriesChanged && ! in_array('category_id', $changed, true)) {
+                $changed[] = 'category_id';
             }
             if (! $creating && $changed === []) {
                 return new BlogArticleSaveResult($article->fresh(['author', 'category']), $warnings);
@@ -96,6 +97,7 @@ class SaveArticle
                 }
             }
             $article->save();
+            $this->categoryAssignments->sync($article, $categoryIds);
 
             if ($creating) {
                 DB::table('blog_slug_ownership')->insert(['slug' => $values['slug'], 'article_id' => $article->id, 'was_public' => $isPublished, 'created_at' => now()]);
@@ -298,7 +300,7 @@ class SaveArticle
         foreach ($this->html->managedSources($value, $kind) as $url) {
             try {
                 $ids[] = $this->media->resolveCanonical($url, $actor, $kind)->id;
-            } catch (PanelAuthException|\Illuminate\Validation\ValidationException) {
+            } catch (PanelAuthException|ValidationException) {
                 throw ValidationException::withMessages(['content' => ['Choose an accessible, ready media file of the required type.']]);
             }
         }

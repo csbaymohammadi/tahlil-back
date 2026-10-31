@@ -101,7 +101,7 @@ class WordImportTest extends PanelTestCase
             ->assertJsonPath('data.record.cover_image', '')
             ->assertJsonPath('data.record.content', '')
             ->assertJsonPath('data.record.meta_description', '')
-            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.category_id', [])
             ->assertJsonPath('data.record.reading_minutes', null)
             ->assertJsonPath('warnings', []);
 
@@ -129,7 +129,7 @@ class WordImportTest extends PanelTestCase
             'content_type' => 'blog', 'file' => UploadedFile::fake()->createWithContent('draft.docx', $bytes),
         ], ['Content-Type' => 'multipart/form-data; boundary=test', 'Idempotency-Key' => $key]);
         $response->assertCreated()
-            ->assertJsonPath('data.record.category_id', null)
+            ->assertJsonPath('data.record.category_id', [])
             ->assertJsonPath('data.record.reading_minutes', null)
             ->assertJsonPath('data.record.cover_image', '');
         $warnings = $response->json('warnings');

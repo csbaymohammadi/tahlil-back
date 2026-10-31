@@ -96,7 +96,7 @@ class ExchangesConcurrencyTest extends TestCase
         $category = ExchangeCategory::factory()->create();
         $exchange = app(SaveExchange::class)->handle($session, null, $this->payload('category-race'), 'exchange-create');
         $results = $this->race([
-            fn () => app(SaveExchange::class)->handle($session, $exchange->id, ['expected_version' => 1, 'category_id' => $category->id], 'exchange-assign'),
+            fn () => app(SaveExchange::class)->handle($session, $exchange->id, ['expected_version' => 1, 'category_id' => [$category->id]], 'exchange-assign'),
             fn () => app(ManageExchangeCategories::class)->delete($session, $category->id, 1, 'category-delete'),
         ]);
         $this->assertSame(200, $results[1]);
@@ -110,7 +110,7 @@ class ExchangesConcurrencyTest extends TestCase
         $target = ExchangeCategory::factory()->create();
         $mergeExchange = app(SaveExchange::class)->handle($session, null, $this->payload('category-merge-race'), 'merge-exchange-create');
         $mergeResults = $this->race([
-            fn () => app(SaveExchange::class)->handle($session, $mergeExchange->id, ['expected_version' => 1, 'category_id' => $source->id], 'exchange-merge-assign'),
+            fn () => app(SaveExchange::class)->handle($session, $mergeExchange->id, ['expected_version' => 1, 'category_id' => [$source->id]], 'exchange-merge-assign'),
             fn () => app(ManageExchangeCategories::class)->merge($session, $source->id, $target->id, 1, 1, 'category-merge'),
         ]);
         $this->assertSame(200, $mergeResults[1]);
@@ -196,7 +196,7 @@ class ExchangesConcurrencyTest extends TestCase
             'title' => 'Exchange '.$slug, 'english_name' => 'Exchange '.$slug, 'slug' => $slug,
             'description' => '', 'logo' => '/images/exchanges/example.png', 'website_url' => 'https://exchange.example/',
             'founded_year' => '', 'platform_type' => '', 'markets' => '', 'access' => '', 'support' => '',
-            'category_id' => null, 'content' => '<p>Exchange review content.</p>', 'meta_description' => '',
+            'category_id' => [], 'content' => '<p>Exchange review content.</p>', 'meta_description' => '',
             'status' => 'draft',
         ];
     }

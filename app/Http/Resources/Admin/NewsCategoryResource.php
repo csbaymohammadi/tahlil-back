@@ -17,7 +17,7 @@ class NewsCategoryResource extends JsonResource
         return [
             'id' => (int) $this->id,
             'name' => $this->name,
-            'news_count' => (int) $this->resource->newsItems()->whereNull('deleted_at')->count(),
+            'news_count' => (int) ($this->resource->assigned_records_count ?? $this->resource->assignedRecords()->count()),
             'created_at' => $this->created_at?->utc()->toISOString(),
             'updated_at' => $this->updated_at?->utc()->toISOString(),
             'version' => (int) $this->version,

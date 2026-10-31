@@ -123,7 +123,7 @@ class TutorialCommentsConcurrencyTest extends TestCase
     {
         $session = (new PanelSessions)->create(User::factory()->panel()->create())['record'];
         $category = TutorialCategory::factory()->create();
-        $payload = ['title' => 'Tutorial', 'youtube_url' => 'https://youtu.be/AbCdEf12_-3', 'category_id' => $category->id, 'cover_image' => '/images/tutorials/a.png'];
+        $payload = ['title' => 'Tutorial', 'youtube_url' => 'https://youtu.be/AbCdEf12_-3', 'category_id' => [$category->id], 'cover_image' => '/images/tutorials/a.png'];
         $results = $this->race([
             fn () => app(SaveTutorial::class)->handle($session, null, $payload, 'create-a'),
             fn () => app(SaveTutorial::class)->handle($session, null, $payload, 'create-b'),
@@ -163,7 +163,7 @@ class TutorialCommentsConcurrencyTest extends TestCase
         $tutorial = Tutorial::factory()->create();
         $source = TutorialCategory::factory()->create();
         $results = $this->race([
-            fn () => app(SaveTutorial::class)->handle($session, $tutorial->id, ['expected_version' => 1, 'category_id' => $source->id], 'assign'),
+            fn () => app(SaveTutorial::class)->handle($session, $tutorial->id, ['expected_version' => 1, 'category_id' => [$source->id]], 'assign'),
             fn () => app(ManageTutorialCategories::class)->delete($session, $source->id, 1, 'category-delete'),
         ]);
         $this->assertSame(200, $results[1]);

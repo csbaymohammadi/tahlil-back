@@ -19,6 +19,7 @@ use App\Models\NewsCategory;
 use App\Models\NewsItem;
 use App\Models\PanelSession;
 use App\Support\BlogText;
+use App\Support\CategoryAssignments;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -144,7 +145,8 @@ class ImportWordDocument
             foreach ($ignoredImageTokens as $token) {
                 $values['content'] = str_replace($token, '', $values['content']);
             }
-            $values['category_id'] = $this->categoryId($values['category_name'], $contentType, $warnings);
+            $matchedCategory = $this->categoryId($values['category_name'], $contentType, $warnings);
+            $values['category_id'] = $matchedCategory === null ? [] : [$matchedCategory];
             $minutes = $values['reading_minutes'];
             if (trim((string) $minutes) === '') {
                 $values['reading_minutes'] = null;
@@ -504,7 +506,6 @@ class ImportWordDocument
     private function snapshot(BlogArticle|NewsItem $article): array
     {
         $author = $article->author;
-        $category = $article->category;
 
         return [
             'id' => (int) $article->id, 'title' => $article->title, 'slug' => $article->slug,
@@ -513,8 +514,8 @@ class ImportWordDocument
             'meta_description' => $article->meta_description, 'status' => $article->status,
             'scheduled_for' => $article->scheduled_for?->utc()->toISOString(),
             'author' => $author ? ['id' => (int) $author->id, 'name' => $author->name] : null,
-            'category_id' => $article->category_id,
-            'category' => $category && $category->deleted_at === null ? ['id' => (int) $category->id, 'name' => $category->name] : null,
+            'category_id' => $article->categories->modelKeys(),
+            'category' => CategoryAssignments::projection($article),
             'created_at' => $article->created_at?->utc()->toISOString(), 'updated_at' => $article->updated_at?->utc()->toISOString(),
             'published_at' => $article->published_at?->utc()->toISOString(), 'public_path' => null, 'version' => (int) $article->version,
         ];

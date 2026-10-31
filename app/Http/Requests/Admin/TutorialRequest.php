@@ -37,7 +37,8 @@ class TutorialRequest extends FormRequest
             'description' => ['sometimes', 'string', 'max:5000'],
             'youtube_url' => [$required, 'string', 'max:2048'],
             'aparat_url' => ['sometimes', 'string', 'max:2048'],
-            'category_id' => [$required, 'integer:strict', 'min:1', 'max:9007199254740991'],
+            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list', 'min:1'],
+            'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'cover_image' => [$required, 'string', 'max:2048'],
             'expected_version' => $this->isMethod('PATCH') ? ['required', 'integer:strict', 'min:1', 'max:9007199254740991'] : ['prohibited'],
         ];
@@ -46,6 +47,10 @@ class TutorialRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $raw = json_decode($this->getContent());
+            if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
+                $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
             $allowed = [...self::EDITABLE, ...($this->isMethod('PATCH') ? ['expected_version'] : [])];
             foreach (array_diff(array_keys($this->all()), $allowed) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
@@ -57,9 +62,6 @@ class TutorialRequest extends FormRequest
                 if (array_key_exists($field, $this->all()) && $this->input($field) === '') {
                     $validator->errors()->add($field, 'This field cannot be empty.');
                 }
-            }
-            if (array_key_exists('category_id', $this->all()) && ! is_int($this->input('category_id'))) {
-                $validator->errors()->add('category_id', 'Choose a live tutorial category ID.');
             }
             $title = $this->input('title');
             if (is_string($title) && strip_tags($title) !== $title) {

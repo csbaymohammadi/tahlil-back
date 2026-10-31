@@ -7,6 +7,7 @@ use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Models\Tutorial;
 use App\Models\TutorialCategory;
+use App\Support\CategoryAssignments;
 use App\Support\PanelMutationLock;
 use App\Support\PlatformText;
 use App\Tutorials\TutorialEvents;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class ManageTutorialCategories
 {
-    public function __construct(private RevokeSessions $sessions, private TutorialEvents $events) {}
+    public function __construct(private RevokeSessions $sessions, private TutorialEvents $events, private CategoryAssignments $categoryAssignments) {}
 
     public function create(PanelSession $session, string $name, string $requestId): TutorialCategory
     {
@@ -48,7 +49,7 @@ class ManageTutorialCategories
             $actor = $this->sessions->currentUser($session);
             $category = TutorialCategory::lockForUpdate()->find($id);
             $this->assertCategory($category, $expectedVersion);
-            $count = Tutorial::where('category_id', $id)->update(['category_id' => null, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Tutorial::class, $id, null, $actor->id);
             $category->delete();
             $this->events->audit('tutorial_category_deleted', $requestId, $actor->id, $id, ['affected_count' => $count], 'category');
             $this->events->publicChange('tutorial_category_changed', $requestId, null, ['category_id' => $id, 'affected_count' => $count]);
@@ -71,7 +72,7 @@ class ManageTutorialCategories
             $source = $categories->get($sourceId);
             $this->assertCategory($source, $sourceVersion);
             $this->assertCategory($categories->get($targetId), $targetVersion);
-            $count = Tutorial::where('category_id', $sourceId)->update(['category_id' => $targetId, 'version' => DB::raw('version + 1'), 'updated_by' => $actor->id, 'updated_at' => now()]);
+            $count = $this->categoryAssignments->replaceCategory(Tutorial::class, $sourceId, $targetId, $actor->id);
             $source->delete();
             $result = ['source_category_id' => $sourceId, 'target_category_id' => $targetId, 'moved_count' => $count];
             $this->events->audit('tutorial_categories_merged', $requestId, $actor->id, $sourceId, $result, 'category');

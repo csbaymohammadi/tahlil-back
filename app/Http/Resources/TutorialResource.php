@@ -10,6 +10,6 @@ class TutorialResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        return app(TutorialProjection::class)->record($this->resource);
+        return app(TutorialProjection::class)->record($this->resource, panel: true);
     }
 }

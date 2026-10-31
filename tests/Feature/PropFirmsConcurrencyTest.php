@@ -161,7 +161,7 @@ class PropFirmsConcurrencyTest extends TestCase
         $category = PropFirmCategory::factory()->create();
         $propFirm = app(SavePropFirm::class)->handle($session, null, $this->payload('category-race'), 'prop-firm-create');
         $results = $this->race([
-            fn () => app(SavePropFirm::class)->handle($session, $propFirm->id, ['expected_version' => 1, 'category_id' => $category->id], 'prop-firm-assign'),
+            fn () => app(SavePropFirm::class)->handle($session, $propFirm->id, ['expected_version' => 1, 'category_id' => [$category->id]], 'prop-firm-assign'),
             fn () => app(ManagePropFirmCategories::class)->delete($session, $category->id, 1, 'category-delete'),
         ]);
         $this->assertSame(200, $results[1]);
@@ -175,7 +175,7 @@ class PropFirmsConcurrencyTest extends TestCase
         $target = PropFirmCategory::factory()->create();
         $mergePropFirm = app(SavePropFirm::class)->handle($session, null, $this->payload('category-merge-race'), 'merge-prop-firm-create');
         $mergeResults = $this->race([
-            fn () => app(SavePropFirm::class)->handle($session, $mergePropFirm->id, ['expected_version' => 1, 'category_id' => $source->id], 'prop-firm-merge-assign'),
+            fn () => app(SavePropFirm::class)->handle($session, $mergePropFirm->id, ['expected_version' => 1, 'category_id' => [$source->id]], 'prop-firm-merge-assign'),
             fn () => app(ManagePropFirmCategories::class)->merge($session, $source->id, $target->id, 1, 1, 'category-merge'),
         ]);
         $this->assertSame(200, $mergeResults[1]);
@@ -191,7 +191,7 @@ class PropFirmsConcurrencyTest extends TestCase
     {
         return [
             'title' => 'Prop Firm '.$slug, 'english_name' => 'Prop Firm '.$slug, 'slug' => $slug,
-            'category_id' => null, 'content' => '<p>Evaluation and payout terms.</p>', 'status' => 'draft',
+            'category_id' => [], 'content' => '<p>Evaluation and payout terms.</p>', 'status' => 'draft',
         ];
     }
 }

@@ -85,9 +85,9 @@ class BrokerPlatformsTest extends PanelTestCase
         $specifications['copy_trading'] = 'yes';
         $specifications['account_currency'] = "USD\nEUR";
 
-        $created = $this->postJson(self::FOREX.'/items', $this->forexPayload(['category_id' => $category->id, 'specifications' => $specifications]))->assertCreated()
+        $created = $this->postJson(self::FOREX.'/items', $this->forexPayload(['category_id' => [$category->id], 'specifications' => $specifications]))->assertCreated()
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.key', 'international-brokers')
+            ->assertJsonPath('data.category.0.key', 'international-brokers')
             ->assertJsonPath('data.platforms', 'MetaTrader 5')
             ->assertJsonPath('data.specifications.copy_trading', 'yes')
             ->assertHeader('Location', self::FOREX.'/items/1');
@@ -123,7 +123,7 @@ class BrokerPlatformsTest extends PanelTestCase
         $specifications['identity_documents'] = "National ID\nProof of address";
         $specifications['account_opening_documents'] = 'Signed application';
         $created = $this->postJson(self::STOCK.'/items', $this->stockPayload([
-            'category_id' => $category->id, 'logo' => '', 'website_url' => '', 'specifications' => $specifications, 'status' => 'published',
+            'category_id' => [$category->id], 'logo' => '', 'website_url' => '', 'specifications' => $specifications, 'status' => 'published',
         ]))->assertCreated()
             ->assertJsonPath('data.kind', 'stock-brokers')
             ->assertJsonPath('data.logo', '')
@@ -133,9 +133,9 @@ class BrokerPlatformsTest extends PanelTestCase
             ->assertJsonPath('data.specifications.account_opening_documents', 'Signed application');
         $id = (int) $created->json('data.id');
         $this->assertCount(24, $created->json('data.specifications'));
-        $this->patchJson(self::STOCK.'/items/'.$id, ['expected_version' => 1, 'logo' => '', 'website_url' => '', 'category_id' => null])->assertOk()
+        $this->patchJson(self::STOCK.'/items/'.$id, ['expected_version' => 1, 'logo' => '', 'website_url' => '', 'category_id' => []])->assertOk()
             ->assertJsonPath('data.version', 2)
-            ->assertJsonPath('data.category_id', null)
+            ->assertJsonPath('data.category_id', [])
             ->assertJsonPath('data.kind', 'stock-brokers');
         $this->assertSame('stock-brokers', StockBrokerage::findOrFail($id)->kind);
         $this->postJson(self::STOCK.'/items', $this->stockPayload(['kind' => 'broker']))->assertUnprocessable()->assertJsonPath('error.fields.kind.0', 'This field is not accepted.');
@@ -148,8 +148,8 @@ class BrokerPlatformsTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $stockCategory = StockBrokerageCategory::factory()->create(['id' => 999]);
 
-        $this->postJson(self::FOREX.'/items', $this->forexPayload(['category_id' => $stockCategory->id]))
-            ->assertUnprocessable()->assertJsonPath('error.fields.category_id.0', 'Choose a live category in this platform domain or null.');
+        $this->postJson(self::FOREX.'/items', $this->forexPayload(['category_id' => [$stockCategory->id]]))
+            ->assertUnprocessable()->assertJsonStructure(['error' => ['fields' => ['category_id.0']]]);
         $unknownForex = $this->postJson(self::FOREX.'/items', $this->forexPayload(['specifications' => ['online_trading' => 'yes']]))->assertUnprocessable();
         $this->assertSame('This specification is not supported.', $unknownForex->json('error.fields')['specifications.online_trading'][0]);
         $unknownStock = $this->postJson(self::STOCK.'/items', $this->stockPayload(['specifications' => ['copy_trading' => 'yes']]))->assertUnprocessable();
@@ -412,11 +412,11 @@ class BrokerPlatformsTest extends PanelTestCase
      */
     private function forexPayload(array $overrides = []): array
     {
-        return array_replace_recursive([
+        return array_replace([
             'title' => 'Example Broker', 'english_name' => 'Example Broker', 'slug' => 'example-broker',
             'description' => 'A forex profile', 'logo' => '/images/brokers/example.png', 'website_url' => 'https://broker.example/',
             'founded_year' => '2007', 'platforms' => 'MetaTrader 5', 'markets' => 'Forex and CFDs', 'access' => 'Web and mobile', 'account_currency' => 'USD',
-            'specifications' => BrokerSpecifications::empty(), 'category_id' => BrokerCategory::factory()->create()->id,
+            'specifications' => BrokerSpecifications::empty(), 'category_id' => [BrokerCategory::factory()->create()->id],
             'content' => '<h2>Overview</h2><p>A review of the broker.</p>', 'meta_description' => 'A broker overview.', 'status' => 'draft',
         ], $overrides);
     }
@@ -426,10 +426,10 @@ class BrokerPlatformsTest extends PanelTestCase
      */
     private function stockPayload(array $overrides = []): array
     {
-        return array_replace_recursive([
+        return array_replace([
             'title' => 'Example Brokerage', 'english_name' => 'Example Brokerage', 'slug' => 'example-stock-broker',
             'description' => 'A stock profile', 'logo' => '', 'website_url' => '', 'founded_year' => '1999',
-            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => StockBrokerageCategory::factory()->create()->id,
+            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => [StockBrokerageCategory::factory()->create()->id],
             'content' => '<h2>Overview</h2><p>A review of the brokerage.</p>', 'meta_description' => 'A brokerage overview.', 'status' => 'draft',
         ], $overrides);
     }

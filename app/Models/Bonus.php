@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Bonus extends Model
 {
+    use HasCategories;
     use HasFactory, SoftDeletes;
     use HasPublicComments;
 

@@ -57,20 +57,20 @@ class TutorialsManagementTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $base = $this->payload();
         foreach ([['title' => ''], ['title' => str_repeat('ش', 201)], ['description' => null], ['description' => str_repeat('x', 5001)],
-            ['youtube_url' => 'bad'], ['youtube_url' => null], ['category_id' => null], ['category_id' => '1'], ['category_id' => true],
+            ['youtube_url' => 'bad'], ['youtube_url' => null], ['category_id' => []], ['category_id' => ['1']], ['category_id' => true],
             ['cover_image' => ''], ['cover_image' => 'https://evil.test/a.png'], ['cover_image' => '/images/../private.png'],
             ['slug' => 'manual'], ['status' => 'draft'], ['duration_seconds' => 50], ['youtube_video_id' => 'XXXXXXXXXXX'], ['author_id' => 1]] as $overrides) {
             $this->postJson(self::BASE.'/items', array_replace($base, $overrides))->assertUnprocessable();
         }
         $this->assertDatabaseCount('tutorials', 0);
         $this->postJson(self::BASE.'/items', $base)->assertCreated();
-        $categoryId = $base['category_id'];
+        $categoryId = $base['category_id'][0];
         $this->delete(self::BASE.'/categories/'.$categoryId.'?expected_version=1')->assertOk()->assertJsonPath('data.affected_tutorial_count', 1);
-        $this->get(self::BASE.'/items/1')->assertOk()->assertJsonPath('data.category', null);
+        $this->get(self::BASE.'/items/1')->assertOk()->assertJsonPath('data.category', []);
         $this->assertSame('tutorial', app(ResolveTutorialCatalog::class)->detail('youtube-AbCdEf12_-3')['type']);
         $this->patchJson(self::BASE.'/items/1', ['expected_version' => 2, 'description' => 'Cannot keep uncategorized'])->assertUnprocessable();
         $target = TutorialCategory::factory()->create();
-        $this->patchJson(self::BASE.'/items/1', ['expected_version' => 2, 'category_id' => $target->id])->assertOk()->assertJsonPath('data.version', 3);
+        $this->patchJson(self::BASE.'/items/1', ['expected_version' => 2, 'category_id' => [$target->id]])->assertOk()->assertJsonPath('data.version', 3);
         $this->postJson(self::BASE.'/items', array_replace($base, ['description' => str_repeat('x', 256 * 1024)]))->assertStatus(413);
     }
 
@@ -98,7 +98,7 @@ class TutorialsManagementTest extends PanelTestCase
         $this->assertSame(['exchanges', 'getting-started', 'strategies'], TutorialCategory::orderBy('key')->pluck('key')->all());
         $source = TutorialCategory::where('key', 'exchanges')->firstOrFail();
         $target = TutorialCategory::where('key', 'strategies')->firstOrFail();
-        $this->postJson(self::BASE.'/items', $this->payload(['category_id' => $source->id, 'aparat_url' => 'https://aparat.com/v/abc123']))->assertCreated();
+        $this->postJson(self::BASE.'/items', $this->payload(['category_id' => [$source->id], 'aparat_url' => 'https://aparat.com/v/abc123']))->assertCreated();
         Tutorial::factory()->count(10)->create();
         $this->get(self::BASE.'/items')->assertOk()->assertJsonPath('meta.total', 11)->assertJsonCount(10, 'data');
         $this->get(self::BASE.'/items?q=example')->assertOk()->assertJsonPath('meta.total', 1);
@@ -141,6 +141,6 @@ class TutorialsManagementTest extends PanelTestCase
     private function payload(array $overrides = []): array
     {
         return array_replace(['title' => 'Example Tutorial', 'description' => '', 'youtube_url' => 'https://youtu.be/AbCdEf12_-3?si=tracking', 'aparat_url' => '',
-            'category_id' => TutorialCategory::factory()->create()->id, 'cover_image' => 'https://i.ytimg.com/vi/AbCdEf12_-3/hqdefault.jpg'], $overrides);
+            'category_id' => [TutorialCategory::factory()->create()->id], 'cover_image' => 'https://i.ytimg.com/vi/AbCdEf12_-3/hqdefault.jpg'], $overrides);
     }
 }

@@ -49,7 +49,7 @@ class PropFirmsTest extends PanelTestCase
         $specifications['payout_rules'] = "Monthly payout\nTerms apply";
 
         $created = $this->postJson(self::PROP.'/items', $this->payload([
-            'category_id' => $category->id,
+            'category_id' => [$category->id],
             'specifications' => $specifications,
             'logo' => '',
             'website_url' => '',
@@ -58,7 +58,7 @@ class PropFirmsTest extends PanelTestCase
         ]))->assertCreated()
             ->assertJsonPath('data.kind', 'prop-firms')
             ->assertJsonPath('data.author.id', $actor->id)
-            ->assertJsonPath('data.category.name', 'Prop Services')
+            ->assertJsonPath('data.category.0.name', 'Prop Services')
             ->assertJsonPath('data.logo', '')
             ->assertJsonPath('data.website_url', '')
             ->assertJsonPath('data.specifications.trial_account', 'yes')
@@ -138,8 +138,8 @@ class PropFirmsTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $this->assertCount(23, PropFirmSpecifications::FIELDS);
         $stockCategory = StockBrokerageCategory::factory()->create(['id' => 999]);
-        $this->postJson(self::PROP.'/items', $this->payload(['category_id' => $stockCategory->id]))
-            ->assertUnprocessable()->assertJsonPath('error.fields.category_id.0', 'Choose a live category in this platform domain or null.');
+        $this->postJson(self::PROP.'/items', $this->payload(['category_id' => [$stockCategory->id]]))
+            ->assertUnprocessable()->assertJsonStructure(['error' => ['fields' => ['category_id.0']]]);
         $this->postJson(self::PROP.'/items', $this->payload(['kind' => 'stock-brokers']))
             ->assertUnprocessable()->assertJsonPath('error.fields.kind.0', 'This field is not accepted.');
         $unknownSpecification = $this->postJson(self::PROP.'/items', $this->payload(['specifications' => ['online_trading' => 'yes']]))
@@ -167,7 +167,7 @@ class PropFirmsTest extends PanelTestCase
         $stock = $this->postJson('/api/v1/admin/stock-brokers/items', [
             'title' => 'Example Brokerage', 'english_name' => 'Example Brokerage', 'slug' => $slug,
             'description' => 'Stock profile', 'logo' => '', 'website_url' => '', 'founded_year' => '',
-            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => null,
+            'specifications' => StockBrokerSpecifications::empty(), 'category_id' => [],
             'content' => '<p>Stock review content</p>', 'meta_description' => '', 'status' => 'published',
         ])->assertCreated();
 
@@ -364,7 +364,7 @@ class PropFirmsTest extends PanelTestCase
     public function test_specifications_default_trim_clear_and_preserve_independent_evaluation_values(): void
     {
         $this->panel(User::factory()->panel()->create());
-        $input = $this->payload(['category_id' => null]);
+        $input = $this->payload(['category_id' => []]);
         unset($input['specifications']);
         $created = $this->postJson(self::PROP.'/items', $input)->assertCreated()
             ->assertJsonPath('data.specifications', PropFirmSpecifications::empty());
@@ -395,11 +395,11 @@ class PropFirmsTest extends PanelTestCase
     public function test_invalid_mutations_return_field_errors_and_create_no_records(): void
     {
         $this->panel(User::factory()->panel()->create());
-        $base = $this->payload(['category_id' => null]);
+        $base = $this->payload(['category_id' => []]);
         $invalid = [
             ['slug' => 'two--hyphens'], ['english_name' => str_repeat('a', 121)],
             ['description' => str_repeat('a', 2001)], ['meta_description' => str_repeat('a', 501)],
-            ['founded_year' => '۱۴۰۵'], ['category_id' => '1'], ['category_id' => ''],
+            ['founded_year' => '۱۴۰۵'], ['category_id' => ['1']], ['category_id' => ['']],
             ['logo' => null], ['website_url' => null], ['description' => null],
             ['logo' => '//evil.test/a.png'], ['logo' => '/images/../private.png'],
             ['logo' => 'https://untrusted.example/a.png'], ['logo' => 'data:image/png;base64,AA'],
@@ -506,7 +506,7 @@ class PropFirmsTest extends PanelTestCase
             $this->assertSame($before[$field], $published->fresh()->getAttributes()[$field]);
         }
         $this->patchJson(self::PROP.'/items/'.$draft->id, ['expected_version' => 1, 'description' => 'Stale editor'])->assertConflict();
-        $this->patchJson(self::PROP.'/items/'.$draft->id, ['expected_version' => 2, 'category_id' => $source->id])->assertUnprocessable();
+        $this->patchJson(self::PROP.'/items/'.$draft->id, ['expected_version' => 2, 'category_id' => [$source->id]])->assertUnprocessable();
         $empty = PropFirmCategory::factory()->create();
         $this->postJson(self::PROP.'/categories/'.$empty->id.'/merge', array_replace($body, ['target_expected_version' => 1]))->assertOk()->assertJsonPath('data.moved_prop_firm_count', 0);
     }
@@ -551,7 +551,7 @@ class PropFirmsTest extends PanelTestCase
         $this->panel(User::factory()->panel()->create());
         $alpha = $this->postJson(self::PROP.'/items', $this->payload([
             'title' => 'آلفا', 'english_name' => 'Alpha', 'slug' => 'alpha', 'founded_year' => '1400',
-            'description' => '', 'meta_description' => '', 'status' => 'published', 'category_id' => null,
+            'description' => '', 'meta_description' => '', 'status' => 'published', 'category_id' => [],
             'content' => '<h2>Specifications</h2><p><a href="https://example.com/path?q=1" target="_blank">Evaluation conditions</a></p><table><tbody><tr><td>Fee</td></tr></tbody></table>',
         ]))->assertCreated();
         $beta = PropFirm::factory()->published()->create(['title' => 'بتا']);
@@ -586,11 +586,11 @@ class PropFirmsTest extends PanelTestCase
      */
     private function payload(array $overrides = []): array
     {
-        return array_replace_recursive([
+        return array_replace([
             'title' => 'Example Prop Firm', 'english_name' => 'Example Prop Firm',
             'slug' => 'example-prop-firm', 'description' => 'A prop firm profile',
             'logo' => '', 'website_url' => '', 'founded_year' => '',
-            'specifications' => PropFirmSpecifications::empty(), 'category_id' => PropFirmCategory::factory()->create()->id,
+            'specifications' => PropFirmSpecifications::empty(), 'category_id' => [PropFirmCategory::factory()->create()->id],
             'content' => '<h2>Overview</h2><p>A review of this platform.</p>', 'meta_description' => '', 'status' => 'draft',
         ], $overrides);
     }

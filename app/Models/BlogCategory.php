@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BlogCategory extends Model
 {
+    use HasAssignedRecords;
+
     /** @use HasFactory<BlogCategoryFactory> */
     use HasFactory, SoftDeletes;
 
