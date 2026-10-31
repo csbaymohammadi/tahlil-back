@@ -17,7 +17,7 @@ class DemoContentSeeder extends Seeder
         }
         $report = $seed->handle($author);
         $this->command?->table(['Module', 'ID', 'Slug', 'Result'], $report);
-        $this->command?->info('Demo content is published. Existing records and populated homepage selections were preserved.');
+        $this->command?->info('Demo content is published: up to 11 distinct samples per supported module (10 additions to the original set). Existing records and homepage selections were preserved.');
         $this->command?->info('Tutorials were skipped because no real company video URL was supplied.');
     }
 }

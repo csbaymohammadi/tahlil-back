@@ -9,6 +9,7 @@ use App\Models\PanelSession;
 use App\Models\User;
 use App\Support\PublicContentIndex;
 use Database\Seeders\DemoContentSeeder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -28,7 +29,12 @@ class DemoContentTest extends PanelTestCase
 
                 continue;
             }
-            $record = $model::where('slug', 'tahlil-demo-'.$type.'-001')->firstOrFail();
+            $all = $model::where('slug', 'like', 'tahlil-demo-'.$type.'-%')->get();
+            $this->assertCount(11, $all);
+            foreach (['title', 'slug', 'description', 'content'] as $field) {
+                $this->assertCount(11, $all->pluck($field)->unique(), $type.' must have distinct '.$field);
+            }
+            $record = $all->firstWhere('slug', 'tahlil-demo-'.$type.'-011');
             $this->assertSame('published', $record->status);
             $this->assertSame($actor->id, $record->created_by);
             $this->assertStringContainsString('آزمایشی', $record->content);
@@ -47,7 +53,7 @@ class DemoContentTest extends PanelTestCase
         foreach ($home->json('data.menu') as $menu) {
             $this->assertCount(1, $menu['items']);
         }
-        $this->get('/api/v1/search')->assertOk()->assertJsonPath('meta.total', 8);
+        $this->get('/api/v1/search')->assertOk()->assertJsonPath('meta.total', 88);
         $this->assertDatabaseCount('panel_sessions', 0);
     }
 
@@ -62,12 +68,43 @@ class DemoContentTest extends PanelTestCase
         $settings = PageSetting::current()->getAttributes();
         $counts = DB::table('blog_audit_events')->count();
         $result = $seed->handle($actor);
-        $this->assertSame(array_fill(0, 8, 'kept'), array_column($result, 'result'));
+        $this->assertSame(array_fill(0, 88, 'kept'), array_column($result, 'result'));
         $this->assertSame('ویرایش دستی محفوظ', $article->fresh()->title);
-        $this->assertDatabaseCount('blog_articles', 1);
+        $this->assertDatabaseCount('blog_articles', 11);
         $this->assertDatabaseCount('blog_audit_events', $counts);
         $this->assertSame($settings, PageSetting::current()->getAttributes());
         $this->assertDatabaseCount('panel_sessions', 0);
+    }
+
+    public function test_upgrade_adds_ten_per_domain_without_changing_the_original_records(): void
+    {
+        $actor = User::factory()->panel()->create();
+        $originals = [];
+        foreach (PublicContentIndex::TYPES as $type => $model) {
+            if ($type === 'tutorials') {
+                continue;
+            }
+            $record = $model::factory()->create(['slug' => 'tahlil-demo-'.$type.'-001', 'title' => 'نسخه اصلی '.$type, 'status' => 'published']);
+            $originals[$type] = [$record, $record->fresh()->getAttributes()];
+        }
+        $report = app(SeedDemoContent::class)->handle($actor);
+        $this->assertCount(80, array_filter($report, fn (array $row): bool => $row['result'] === 'created'));
+        $this->assertCount(8, array_filter($report, fn (array $row): bool => $row['result'] === 'kept'));
+        $descriptions = $contents = [];
+        foreach ($originals as $type => [$record, $attributes]) {
+            $this->assertSame($attributes, $record->fresh()->getAttributes());
+            $new = $record::where('slug', 'like', 'tahlil-demo-'.$type.'-%')->where('id', '!=', $record->id)->get();
+            $this->assertCount(10, $new);
+            $this->assertCount(10, $new->pluck('title')->unique());
+            $descriptions = [...$descriptions, ...$new->pluck('description')->all()];
+            $contents = [...$contents, ...$new->pluck('content')->all()];
+            if ($type !== 'articles' && $type !== 'news' && $type !== 'bonuses') {
+                $this->assertCount(10, $new->map(fn (Model $item): string => json_encode($item->specifications, JSON_THROW_ON_ERROR))->unique());
+                $this->assertCount(10, $new->pluck('website_url')->unique());
+            }
+        }
+        $this->assertCount(80, array_unique($descriptions));
+        $this->assertCount(80, array_unique($contents));
     }
 
     public function test_existing_homepage_selections_and_sessions_are_preserved(): void

@@ -50,6 +50,20 @@ class SeedDemoContent
         'bonuses' => ['model' => Models\Bonus::class, 'save' => SaveBonus::class, 'manager' => ManageBonusCategories::class, 'title' => 'بونوس نمونه تحلیل'],
     ];
 
+    /** @var list<array{name: string, english: string, topic: string, detail: string, city: string}> */
+    private const VARIANTS = [
+        ['name' => 'آبان', 'english' => 'Aban', 'topic' => 'شفافیت کارمزد', 'detail' => 'هزینه ثبت سفارش، تبدیل دارایی و برداشت را جداگانه ثبت کنید تا هزینه نهایی خدمت پیش از تأیید قابل مقایسه باشد.', 'city' => 'تهران'],
+        ['name' => 'سپهر', 'english' => 'Sepehr', 'topic' => 'امنیت حساب', 'detail' => 'فعال‌سازی ورود دومرحله‌ای، مشاهده نشست‌های فعال و دریافت اعلان ورود تازه، سه مسیر اصلی بررسی حفاظت از حساب هستند.', 'city' => 'شیراز'],
+        ['name' => 'باران', 'english' => 'Baran', 'topic' => 'کیفیت پشتیبانی', 'detail' => 'برای یک درخواست آزمایشی، زمان اولین پاسخ و زمان حل مسئله را ثبت کنید و امکان پیگیری شماره تیکت را بسنجید.', 'city' => 'رشت'],
+        ['name' => 'آرمان', 'english' => 'Arman', 'topic' => 'سرعت تسویه', 'detail' => 'زمان ثبت درخواست، تأیید داخلی و دریافت وجه را از هم تفکیک کنید؛ تعطیلات و سقف روزانه می‌توانند مدت تسویه را تغییر دهند.', 'city' => 'اصفهان'],
+        ['name' => 'ترنج', 'english' => 'Toranj', 'topic' => 'تجربه کاربری موبایل', 'detail' => 'خوانایی جدول‌ها، دسترسی به دکمه اصلی و تکمیل فرم با صفحه‌کلید موبایل را در نمایشگر کوچک بررسی کنید.', 'city' => 'تبریز'],
+        ['name' => 'آتیه', 'english' => 'Atieh', 'topic' => 'احراز هویت', 'detail' => 'نوع مدارک، مدت بررسی درخواست و روش اصلاح اطلاعات ناقص باید پیش از شروع ثبت‌نام برای کاربر روشن باشد.', 'city' => 'یزد'],
+        ['name' => 'پارس', 'english' => 'Pars', 'topic' => 'گزارش‌گیری مالی', 'detail' => 'تاریخچه عملیات باید قابلیت جست‌وجو بر اساس تاریخ و وضعیت داشته باشد و خروجی آن با مانده حساب قابل تطبیق باشد.', 'city' => 'مشهد'],
+        ['name' => 'روشنا', 'english' => 'Roshna', 'topic' => 'محدودیت برداشت', 'detail' => 'حداقل مبلغ، سقف هر درخواست و محدودیت دفعات برداشت را کنار روش انتقال ثبت کنید تا شرایط نقدشوندگی قابل ارزیابی باشد.', 'city' => 'کرمان'],
+        ['name' => 'کارون', 'english' => 'Karun', 'topic' => 'شرایط قرارداد', 'detail' => 'مقررات لغو خدمت، تغییر تعرفه و روش رسیدگی به اختلاف باید متن روشن و نسخه قابل مراجعه داشته باشند.', 'city' => 'اهواز'],
+        ['name' => 'نارون', 'english' => 'Narvan', 'topic' => 'آزمایش خدمات پیش از شروع', 'detail' => 'در محیط آزمایشی، مسیر ایجاد سفارش، اصلاح اشتباه و دریافت گزارش را بررسی کنید؛ نتیجه آزمایش را با شرایط حساب واقعی یکسان فرض نکنید.', 'city' => 'کرمانشاه'],
+    ];
+
     public function __construct(private PanelSessions $sessions, private SavePageSettings $settings, private PublicContentIndex $index) {}
 
     /** @return list<array{module: string, id: int, slug: string, result: string}> */
@@ -71,44 +85,50 @@ class SeedDemoContent
             try {
                 foreach (self::MODULES as $module => $definition) {
                     $model = $definition['model'];
-                    $slug = 'tahlil-demo-'.$module.'-001';
-                    $record = $model::withTrashed()->where('slug', $slug)->first();
-                    $created = $record === null;
-                    if ($created) {
-                        $categoryClass = CategoryAssignments::MODELS[$model];
-                        $categories = $categoryClass::orderBy('id')->limit(2)->pluck('id')->all();
-                        if ($categories === []) {
-                            $categories[] = app($definition['manager'])->create($session, 'محتوای نمونه', $requestId)->id;
-                        }
-                        $payload = [
-                            'title' => $definition['title'].' ۰۰۱', 'slug' => $slug, 'status' => 'published',
-                            'category_id' => $categories,
-                            'description' => 'محتوای آزمایشی برای بررسی نمایش کارت، تصویر، دسته‌بندی و جزئیات خدمات؛ این رکورد معرف کسب‌وکار واقعی نیست.',
-                            'content' => $this->content($definition['title']),
-                            'meta_description' => 'نمونه آزمایشی تحلیل برای بررسی نمایش محتوا و مشخصات خدمات در سایت.',
-                        ];
-                        if (isset($definition['specs'])) {
-                            $payload += ['english_name' => 'Tahlil Demo '.ucwords(str_replace('-', ' ', $module)).' 001',
-                                'logo' => self::IMAGE, 'website_url' => 'https://example.com', 'founded_year' => '1402',
-                                'specifications' => $this->specifications($definition['specs'])];
-                            if ($module === 'exchanges') {
-                                $payload += ['platform_type' => 'پلتفرم آزمایشی', 'markets' => 'بازار نمونه', 'access' => 'وب و موبایل', 'support' => 'پشتیبانی آزمایشی'];
-                            } elseif ($module === 'brokers') {
-                                $payload += ['platforms' => 'پلتفرم معاملاتی نمونه', 'markets' => 'Forex', 'access' => 'وب و موبایل', 'account_currency' => 'USD'];
+                    for ($sequence = 1; $sequence <= count(self::VARIANTS) + 1; $sequence++) {
+                        $variant = self::VARIANTS[$sequence - 2] ?? null;
+                        $suffix = str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
+                        $slug = 'tahlil-demo-'.$module.'-'.$suffix;
+                        $record = $model::withTrashed()->where('slug', $slug)->first();
+                        $created = $record === null;
+                        if ($created) {
+                            $categoryClass = CategoryAssignments::MODELS[$model];
+                            $categories = $categoryClass::orderBy('id')->limit(2)->pluck('id')->all();
+                            if ($categories === []) {
+                                $categories[] = app($definition['manager'])->create($session, 'محتوای نمونه', $requestId)->id;
                             }
-                        } else {
-                            $payload += ['cover_image' => self::IMAGE, 'reading_minutes' => 3];
-                            if ($module !== 'bonuses') {
-                                $payload['scheduled_for'] = null;
+                            $payload = [
+                                'title' => $variant === null ? $definition['title'].' ۰۰۱' : $definition['title'].' '.$variant['name'].'؛ '.$variant['topic'], 'slug' => $slug, 'status' => 'published',
+                                'category_id' => $categories,
+                                'description' => $variant === null ? 'محتوای آزمایشی برای بررسی نمایش کارت، تصویر، دسته‌بندی و جزئیات خدمات؛ این رکورد معرف کسب‌وکار واقعی نیست.' : $definition['title'].' '.$variant['name'].' با تمرکز بر '.$variant['topic'].'؛ '.$variant['detail'],
+                                'content' => $this->content($definition['title'], $variant),
+                                'meta_description' => $variant === null ? 'نمونه آزمایشی تحلیل برای بررسی نمایش محتوا و مشخصات خدمات در سایت.' : 'بررسی آزمایشی '.$variant['topic'].' در '.$definition['title'].' '.$variant['name'],
+                            ];
+                            if (isset($definition['specs'])) {
+                                $payload += ['english_name' => 'Tahlil Demo '.ucwords(str_replace('-', ' ', $module)).' '.($variant['english'] ?? '001'),
+                                    'logo' => self::IMAGE, 'website_url' => $variant === null ? 'https://example.com' : 'https://example.com/demo/'.$module.'/'.$suffix, 'founded_year' => (string) (1403 - $sequence),
+                                    'specifications' => $this->specifications($definition['specs'], $sequence)];
+                                if ($module === 'exchanges') {
+                                    $payload += ['platform_type' => 'پلتفرم آزمایشی', 'markets' => $variant['topic'] ?? 'بازار نمونه', 'access' => $sequence % 2 === 0 ? 'وب و موبایل' : 'پنل وب', 'support' => 'پشتیبانی آزمایشی؛ پاسخ‌گویی در '.(8 + $sequence).' ساعت کاری'];
+                                } elseif ($module === 'brokers') {
+                                    $payload += ['platforms' => 'Demo '.($variant['english'] ?? 'Platform'), 'markets' => 'Forex؛ '.($variant['topic'] ?? 'بررسی خدمات'), 'access' => $sequence % 2 === 0 ? 'وب و موبایل' : 'پنل وب', 'account_currency' => ['USD', 'EUR', 'GBP'][$sequence % 3]];
+                                }
+                            } else {
+                                $payload += ['cover_image' => self::IMAGE, 'reading_minutes' => 3 + (($sequence - 1) % 5)];
+                                if ($module !== 'bonuses') {
+                                    $payload['scheduled_for'] = null;
+                                }
                             }
+                            $result = app($definition['save'])->handle($session, null, $payload, $requestId);
+                            $record = match ($module) {
+                                'articles' => $result->article, 'news' => $result->newsItem, default => $result
+                            };
                         }
-                        $result = app($definition['save'])->handle($session, null, $payload, $requestId);
-                        $record = match ($module) {
-                            'articles' => $result->article, 'news' => $result->newsItem, default => $result
-                        };
+                        if (! isset($records[$module]) && ! $record->trashed() && $record->status === 'published') {
+                            $records[$module] = $record;
+                        }
+                        $report[] = ['module' => $module, 'id' => $record->id, 'slug' => $record->slug, 'result' => $created ? 'created' : 'kept'];
                     }
-                    $records[$module] = $record;
-                    $report[] = ['module' => $module, 'id' => $record->id, 'slug' => $record->slug, 'result' => $created ? 'created' : 'kept'];
                 }
                 $this->fillEmptySelections($session, $records, $requestId);
                 $this->index->rebuild();
@@ -120,9 +140,22 @@ class SeedDemoContent
         });
     }
 
-    private function content(string $title): string
+    /** @param array{name: string, english: string, topic: string, detail: string, city: string}|null $variant */
+    private function content(string $title, ?array $variant = null): string
     {
         $heading = htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        if ($variant !== null) {
+            $name = htmlspecialchars($variant['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $topic = htmlspecialchars($variant['topic'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $detail = htmlspecialchars($variant['detail'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+            return '<h2>'.$heading.' '.$name.'</h2><p>این نمونه از '.$heading.' برای ارزیابی '.$topic.' آماده شده است و معرف کسب‌وکار واقعی نیست.</p>'
+                .'<p><img src="'.self::IMAGE.'" alt="نمودار آزمایشی '.$topic.'"></p>'
+                .'<h2>بررسی '.$topic.'</h2><p>'.$detail.'</p>'
+                .'<h3>سناریوی بررسی '.$name.'</h3><ol><li>شرایط '.$topic.' را در صفحه معرفی '.$name.' بخوانید.</li><li>یک درخواست آزمایشی ایجاد و نتیجه را ثبت کنید.</li><li>نتیجه را با اطلاعات اعلام‌شده در قرارداد مقایسه کنید.</li></ol>'
+                .'<table><tbody><tr><th>بخش بررسی</th><th>شرح نمونه</th></tr><tr><td>'.$heading.'</td><td>'.$name.'</td></tr><tr><td>'.$topic.'</td><td>'.$detail.'</td></tr></tbody></table>'
+                .'<blockquote>این داده آزمایشی برای ارزیابی '.$topic.' است و توصیه سرمایه‌گذاری یا تأیید خدمات '.$name.' محسوب نمی‌شود.</blockquote>';
+        }
 
         return '<h2>'.$heading.'</h2><p>این متن صرفاً برای آزمودن نمایش محتوا در تحلیل تهیه شده است و توصیه سرمایه‌گذاری یا تأیید یک کسب‌وکار واقعی نیست.</p>'
             .'<p><img src="'.self::IMAGE.'" alt="نمودار نمونه خدمات مالی"></p>'
@@ -134,7 +167,7 @@ class SeedDemoContent
 
     /** @param class-string $class
      * @return array<string, string> */
-    private function specifications(string $class): array
+    private function specifications(string $class, int $sequence): array
     {
         $values = [
             'established_at' => '1402/04/04', 'head_office_address' => 'تهران، نشانی آزمایشی برای تست نمایش', 'physical_branch_count' => '3', 'years_active' => '3',
@@ -143,6 +176,22 @@ class SeedDemoContent
             'physical_delivery_time' => '3 روز کاری برای تست', 'physical_delivery_method' => 'دریافت حضوری آزمایشی', 'asset_storage' => 'خزانه آزمایشی',
             'trading_fee' => '0.5 درصد', 'registration_fee' => 'صفر', 'evaluation_type' => 'دو مرحله‌ای', 'daily_loss_limit' => '5 درصد', 'total_loss_limit' => '10 درصد', 'payout_rules' => 'تسویه آزمایشی هر 14 روز',
         ];
+        if ($sequence > 1) {
+            $variant = self::VARIANTS[$sequence - 2];
+            $values = array_replace($values, [
+                'established_at' => (1403 - $sequence).'/'.str_pad((string) $sequence, 2, '0', STR_PAD_LEFT).'/15',
+                'head_office_address' => $variant['city'].'، دفتر آزمایشی '.$variant['name'],
+                'physical_branch_count' => (string) ($sequence - 1), 'years_active' => (string) $sequence,
+                'minimum_purchase' => ($sequence * 10).' هزار تومان', 'maximum_purchase' => ($sequence * 20).' میلیون تومان روزانه',
+                'minimum_sale' => ($sequence * 5).' هزار تومان', 'maximum_sale' => ($sequence * 15).' میلیون تومان روزانه',
+                'minimum_deposit' => ($sequence * 50).' دلار', 'maximum_withdrawal' => ($sequence * 500).' دلار در هر درخواست',
+                'trading_fee' => number_format($sequence / 10, 1, '.', '').' درصد',
+                'physical_delivery_time' => $sequence.' روز کاری آزمایشی', 'asset_storage' => 'خزانه آزمایشی '.$variant['name'],
+                'evaluation_type' => $sequence % 2 === 0 ? 'دو مرحله‌ای آزمایشی' : 'تک مرحله‌ای آزمایشی',
+                'daily_loss_limit' => (2 + $sequence % 4).' درصد', 'total_loss_limit' => (6 + $sequence % 5).' درصد',
+                'payout_rules' => 'تسویه آزمایشی هر '.(7 + $sequence).' روز',
+            ]);
+        }
         $specs = $class::empty();
         foreach ($specs as $field => $value) {
             $specs[$field] = $values[$field] ?? '';
