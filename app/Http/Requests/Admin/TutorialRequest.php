@@ -10,7 +10,9 @@ use Illuminate\Validation\Validator;
 
 class TutorialRequest extends FormRequest
 {
-    public const EDITABLE = ['title', 'description', 'youtube_url', 'aparat_url', 'category_id', 'cover_image'];
+    public const EDITABLE = ['title', 'description', 'youtube_url', 'aparat_url', 'category_id', 'cover_image', 'vid_time'];
+
+    public const VIDEO_TIME_RULES = ['bail', 'sometimes', 'nullable', 'numeric:strict', 'min:0', 'max:9007199254740991'];
 
     public function authorize(): bool
     {
@@ -40,6 +42,7 @@ class TutorialRequest extends FormRequest
             'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list', 'min:1'],
             'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
             'cover_image' => [$required, 'string', 'max:2048'],
+            'vid_time' => self::VIDEO_TIME_RULES,
             'expected_version' => $this->isMethod('PATCH') ? ['required', 'integer:strict', 'min:1', 'max:9007199254740991'] : ['prohibited'],
         ];
     }
@@ -58,7 +61,7 @@ class TutorialRequest extends FormRequest
             if ($this->isMethod('PATCH') && array_intersect(array_keys($this->all()), self::EDITABLE) === []) {
                 $validator->errors()->add('expected_version', 'Supply an editable tutorial field.');
             }
-            foreach (['title', 'youtube_url', 'cover_image'] as $field) {
+            foreach (['title', 'youtube_url', 'cover_image', 'vid_time'] as $field) {
                 if (array_key_exists($field, $this->all()) && $this->input($field) === '') {
                     $validator->errors()->add($field, 'This field cannot be empty.');
                 }

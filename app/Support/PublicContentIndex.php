@@ -170,7 +170,7 @@ class PublicContentIndex
         $author = $record instanceof Tutorial ? null : $record->author;
 
         return hash('sha256', json_encode([
-            $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id']),
+            $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id', 'vid_time']),
             $record->categories->map(fn (Model $category): array => $category->only(['id', 'name', 'key', 'version', 'deleted_at']))->all(),
             $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']),
             $record instanceof Bonus ? $this->bonuses->campaign($record) : null,
@@ -183,7 +183,7 @@ class PublicContentIndex
         $author = $record instanceof Tutorial ? null : $record->author;
 
         $values = [
-            $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url']),
+            $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url', 'vid_time']),
             CategoryAssignments::publicFields($record), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
         ];
         if ($record instanceof Tutorial) {

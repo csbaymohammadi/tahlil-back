@@ -27,7 +27,7 @@ class TutorialProjection
         }
 
         return [
-            ...$tutorial->only(['id', 'title', 'description', 'slug', 'youtube_url', 'youtube_video_id', 'aparat_url', 'aparat_video_id', 'cover_image', 'version']),
+            ...$tutorial->only(['id', 'title', 'description', 'slug', 'youtube_url', 'youtube_video_id', 'aparat_url', 'aparat_video_id', 'cover_image', 'vid_time', 'version']),
             'default_provider' => $default,
             ...($panel ? ['category_id' => $tutorial->categories->modelKeys(), 'category' => CategoryAssignments::projection($tutorial)] : CategoryAssignments::publicFields($tutorial)),
             'duration_seconds' => $duration?->seconds, 'duration_source' => $duration?->provider,

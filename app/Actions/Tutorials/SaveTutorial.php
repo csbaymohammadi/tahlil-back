@@ -15,6 +15,7 @@ use App\Tutorials\TutorialEvents;
 use App\Tutorials\TutorialMedia;
 use App\Tutorials\TutorialProviders;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class SaveTutorial
@@ -35,9 +36,16 @@ class SaveTutorial
             if (! $creating && $tutorial->version !== $input['expected_version']) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'Fetch the current tutorial before retrying.');
             }
+            if (isset($input['vid_time']) && ! is_int($input['vid_time']) && ! is_float($input['vid_time'])) {
+                throw ValidationException::withMessages(['vid_time' => ['Supply a JSON number or null.']]);
+            }
+            Validator::make($input, ['vid_time' => TutorialRequest::VIDEO_TIME_RULES])->validate();
+            if (isset($input['vid_time'])) {
+                $input['vid_time'] = (float) $input['vid_time'];
+            }
             $categoryIds = $this->categoryAssignments->prepare($tutorial, $input);
             $categoriesChanged = $tutorial->categories->modelKeys() !== $categoryIds;
-            $values = $creating ? ['description' => '', 'aparat_url' => ''] : $tutorial->only(TutorialRequest::EDITABLE);
+            $values = $creating ? ['description' => '', 'aparat_url' => '', 'vid_time' => null] : $tutorial->only(TutorialRequest::EDITABLE);
             foreach (array_intersect_key($input, array_flip(TutorialRequest::EDITABLE)) as $field => $value) {
                 $values[$field] = is_string($value) ? trim($value) : $value;
             }

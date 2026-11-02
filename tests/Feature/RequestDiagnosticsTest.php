@@ -8,10 +8,40 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Encryption\MissingAppKeyException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RequestDiagnosticsTest extends TestCase
 {
+    #[DataProvider('loggingFailureStatuses')]
+    public function test_unavailable_application_log_preserves_error_response_and_reports_safe_fallback(int $status): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'tahlil-log-');
+        $previous = ini_set('error_log', $path);
+        Log::shouldReceive('log')->once()->andThrow(new \UnexpectedValueException('Private log path and secret-value'));
+        Route::post('/api/v1/blog/log-unavailable', function () use ($status): never {
+            throw new PanelAuthException($status, 'DIAGNOSTIC_FAILURE', 'Request could not be completed.');
+        });
+        try {
+            $response = $this->postJson('/api/v1/blog/log-unavailable', ['password' => 'secret-value'])
+                ->assertStatus($status)->assertJsonPath('error.code', $status === 503 ? 'BLOG_UNAVAILABLE' : 'DIAGNOSTIC_FAILURE');
+            $fallback = file_get_contents($path);
+            $this->assertStringContainsString($response->json('request_id'), $fallback);
+            $this->assertStringContainsString('DIAGNOSTIC_FAILURE', $fallback);
+            $this->assertStringContainsString('UnexpectedValueException', $fallback);
+            $this->assertStringNotContainsString('secret-value', $fallback);
+            $this->assertStringNotContainsString('Private log path', $fallback);
+        } finally {
+            ini_set('error_log', $previous);
+            unlink($path);
+        }
+    }
+
+    public static function loggingFailureStatuses(): array
+    {
+        return [[401], [403], [422], [503]];
+    }
+
     public function test_runtime_errors_record_safe_symbols_and_locations_without_request_payload_or_route_values(): void
     {
         Log::spy();

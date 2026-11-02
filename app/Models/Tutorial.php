@@ -27,6 +27,6 @@ class Tutorial extends Model
 
     protected function casts(): array
     {
-        return ['version' => 'integer', 'category_id' => 'integer', 'published_at' => 'immutable_datetime'];
+        return ['version' => 'integer', 'category_id' => 'integer', 'vid_time' => 'double', 'published_at' => 'immutable_datetime'];
     }
 }

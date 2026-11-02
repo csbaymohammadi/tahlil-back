@@ -65,7 +65,13 @@ class RequestFailureReporter
                 break;
             }
         }
-        Log::log($status >= 500 ? 'error' : 'notice', $status >= 500 ? 'Application request failed.' : 'Application request rejected.', $context);
+        try {
+            Log::log($status >= 500 ? 'error' : 'notice', $status >= 500 ? 'Application request failed.' : 'Application request rejected.', $context);
+        } catch (Throwable $loggingException) {
+            error_log('Application request reporting fallback. '.json_encode([
+                ...$context, 'logging_exception_type' => $loggingException::class,
+            ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_SLASHES));
+        }
     }
 
     /** @return array<string, mixed> */

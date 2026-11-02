@@ -60,7 +60,7 @@ class PublicTutorialProjection
             'cover_image' => $cover, ...CategoryAssignments::publicFields($tutorial),
             'youtube_url' => 'https://www.youtube.com/watch?v='.$tutorial->youtube_video_id, 'youtube_video_id' => $tutorial->youtube_video_id,
             'aparat_url' => $aparat ? 'https://www.aparat.com/v/'.$tutorial->aparat_video_id : '', 'aparat_video_id' => $aparat ? $tutorial->aparat_video_id : null,
-            'default_provider' => $aparat ? 'aparat' : 'youtube', ...$this->duration($tutorial),
+            'default_provider' => $aparat ? 'aparat' : 'youtube', 'vid_time' => $tutorial->vid_time, ...$this->duration($tutorial),
             'created_at' => $tutorial->created_at?->utc()->toISOString(), 'updated_at' => $tutorial->updated_at?->utc()->toISOString(),
             'published_at' => $tutorial->published_at?->utc()->toISOString()];
     }
