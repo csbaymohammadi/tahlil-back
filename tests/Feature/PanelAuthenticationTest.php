@@ -296,6 +296,15 @@ class PanelAuthenticationTest extends TestCase
         $this->login(password: $new)->assertOk();
     }
 
+    public function test_eight_character_password_can_be_saved_and_used_to_log_in(): void
+    {
+        $user = $this->administrator();
+        $this->login()->assertOk();
+        $this->postJson(self::BASE.'/password', ['current_password' => self::PASSWORD, 'new_password' => '12345678'])->assertNoContent();
+        $this->assertTrue(Hash::check('12345678', $user->fresh()->password));
+        $this->login(password: '12345678')->assertOk();
+    }
+
     #[DataProvider('passwordFailures')]
     public function test_password_policy_failures_leave_hash_and_session_unchanged(string $current, string $new, string $field): void
     {
@@ -310,7 +319,7 @@ class PanelAuthenticationTest extends TestCase
 
     public static function passwordFailures(): array
     {
-        return [['wrong', 'Valid replacement password', 'current_password'], [self::PASSWORD, 'short', 'new_password'],
+        return [['wrong', 'Valid replacement password', 'current_password'], [self::PASSWORD, '1234567', 'new_password'],
             [self::PASSWORD, str_repeat('x', 129), 'new_password'], [self::PASSWORD, self::PASSWORD, 'new_password']];
     }
 

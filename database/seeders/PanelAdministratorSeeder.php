@@ -28,7 +28,7 @@ class PanelAdministratorSeeder extends Seeder
             'username' => ['required', 'string', 'min:3', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'email' => ['required', 'string', 'email', 'max:254'],
             'name' => ['required', 'string', 'min:1', 'max:100'],
-            'password' => ['present', 'string', 'min:15', 'max:128'],
+            'password' => ['present', 'string', 'min:8', 'max:128'],
         ])->validate();
         try {
             DB::transaction(function () use ($settings): void {

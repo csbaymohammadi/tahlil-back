@@ -47,6 +47,27 @@ class UserRoleManagementTest extends PanelTestCase
         $this->assertSame(2, $response->json('data.id'));
     }
 
+    public function test_user_creation_and_password_replacement_accept_eight_characters(): void
+    {
+        $this->panel(User::factory()->panel()->create());
+        $role = Role::factory()->create();
+        $this->postJson(self::BASE.'/users', [...$this->fields($role), 'password' => '12345678'])->assertCreated();
+        $user = User::where('username_normalized', 'new.editor')->sole();
+        $this->assertTrue(Hash::check('12345678', $user->password));
+        $this->patchJson(self::BASE.'/users/'.$user->id, ['expected_version' => 1, 'password' => '87654321'])->assertOk();
+        $this->assertTrue(Hash::check('87654321', $user->fresh()->password));
+    }
+
+    public function test_seven_character_password_replacement_is_rejected_without_changing_the_hash(): void
+    {
+        $this->panel(User::factory()->panel()->create());
+        $user = User::factory()->panel()->create();
+        $hash = $user->password;
+        $this->patchJson(self::BASE.'/users/'.$user->id, ['expected_version' => 1, 'password' => '1234567'])
+            ->assertUnprocessable()->assertJsonValidationErrors('password', 'error.fields');
+        $this->assertSame($hash, $user->fresh()->password);
+    }
+
     public function test_user_list_has_deterministic_pagination_and_excludes_legacy_and_deleted_rows(): void
     {
         $this->freezeTime();
@@ -207,7 +228,7 @@ class UserRoleManagementTest extends PanelTestCase
     public static function invalidFields(): array
     {
         return ['boolean string' => [['is_active' => 'true']], 'role string' => [['role_id' => '1']],
-            'null password' => [['password' => null]], 'invalid username' => [['username' => 'not valid']],
+            'null password' => [['password' => null]], 'seven character password' => [['password' => '1234567']], 'invalid username' => [['username' => 'not valid']],
             'empty name' => [['name' => '   ']], 'unknown permission' => [['permissions' => ['all']]],
             'null role' => [['role_id' => null]], 'null status' => [['is_active' => null]]];
     }

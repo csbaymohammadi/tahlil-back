@@ -49,7 +49,7 @@ class ManagementRequest extends FormRequest
             'username' => [...$required, 'string', 'min:3', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'name' => [...$required, 'string', 'min:1', 'max:100'],
             'email' => [...$required, 'string', 'email', 'max:254'],
-            'password' => [$create ? 'present' : 'sometimes', 'string', ...($create || $this->input('password') !== '' ? ['min:15'] : []), 'max:128'],
+            'password' => [$create ? 'present' : 'sometimes', 'string', ...($create || $this->input('password') !== '' ? ['min:8'] : []), 'max:128'],
             'role_id' => [...$required, 'integer:strict', 'min:1', 'max:9007199254740991'],
             'is_active' => [...$required, 'boolean:strict'],
             'avatar_media_id' => ['sometimes', ...($create ? ['nullable'] : ['required']), 'integer:strict', 'min:1', 'max:9007199254740991'],

@@ -26,7 +26,7 @@ class AuthRequest extends FormRequest
         return match ($this->route()->getName()) {
             'panel.auth.login' => ['username' => ['required', 'string', 'min:3', 'max:120'], 'password' => ['present', 'string', 'min:8', 'max:256']],
             'panel.auth.logout-all' => ['current_password' => ['present', 'string', 'min:1', 'max:256']],
-            'panel.auth.password' => ['current_password' => ['present', 'string', 'min:1', 'max:256'], 'new_password' => ['present', 'string', 'min:15', 'max:128']],
+            'panel.auth.password' => ['current_password' => ['present', 'string', 'min:1', 'max:256'], 'new_password' => ['present', 'string', 'min:8', 'max:128']],
             default => [],
         };
     }

@@ -25,14 +25,14 @@ class CreatePanelAdministrator extends Command
         $username = trim((string) $this->ask('Username'));
         $email = trim((string) $this->ask('Contact email'));
         $name = trim((string) $this->ask('Display name'));
-        $password = $this->secret('Password (15-128 characters)', false);
+        $password = $this->secret('Password (8-128 characters)', false);
         $confirmation = $this->secret('Confirm password', false);
         $data = ['username' => $username, 'email' => $email, 'name' => $name, 'password' => $password, 'password_confirmation' => $confirmation];
         $validator = Validator::make($data, [
             'username' => ['required', 'string', 'min:3', 'max:120', 'regex:/^[A-Za-z0-9._-]+$/'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'name' => ['required', 'string', 'max:100'],
-            'password' => ['present', 'string', 'min:15', 'max:128', 'confirmed'],
+            'password' => ['present', 'string', 'min:8', 'max:128', 'confirmed'],
         ]);
         if ($validator->fails()) {
             foreach ($validator->errors()->all() as $error) {

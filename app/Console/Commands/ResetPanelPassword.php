@@ -30,10 +30,10 @@ class ResetPanelPassword extends Command
 
             return self::FAILURE;
         }
-        $password = $this->secret('New password (15-128 characters)', false);
+        $password = $this->secret('New password (8-128 characters)', false);
         $confirmation = $this->secret('Confirm password', false);
         $validator = Validator::make(['password' => $password, 'password_confirmation' => $confirmation], [
-            'password' => ['present', 'string', 'min:15', 'max:128', 'confirmed'],
+            'password' => ['present', 'string', 'min:8', 'max:128', 'confirmed'],
         ]);
         if ($validator->fails()) {
             foreach ($validator->errors()->all() as $error) {

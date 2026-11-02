@@ -24,14 +24,14 @@ class PanelOperationsTest extends TestCase
             ->expectsQuestion('Username', 'Owner.Admin')
             ->expectsQuestion('Contact email', 'owner@example.test')
             ->expectsQuestion('Display name', 'Site Owner')
-            ->expectsQuestion('Password (15-128 characters)', 'Protected initial password')
-            ->expectsQuestion('Confirm password', 'Protected initial password')
+            ->expectsQuestion('Password (8-128 characters)', '12345678')
+            ->expectsQuestion('Confirm password', '12345678')
             ->expectsOutput('Panel administrator created.')->assertSuccessful();
         $user = User::sole();
         $this->assertSame('owner.admin', $user->username_normalized);
         $this->assertTrue($user->is_active);
         $this->assertNull($user->role_id);
-        $this->assertTrue(Hash::check('Protected initial password', $user->password));
+        $this->assertTrue(Hash::check('12345678', $user->password));
     }
 
     public function test_repeated_provisioning_never_resets_existing_password(): void
@@ -42,8 +42,8 @@ class PanelOperationsTest extends TestCase
             ->expectsQuestion('Username', 'OWNER.ADMIN')
             ->expectsQuestion('Contact email', 'different@example.test')
             ->expectsQuestion('Display name', 'Site Owner')
-            ->expectsQuestion('Password (15-128 characters)', 'Protected replacement password')
-            ->expectsQuestion('Confirm password', 'Protected replacement password')
+            ->expectsQuestion('Password (8-128 characters)', '87654321')
+            ->expectsQuestion('Confirm password', '87654321')
             ->expectsOutput('That username already exists. No account was changed.')->assertFailed();
         $this->assertSame($hash, $user->fresh()->password);
         $this->assertDatabaseCount('users', 1);
@@ -54,10 +54,10 @@ class PanelOperationsTest extends TestCase
         $user = User::factory()->panel()->create(['username' => 'owner.admin']);
         $session = (new PanelSessions)->create($user)['record'];
         $this->artisan('panel:admin-reset-password', ['username' => ' OWNER.ADMIN '])
-            ->expectsQuestion('New password (15-128 characters)', 'Protected replacement password')
-            ->expectsQuestion('Confirm password', 'Protected replacement password')
+            ->expectsQuestion('New password (8-128 characters)', '87654321')
+            ->expectsQuestion('Confirm password', '87654321')
             ->expectsOutput('Password reset; all sessions revoked.')->assertSuccessful();
-        $this->assertTrue(Hash::check('Protected replacement password', $user->fresh()->password));
+        $this->assertTrue(Hash::check('87654321', $user->fresh()->password));
         $this->assertNotNull($session->fresh()->revoked_at);
         $this->assertDatabaseHas('panel_security_events', ['event' => 'admin_password_reset', 'user_id' => $user->id]);
     }
@@ -69,8 +69,8 @@ class PanelOperationsTest extends TestCase
         $session = (new PanelSessions)->create($user)['record'];
         DB::statement("CREATE TRIGGER fail_reset_audit BEFORE INSERT ON panel_security_events BEGIN SELECT RAISE(ABORT, 'audit unavailable'); END");
         $this->artisan('panel:admin-reset-password', ['username' => 'owner.admin'])
-            ->expectsQuestion('New password (15-128 characters)', 'Protected replacement password')
-            ->expectsQuestion('Confirm password', 'Protected replacement password')
+            ->expectsQuestion('New password (8-128 characters)', '87654321')
+            ->expectsQuestion('Confirm password', '87654321')
             ->expectsOutput('Account storage is unavailable or conflicted; the password reset was rolled back.')
             ->assertFailed();
 

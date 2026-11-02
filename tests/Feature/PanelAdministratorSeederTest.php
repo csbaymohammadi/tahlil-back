@@ -18,7 +18,7 @@ class PanelAdministratorSeederTest extends PanelTestCase
     private function settings(): void
     {
         config(['panel.seed_administrator' => ['username' => 'admin', 'name' => 'Panel Owner',
-            'email' => 'owner@example.test', 'password' => 'Private initial seed password']]);
+            'email' => 'owner@example.test', 'password' => '12345678']]);
     }
 
     public function test_configured_seed_account_can_authenticate_and_use_the_management_api(): void
@@ -27,11 +27,11 @@ class PanelAdministratorSeederTest extends PanelTestCase
         $this->seed(DatabaseSeeder::class);
         $user = User::where('username_normalized', 'admin')->sole();
         $this->assertTrue($user->is_active);
-        $this->assertTrue(Hash::check('Private initial seed password', $user->password));
+        $this->assertTrue(Hash::check('12345678', $user->password));
         $session = (new PanelSessions)->create();
         $this->withCredentials()->withUnencryptedCookie(PanelSessions::CONTEXT_COOKIE, $session['token'])
             ->withHeader('X-CSRF-Token', $session['store']->token());
-        $response = $this->postJson('/api/v1/admin/auth/login', ['username' => 'admin', 'password' => 'Private initial seed password'])->assertOk();
+        $response = $this->postJson('/api/v1/admin/auth/login', ['username' => 'admin', 'password' => '12345678'])->assertOk();
         $this->withUnencryptedCookie(PanelSessions::COOKIE, $response->getCookie(PanelSessions::COOKIE, false)->getValue());
         $this->get('/api/v1/admin/users')->assertOk()->assertJsonPath('meta.total', 1);
     }
@@ -64,7 +64,7 @@ class PanelAdministratorSeederTest extends PanelTestCase
     public function test_seed_rejects_short_passwords_before_creating_an_account(): void
     {
         $this->settings();
-        config(['panel.seed_administrator.password' => 'short']);
+        config(['panel.seed_administrator.password' => '1234567']);
         try {
             $this->seed(PanelAdministratorSeeder::class);
             $this->fail('A weak seed password must be rejected.');
