@@ -15,7 +15,7 @@ class PresentationRequest
     {
         $collection = $request->routeIs('analytics.page-views', 'analytics.options');
         $seen = [];
-        $allowedQuery = $request->routeIs('panel.page-settings.options.*') ? ['q', 'page', 'per_page'] : [];
+        $allowedQuery = $request->routeIs('panel.advertisements.destroy') ? ['expected_version'] : ($request->routeIs('panel.page-settings.options.*') ? ['q', 'page', 'per_page'] : []);
         foreach (explode('&', (string) $request->server('QUERY_STRING', '')) as $pair) {
             if ($pair === '') {
                 continue;
@@ -49,7 +49,7 @@ class PresentationRequest
             $request->json()->replace(json_decode($raw, true, 16, JSON_THROW_ON_ERROR));
         } elseif ($request->isMethodSafe() && $request->getContent() !== '') {
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'This endpoint does not accept a body.');
-        } elseif ($request->getContent() !== '') {
+        } elseif ($request->getContent() !== '' && ! $request->routeIs('panel.advertisements.store', 'panel.advertisements.update')) {
             StrictJson::rejectDuplicateKeys($request->getContent());
         }
         $limit = $collection ? config('analytics.collection_rate_limit') : ($request->routeIs('panel.dashboard.home') ? config('analytics.dashboard_rate_limit') : config('presentation.management_rate_limit'));

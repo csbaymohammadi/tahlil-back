@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Media\MediaConsumers;
+use App\Models\Advertisement;
 use App\Models\BlogArticle;
 use App\Models\Bonus;
 use App\Models\Broker;
@@ -39,6 +40,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->app->make(MediaConsumers::class)->register('advertisement',
+            static fn (int $id, User $actor): bool => Advertisement::whereKey($id)->exists(),
+            static fn (int $id): bool => Advertisement::public()->whereKey($id)->exists(),
+        );
         $this->app->make(MediaConsumers::class)->register('page-settings',
             static fn (int $id, User $actor): bool => PageSetting::whereKey($id)->exists(),
             static fn (int $id): bool => PageSetting::whereKey($id)->exists(),

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdvertisementController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BlogArticleController;
 use App\Http\Controllers\Admin\BlogCategoryController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BonusRatingController;
 use App\Http\Controllers\PageSettingsController;
 use App\Http\Controllers\PageViewController;
+use App\Http\Controllers\PublicAdvertisementController;
 use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\PublicBonusController;
 use App\Http\Controllers\PublicCommentController;
@@ -73,6 +75,15 @@ Route::prefix('v1/admin')->name('panel.')->middleware(PanelRequest::class)->grou
     Route::patch('users/{id}', [UserController::class, 'update'])->name('users.update');
     Route::apiResource('roles', RoleController::class)->parameters(['roles' => 'id'])->except('update');
     Route::patch('roles/{id}', [RoleController::class, 'update'])->name('roles.update');
+});
+
+Route::prefix('v1/admin/advertisements')->name('panel.advertisements.')->middleware([PanelRequest::class, PresentationRequest::class])->group(function (): void {
+    Route::get('/', [AdvertisementController::class, 'index'])->name('index');
+    Route::post('/', [AdvertisementController::class, 'store'])->name('store');
+    Route::put('order', [AdvertisementController::class, 'order'])->name('order');
+    Route::get('{id}', [AdvertisementController::class, 'show'])->name('show');
+    Route::post('{id}', [AdvertisementController::class, 'update'])->name('update');
+    Route::delete('{id}', [AdvertisementController::class, 'destroy'])->name('destroy');
 });
 
 Route::prefix('v1/admin/media')->name('panel.media.')->middleware(PanelRequest::class)->group(function (): void {
@@ -222,6 +233,8 @@ Route::prefix('v1/comments')->name('comments.')->middleware([StrictCommentQuery:
 });
 
 Route::prefix('v1')->middleware(PublicReadRequest::class)->group(function (): void {
+    Route::get('advertisements', [PublicAdvertisementController::class, 'index'])->name('public.advertisements.index');
+    Route::options('advertisements', fn () => response()->noContent());
     Route::get('page-settings', [PageSettingsController::class, 'show'])->name('page-settings.public');
     Route::get('blog/articles', [PublicBlogController::class, 'index'])->name('public.blog.index');
     Route::get('blog/featured', [PublicBlogController::class, 'featured'])->name('public.blog.featured');

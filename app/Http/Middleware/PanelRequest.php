@@ -40,7 +40,8 @@ class PanelRequest
         $goldPlatformItemMutation = $request->routeIs('panel.gold-platforms.items.store', 'panel.gold-platforms.items.update');
         $propFirmItemMutation = $request->routeIs('panel.prop-firms.items.store', 'panel.prop-firms.items.update');
         $bonusItemMutation = $request->routeIs('panel.bonuses.items.store', 'panel.bonuses.items.update');
-        $multipart = $mediaUpload || $contentImport;
+        $advertisementMutation = $request->routeIs('panel.advertisements.store', 'panel.advertisements.update');
+        $multipart = $mediaUpload || $contentImport || $advertisementMutation;
         $bodyLimit = $request->routeIs('panel.blog.articles.store', 'panel.blog.articles.update') || $newsItemMutation || $exchangeItemMutation || $brokerItemMutation || $stockBrokerageItemMutation || $goldPlatformItemMutation || $propFirmItemMutation || $bonusItemMutation ? 2 * 1024 * 1024 : 16384;
         if ($request->routeIs('panel.page-settings.update')) {
             $bodyLimit = 2 * 1024 * 1024;
@@ -57,17 +58,21 @@ class PanelRequest
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'DELETE requests do not accept a body.', ['body' => ['Use query parameters only where documented.']]);
         }
         if ($multipart) {
-            $maximum = $contentImport ? config('blog.import_max_bytes') + 65536 : 30 * 1024 * 1024 + 65536;
+            $maximum = $advertisementMutation ? 5 * 1024 * 1024 + 65536 : ($contentImport ? config('blog.import_max_bytes') + 65536 : 30 * 1024 * 1024 + 65536);
             if ((int) $request->header('Content-Length', 0) > $maximum) {
                 throw new PanelAuthException(413, 'FILE_TOO_LARGE', 'The upload body is too large.');
             }
-            if (! preg_match('/^multipart\/form-data;.*boundary=/i', $request->header('Content-Type', '')) || count($request->allFiles()) !== 1 || ! $request->file('file') instanceof UploadedFile) {
+            $fileField = $advertisementMutation ? 'img' : 'file';
+            $file = $request->file($fileField);
+            $optionalFile = $request->routeIs('panel.advertisements.update') && $request->allFiles() === [];
+            if (! preg_match('/^multipart\/form-data;.*boundary=/i', $request->header('Content-Type', '')) ||
+                (! $optionalFile && (count($request->allFiles()) !== 1 || ! $file instanceof UploadedFile))) {
                 throw new PanelAuthException(400, 'INVALID_MULTIPART', 'Send exactly one file in a multipart request.');
             }
             if ($contentImport && array_diff(array_keys($request->except('file')), ['content_type']) !== []) {
                 throw new PanelAuthException(422, 'VALIDATION_FAILED', 'Check the submitted information.', ['body' => ['Only content_type and file are accepted.']]);
             }
-            if (in_array($request->file('file')->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            if ($file instanceof UploadedFile && in_array($file->getError(), [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
                 throw new PanelAuthException(413, 'FILE_TOO_LARGE', 'The upload exceeds the PHP file size limit.');
             }
         } elseif (! $request->isMethod('GET') && ! $request->isMethod('HEAD')) {
@@ -107,7 +112,7 @@ class PanelRequest
             $request->routeIs('panel.exchanges.categories.index') => ['q'],
             $request->routeIs('panel.brokers.items.index', 'panel.stock-brokers.items.index', 'panel.gold-platforms.items.index', 'panel.prop-firms.items.index', 'panel.bonuses.items.index', 'panel.tutorials.items.index') => ['page', 'per_page', 'q', 'category_id'],
             $request->routeIs('panel.brokers.categories.index', 'panel.stock-brokers.categories.index', 'panel.gold-platforms.categories.index', 'panel.prop-firms.categories.index', 'panel.bonuses.categories.index', 'panel.tutorials.categories.index') => ['q'],
-            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy', 'panel.brokers.items.destroy', 'panel.brokers.categories.destroy', 'panel.stock-brokers.items.destroy', 'panel.stock-brokers.categories.destroy', 'panel.gold-platforms.items.destroy', 'panel.gold-platforms.categories.destroy', 'panel.prop-firms.items.destroy', 'panel.prop-firms.categories.destroy', 'panel.bonuses.items.destroy', 'panel.bonuses.categories.destroy', 'panel.tutorials.items.destroy', 'panel.tutorials.categories.destroy', 'panel.comments.destroy') => ['expected_version'],
+            $request->isMethod('DELETE') && $request->routeIs('panel.users.destroy', 'panel.roles.destroy', 'panel.blog.articles.destroy', 'panel.blog.categories.destroy', 'panel.news.items.destroy', 'panel.news.categories.destroy', 'panel.exchanges.items.destroy', 'panel.exchanges.categories.destroy', 'panel.brokers.items.destroy', 'panel.brokers.categories.destroy', 'panel.stock-brokers.items.destroy', 'panel.stock-brokers.categories.destroy', 'panel.gold-platforms.items.destroy', 'panel.gold-platforms.categories.destroy', 'panel.prop-firms.items.destroy', 'panel.prop-firms.categories.destroy', 'panel.bonuses.items.destroy', 'panel.bonuses.categories.destroy', 'panel.tutorials.items.destroy', 'panel.tutorials.categories.destroy', 'panel.comments.destroy', 'panel.advertisements.destroy') => ['expected_version'],
             default => [],
         };
         if (array_diff(array_keys($request->query->all()), $allowedQuery) !== []) {
