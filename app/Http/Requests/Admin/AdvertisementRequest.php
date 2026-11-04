@@ -37,7 +37,7 @@ class AdvertisementRequest extends FormRequest
         $required = $create ? ['required'] : ['sometimes', 'required'];
 
         return ['img' => [...$required, 'file'], 'title' => [...$required, 'string', 'max:200'],
-            'description' => [...$required, 'string', 'max:2000'], 'show' => [...$required, 'string', Rule::in(['0', '1'])],
+            'description' => [...$required, 'string', 'max:2000'], 'link' => ['sometimes', 'string'], 'show' => [...$required, 'string', Rule::in(['0', '1'])],
             ...($create ? [] : ['expected_version' => $version])];
     }
 
@@ -53,7 +53,7 @@ class AdvertisementRequest extends FormRequest
                     $validator->errors()->add($field, 'Enter plain text.');
                 }
             }
-            if ($this->routeIs('panel.advertisements.update') && array_intersect(array_keys($this->all()), ['img', 'title', 'description', 'show']) === []) {
+            if ($this->routeIs('panel.advertisements.update') && array_intersect(array_keys($this->all()), ['img', 'title', 'description', 'link', 'show']) === []) {
                 $validator->errors()->add('body', 'Supply at least one editable field.');
             }
         }];

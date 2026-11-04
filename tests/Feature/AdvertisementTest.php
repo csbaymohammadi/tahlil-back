@@ -46,7 +46,7 @@ class AdvertisementTest extends PanelTestCase
         $this->panel($actor);
         $snapshot = PageSetting::current()->snapshot;
         $response = $this->createAdvertisement()->assertCreated()->assertJsonPath('data.show', true)
-            ->assertJsonPath('data.position', 1)->assertJsonPath('data.version', 1)->assertJsonPath('data.title', 'عنوان تبلیغ');
+            ->assertJsonPath('data.link', '')->assertJsonPath('data.position', 1)->assertJsonPath('data.version', 1)->assertJsonPath('data.title', 'عنوان تبلیغ');
         $advertisement = Advertisement::sole();
         $this->assertSame($actor->id, $advertisement->created_by);
         $this->assertSame('banner', $advertisement->image->purpose);
@@ -82,7 +82,7 @@ class AdvertisementTest extends PanelTestCase
         $this->withUnencryptedCookie(PanelSessions::COOKIE, '');
         $response = $this->get('/api/v1/advertisements')->assertOk()->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', $last['id'])->assertJsonPath('data.1.id', $first['id'])->assertJsonMissingPath('data.0.version');
-        $this->assertSame(['id', 'img', 'title', 'description', 'show'], array_keys($response->json('data.0')));
+        $this->assertSame(['id', 'img', 'title', 'description', 'link', 'show'], array_keys($response->json('data.0')));
         $this->assertNotEmpty($response->headers->get('X-Request-ID'));
         $this->assertStringContainsString('no-cache', $response->headers->get('Cache-Control'));
     }
@@ -295,5 +295,36 @@ class AdvertisementTest extends PanelTestCase
         $this->multipart(self::BASE.'/'.$first['id'], ['expected_version' => '3', 'show' => '1'])->assertNotFound()->assertJsonPath('error.code', 'ADVERTISEMENT_NOT_FOUND');
         $this->delete(self::BASE.'/'.$first['id'].'?expected_version=3')->assertNotFound();
         $this->get(self::BASE)->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('data.0.id', $second['id']);
+    }
+
+    public function test_link_is_saved_returned_and_updated_without_url_validation(): void
+    {
+        Storage::fake('media');
+        $this->panel(User::factory()->panel()->create());
+        $link = '  arbitrary destination /مسیر?x=1  ';
+        $data = $this->createAdvertisement(['link' => $link])->assertCreated()->assertJsonPath('data.link', $link)->json('data');
+        $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link' => $link]);
+        $this->get(self::BASE)->assertOk()->assertJsonPath('data.0.link', $link);
+        $this->get(self::BASE.'/'.$data['id'])->assertOk()->assertJsonPath('data.link', $link);
+        $this->get('/api/v1/advertisements')->assertOk()->assertJsonPath('data.0.link', $link);
+        $this->multipart(self::BASE.'/'.$data['id'], ['expected_version' => '1', 'link' => 'custom:value'])
+            ->assertOk()->assertJsonPath('data.link', 'custom:value')->assertJsonPath('data.version', 2);
+        $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link' => 'custom:value', 'version' => 2]);
+        $this->multipart(self::BASE.'/'.$data['id'], ['expected_version' => '2', 'title' => 'Changed'])
+            ->assertOk()->assertJsonPath('data.link', 'custom:value')->assertJsonPath('data.version', 3);
+        $this->multipart(self::BASE.'/'.$data['id'], ['expected_version' => '3', 'link' => ''])
+            ->assertOk()->assertJsonPath('data.link', '')->assertJsonPath('data.version', 4);
+        $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link' => '', 'version' => 4]);
+        $this->get('/api/v1/advertisements')->assertOk()->assertJsonPath('data.0.link', '');
+    }
+
+    public function test_non_string_link_is_rejected_without_changing_the_advertisement(): void
+    {
+        Storage::fake('media');
+        $this->panel(User::factory()->panel()->create());
+        $data = $this->createAdvertisement(['link' => 'original'])->assertCreated()->json('data');
+        $this->multipart(self::BASE.'/'.$data['id'], ['expected_version' => '1', 'link' => ['invalid']])
+            ->assertUnprocessable()->assertJsonValidationErrors('link', 'error.fields');
+        $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link' => 'original', 'version' => 1]);
     }
 }

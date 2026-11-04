@@ -16,6 +16,8 @@ class Advertisement extends Model
 
     protected $guarded = ['*'];
 
+    protected $attributes = ['link' => ''];
+
     protected function casts(): array
     {
         return ['show' => 'boolean', 'position' => 'integer', 'version' => 'integer', 'image_media_id' => 'integer'];
