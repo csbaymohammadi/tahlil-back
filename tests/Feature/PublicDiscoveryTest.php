@@ -20,6 +20,26 @@ class PublicDiscoveryTest extends PanelTestCase
 {
     use RefreshDatabase;
 
+    public function test_tutorial_manual_time_remains_fresh_in_search_and_sitemap_after_synchronization(): void
+    {
+        $tutorial = Tutorial::factory()->create(['title' => 'Manual time lesson', 'vid_time' => 12.75]);
+        Tutorial::factory()->create(['title' => 'Untimed lesson', 'vid_time' => null]);
+        $this->artisan('public-content:rebuild')->assertSuccessful();
+        $this->get('/api/v1/search?q=Manual')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $tutorial->id);
+        $this->get('/api/v1/search?surface=header&type=tutorials')->assertOk()->assertJsonPath('meta.total', 2);
+        $this->get('/api/v1/sitemap/entries?type=tutorials')->assertOk()->assertJsonPath('meta.total', 2);
+
+        $this->panel(User::factory()->panel()->create());
+        $this->patchJson('/api/v1/admin/tutorials/items/'.$tutorial->id, ['expected_version' => 1, 'vid_time' => 20.5])->assertOk();
+        $this->get('/api/v1/search?q=Manual')->assertOk()->assertJsonPath('meta.total', 1);
+        $this->get('/api/v1/sitemap/entries?type=tutorials')->assertOk()->assertJsonPath('meta.total', 2);
+
+        DB::table('tutorials')->where('id', $tutorial->id)->update(['vid_time' => 21.5]);
+        $this->get('/api/v1/search')->assertServiceUnavailable()->assertJsonPath('error.code', 'SEARCH_UNAVAILABLE');
+        $this->artisan('public-content:rebuild')->assertSuccessful();
+        $this->get('/api/v1/search?q=Manual')->assertOk()->assertJsonPath('meta.total', 1);
+    }
+
     public function test_nine_domains_have_typed_identities_and_header_has_only_three(): void
     {
         $this->freezeTime();

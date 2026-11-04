@@ -109,7 +109,7 @@ class PublicContentIndex
             if ($type !== 'tutorials') {
                 $columns = [...$columns, 'status', 'author_id'];
             } else {
-                $columns = [...$columns, 'youtube_url', 'youtube_video_id'];
+                $columns = [...$columns, 'youtube_url', 'youtube_video_id', 'vid_time'];
             }
             $model::query()->select($columns)->with($this->relations($type))->chunkById(200, function ($records) use ($type, $errorCode, &$count): void {
                 $entries = DB::table('public_content_entries')->where('type', $type)->whereIn('record_id', $records->modelKeys())->pluck('source_stamp', 'record_id');
