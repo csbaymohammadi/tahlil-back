@@ -16,6 +16,8 @@ For each `kind` below, use the **numeric record ID** returned in public cards/de
 
 `OPTIONS` is supported. IDs are canonical positive integers, at most `9007199254740991`; leading zeros, slugs, zero and negative values are invalid. No query parameters are accepted. GET accepts no body. PUT accepts a JSON object no larger than 4096 bytes, containing only `value`.
 
+Use the page/directory kind for directory cards and the search card `type` for global-search cards. The navigation-menu key `forex` maps to rating kind `brokers`; `forex` is not a rating endpoint kind.
+
 The identity is `(kind, platform_id, visitor context)`. For example, exchange 31, broker 31 and bonus 31 are three independent targets. Panel login is not required.
 
 ## Read before submitting
@@ -88,7 +90,7 @@ Every existing public card/detail for these five kinds includes:
 
 This includes public lists, details, related/other items, existing homepage/carousel cards, navigation-menu cards and global-search cards. Existing selection slots are preserved. `comment_count` counts visible comments independently of `rating_count`; never derive one from the other.
 
-Public responses never contain `my_rating`, visitor context IDs or CSRF. Voting does not change the editorial record's version, update date or publication date. A real vote change updates its public discovery fingerprint, homepage ETag/revision and the existing cache-revalidation outbox. A failed webhook is retained for retry; the vote itself is not submitted again. Frontend cache invalidation after a successful PUT should update the relevant target, directory, home/menu and search cards using the returned authoritative aggregate.
+Public responses never contain `my_rating`, visitor context IDs or CSRF. Voting does not change the editorial record's version, update date or publication date. A real vote change updates its public discovery fingerprint, homepage ETag/revision when the target appears in its snapshot, and the existing cache-revalidation outbox. A failed webhook is retained for retry; the vote itself is not submitted again. Frontend cache invalidation after a successful PUT should update the relevant target, directory, home/menu and search cards using the returned authoritative aggregate.
 
 ## Errors and limits
 
@@ -183,4 +185,309 @@ The normal tests use isolated SQLite memory databases. `PlatformRatingConcurrenc
 
 ### Live verification
 
-Production verification results will be recorded here after deployment. Only existing demo-seeder records are used for real votes. Cookie values and CSRF tokens are redacted. Infrastructure failures are verified in isolated tests; the production service is not deliberately interrupted to generate 503 samples.
+Verified on 2026-11-05 (Asia/Tehran), against the deployed backend commit `5b27e80`. Capture timestamp in UTC: `2026-11-04T21:44:10.251721+00:00`.
+
+These are actual production HTTP results against existing demo-seeder records. Test votes were intentionally left on those demo records. No editorial record was changed. Cookie values and CSRF tokens are redacted; request IDs and aggregate values below are from the captured responses.
+
+| Kind | Demo ID | First PUT revision | Same-value PUT revision | Changed-value revision | Final vote count | Visitor vote |
+|---|---:|---:|---:|---:|---:|---:|
+| `exchanges` | 2 | 1 | 1 | 2 | 1 | 4 |
+| `brokers` | 2 | 1 | 1 | 2 | 1 | 4 |
+| `stock-brokers` | 2 | 1 | 1 | 2 | 1 | 4 |
+| `gold-platforms` | 1 | 1 | 1 | 2 | 1 | 4 |
+| `prop-firms` | 1 | 1 | 1 | 2 | 1 | 4 |
+
+All five demo details, matching global-search cards and scoped sitemap responses were checked after the votes. Rating fields matched the personal readback. A repeated same-value PUT left the homepage ETag unchanged. Bonus GET still returned the legacy `bonus_id`/`rating` contract with its separate cookie.
+
+#### Actual GET before the first vote
+
+`GET /api/v1/exchanges/2/rating` — HTTP 200
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_caef18a6-c3a3-47af-9dcd-23303e049cc6
+set-cookie: tahlil-platform-voter-v1=<redacted>; expires=Thu, 04 Nov 2027 21:43:56 GMT; Max-Age=31536000; path=/api/v1; secure; httponly; samesite=lax
+```
+
+```json
+{
+  "data": {
+    "kind": "exchanges",
+    "platform_id": 2,
+    "rating_average": null,
+    "rating_count": 0,
+    "rating_revision": 0,
+    "my_rating": null,
+    "csrf_token": "<redacted>",
+    "csrf_expires_at": "2026-11-04T21:58:56.409042Z"
+  },
+  "request_id": "req_caef18a6-c3a3-47af-9dcd-23303e049cc6"
+}
+```
+
+#### Actual PUT with value 5
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 200
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_127630f0-aa05-4312-9e8a-f442a6ef3c54
+```
+
+```json
+{
+  "data": {
+    "kind": "exchanges",
+    "platform_id": 2,
+    "rating_average": 5,
+    "rating_count": 1,
+    "rating_revision": 1,
+    "my_rating": 5
+  },
+  "request_id": "req_127630f0-aa05-4312-9e8a-f442a6ef3c54"
+}
+```
+
+#### Actual repeated PUT with value 5
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 200
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_bf1289b8-87f3-4861-93fc-d9c5f10017d6
+```
+
+```json
+{
+  "data": {
+    "kind": "exchanges",
+    "platform_id": 2,
+    "rating_average": 5,
+    "rating_count": 1,
+    "rating_revision": 1,
+    "my_rating": 5
+  },
+  "request_id": "req_bf1289b8-87f3-4861-93fc-d9c5f10017d6"
+}
+```
+
+#### Actual replacement PUT with value 4
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 200
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_4631ccb5-6dda-4cb7-95b5-244006b2e45b
+```
+
+```json
+{
+  "data": {
+    "kind": "exchanges",
+    "platform_id": 2,
+    "rating_average": 4,
+    "rating_count": 1,
+    "rating_revision": 2,
+    "my_rating": 4
+  },
+  "request_id": "req_4631ccb5-6dda-4cb7-95b5-244006b2e45b"
+}
+```
+
+#### Actual GET after replacement
+
+`GET /api/v1/exchanges/2/rating` — HTTP 200
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_6d856ec6-6422-45ef-ac97-e381e9629b85
+```
+
+```json
+{
+  "data": {
+    "kind": "exchanges",
+    "platform_id": 2,
+    "rating_average": 4,
+    "rating_count": 1,
+    "rating_revision": 2,
+    "my_rating": 4,
+    "csrf_token": "<redacted>",
+    "csrf_expires_at": "2026-11-04T21:58:57.108306Z"
+  },
+  "request_id": "req_6d856ec6-6422-45ef-ac97-e381e9629b85"
+}
+```
+
+#### Actual domain-specific 404 responses
+
+Each GET below used numeric ID `9007199254740991`, which does not identify a public platform.
+
+| Kind | HTTP | Error code | Request ID |
+|---|---:|---|---|
+| `exchanges` | 404 | `EXCHANGE_NOT_FOUND` | `req_08a60ecf-82ff-4823-a269-ace019fa83ec` |
+| `brokers` | 404 | `BROKER_NOT_FOUND` | `req_a2fafcc4-1346-4a78-b183-67a16689a126` |
+| `stock-brokers` | 404 | `STOCK_BROKER_NOT_FOUND` | `req_04c18990-4d31-44b3-a59d-05948279e7a8` |
+| `gold-platforms` | 404 | `GOLD_PLATFORM_NOT_FOUND` | `req_720c13ac-eace-451d-8d55-4db6b020a3fb` |
+| `prop-firms` | 404 | `PROP_FIRM_NOT_FOUND` | `req_e9c298be-c520-4ab2-9dad-b690050eac3a` |
+
+#### Actual 403 without a visitor cookie
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 403
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_fe64c4f9-4660-4f17-a6fb-20c562f5b9bf
+```
+
+```json
+{
+  "error": {
+    "code": "RATING_CONTEXT_INVALID",
+    "message": "Read a fresh rating context before retrying.",
+    "fields": {}
+  },
+  "request_id": "req_fe64c4f9-4660-4f17-a6fb-20c562f5b9bf"
+}
+```
+
+#### Actual 403 with an invalid CSRF token
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 403
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_b01102b9-1183-4820-9cb4-c613d824433e
+```
+
+```json
+{
+  "error": {
+    "code": "CSRF_INVALID",
+    "message": "Read a fresh rating context before retrying.",
+    "fields": {}
+  },
+  "request_id": "req_b01102b9-1183-4820-9cb4-c613d824433e"
+}
+```
+
+#### Actual 422 for value 0
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 422
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_b2137447-843e-490f-b58b-592192b48110
+```
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Check the submitted information.",
+    "fields": {
+      "value": [
+        "The value field must be at least 1."
+      ]
+    }
+  },
+  "request_id": "req_b2137447-843e-490f-b58b-592192b48110"
+}
+```
+
+#### Actual 400 for duplicate value keys
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 400
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_773c7913-2546-49a3-92ce-63427d58e80d
+```
+
+```json
+{
+  "error": {
+    "code": "INVALID_JSON",
+    "message": "Duplicate JSON object keys are not accepted.",
+    "fields": {}
+  },
+  "request_id": "req_773c7913-2546-49a3-92ce-63427d58e80d"
+}
+```
+
+#### Actual 415 for text/plain
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 415
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_6caa34f7-7601-4494-80c5-d0f1fff4f53d
+```
+
+```json
+{
+  "error": {
+    "code": "UNSUPPORTED_MEDIA_TYPE",
+    "message": "Use application/json.",
+    "fields": {}
+  },
+  "request_id": "req_6caa34f7-7601-4494-80c5-d0f1fff4f53d"
+}
+```
+
+#### Actual 413 for a 4097-byte body
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 413
+
+```http
+cache-control: no-store, private
+vary: Cookie
+x-request-id: req_96bb1f53-567d-4d59-9c11-41eaa959e7a9
+```
+
+```json
+{
+  "error": {
+    "code": "PAYLOAD_TOO_LARGE",
+    "message": "The rating body exceeds 4 KiB.",
+    "fields": {}
+  },
+  "request_id": "req_96bb1f53-567d-4d59-9c11-41eaa959e7a9"
+}
+```
+
+#### Actual 429 after exhausting the isolated test visitor's write quota
+
+`PUT /api/v1/exchanges/2/rating` — HTTP 429
+
+```http
+cache-control: no-store, private
+retry-after: 887
+vary: Cookie
+x-request-id: req_974b9367-4740-4574-8429-652a9bf6d510
+```
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Please wait before trying again.",
+    "fields": {}
+  },
+  "request_id": "req_974b9367-4740-4574-8429-652a9bf6d510"
+}
+```
+
+The 429 sample was obtained using same-value PUTs from the test visitor; limits were not lowered and no extra votes were inserted. No production outage was induced for a 503 example. Isolated failure tests verified `503 / RATINGS_UNAVAILABLE`, atomic rollback on audit/outbox failure, and private cache headers.
+
+Final verification: 581 tests passed in the full PHPUnit run (17 skipped, including opt-in concurrency cases), all six opt-in MariaDB 11.7.2 concurrency tests passed separately, and Pint passed. The disposable MariaDB test database was removed after use.
