@@ -183,6 +183,14 @@ Deploy the additive migration before enabling the new code, rebuild public disco
 
 The normal tests use isolated SQLite memory databases. `PlatformRatingConcurrencyTest` is opt-in and requires a separately created disposable MariaDB database named `tahlil_ratings_test_<12 hex digits>`, using `PLATFORM_RATING_TEST_DATABASE`, `PLATFORM_RATING_TEST_USER`, optional `PLATFORM_RATING_TEST_PASSWORD` and optional `PLATFORM_RATING_TEST_SOCKET`. It migrates that disposable database with `migrate:fresh`; never point it at application data.
 
+### Frontend cache receiver is not connected yet
+
+As confirmed by the operator on 2026-11-05 (Asia/Tehran), the frontend revalidation receiver is not connected yet. Backend rating APIs, public projections, ETags and discovery are active and verified. The configured receiver host `tahlilex.com` currently does not resolve from the backend server (`cURL error 6`); the ordinary resolver can resolve the API host and unrelated public hosts. No DNS settings, receiver URL or secrets were changed for this release.
+
+The ten real demo rating-change events remain in their existing outboxes and delivery queue with retry/backoff. Frontend cache invalidation via webhook cannot complete until the receiver is reachable. When the frontend is ready, connect the existing `PUBLIC_REVALIDATION_URL` and server-only `PUBLIC_REVALIDATION_SECRET` integration. Follow the existing signed webhook contract in [Public Website API](public-website-api.md#11-publication-cache-propagation-and-deployment): verify `X-Revalidation-Timestamp` and `X-Revalidation-Signature`, handle `Idempotency-Key` idempotently, invalidate/refetch the supplied `areas`, and return a successful response. The webhook's homepage revision is not a global search/sitemap revision; delayed events must refetch current data rather than overwrite it with older data.
+
+This deferred frontend connection does not require resubmitting any visitor's vote. The browser integration still sends each PUT once and reconciles uncertain outcomes with GET.
+
 ### Live verification
 
 Verified on 2026-11-05 (Asia/Tehran), against the deployed backend commit `5b27e80`. Capture timestamp in UTC: `2026-11-04T21:44:10.251721+00:00`.
@@ -197,7 +205,7 @@ These are actual production HTTP results against existing demo-seeder records. T
 | `gold-platforms` | 1 | 1 | 1 | 2 | 1 | 4 |
 | `prop-firms` | 1 | 1 | 1 | 2 | 1 | 4 |
 
-All five demo details, matching global-search cards and scoped sitemap responses were checked after the votes. Rating fields matched the personal readback. A repeated same-value PUT left the homepage ETag unchanged. Bonus GET still returned the legacy `bonus_id`/`rating` contract with its separate cookie.
+All five demo details, matching global-search cards and scoped sitemap responses were checked after the votes. All 14 existing platform cards in the live homepage/navigation snapshot contained the three rating fields and no personal rating/CSRF fields. Rating fields matched the personal readback. A repeated same-value PUT left the homepage ETag unchanged. Bonus GET still returned the legacy `bonus_id`/`rating` contract with its separate cookie.
 
 #### Actual GET before the first vote
 
