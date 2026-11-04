@@ -30,6 +30,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\BonusRatingController;
 use App\Http\Controllers\PageSettingsController;
 use App\Http\Controllers\PageViewController;
+use App\Http\Controllers\PlatformRatingController;
 use App\Http\Controllers\PublicAdvertisementController;
 use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\PublicBonusController;
@@ -41,10 +42,12 @@ use App\Http\Controllers\PublicTutorialController;
 use App\Http\Controllers\SitemapEntriesController;
 use App\Http\Middleware\BonusRatingRequest;
 use App\Http\Middleware\PanelRequest;
+use App\Http\Middleware\PlatformRatingRequest;
 use App\Http\Middleware\PresentationRequest;
 use App\Http\Middleware\PublicCommentsRequest;
 use App\Http\Middleware\PublicReadRequest;
 use App\Http\Middleware\StrictCommentQuery;
+use App\Ratings\PlatformRatings;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/admin')->name('panel.')->middleware([PanelRequest::class, PresentationRequest::class])->group(function (): void {
@@ -201,6 +204,14 @@ Route::prefix('v1/admin/bonuses')->name('panel.bonuses.')->middleware(PanelReque
     Route::delete('categories/{id}', [BonusCategoryController::class, 'destroy'])->name('categories.destroy');
     Route::post('categories/{id}/merge', [BonusCategoryController::class, 'merge'])->name('categories.merge');
 });
+
+foreach (array_keys(PlatformRatings::TYPES) as $ratingKind) {
+    Route::prefix('v1/'.$ratingKind)->name('platforms.rating.'.$ratingKind.'.')->middleware(PlatformRatingRequest::class)->group(function () use ($ratingKind): void {
+        Route::get('{id}/rating', [PlatformRatingController::class, 'show'])->defaults('kind', $ratingKind)->name('show');
+        Route::put('{id}/rating', [PlatformRatingController::class, 'update'])->defaults('kind', $ratingKind)->name('update');
+        Route::options('{id}/rating', fn () => response()->noContent())->defaults('kind', $ratingKind)->name('options');
+    });
+}
 
 Route::prefix('v1/bonuses')->name('bonuses.rating.')->middleware(BonusRatingRequest::class)->group(function (): void {
     Route::get('{id}/rating', [BonusRatingController::class, 'show'])->name('show');

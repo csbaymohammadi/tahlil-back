@@ -18,7 +18,10 @@ class PanelEnvelope
         $response = $next($request);
         $response->headers->set('X-Request-ID', $request->attributes->get('request_id'));
         $public = ($request->is('api/v1/bonuses', 'api/v1/bonuses/*') && ! $request->is('api/v1/bonuses/*/rating')) || $request->is('api/v1/page-settings', 'api/v1/advertisements', 'api/v1/blog/*', 'api/v1/news/*', 'api/v1/exchanges', 'api/v1/exchanges/*', 'api/v1/brokers', 'api/v1/brokers/*', 'api/v1/stock-brokers', 'api/v1/stock-brokers/*', 'api/v1/gold-platforms', 'api/v1/gold-platforms/*', 'api/v1/prop-firms', 'api/v1/prop-firms/*', 'api/v1/tutorials', 'api/v1/tutorials/*', 'api/v1/search', 'api/v1/sitemap/*') || ($request->is('api/v1/comments/*') && $request->isMethodSafe());
-        if ($public && ! $request->is('api/v1/sitemap/*')) {
+        if ($request->routeIs('platforms.rating.*')) {
+            $public = false;
+            $response->headers->set('Cache-Control', 'no-store, private');
+        } elseif ($public && ! $request->is('api/v1/sitemap/*')) {
             $response->headers->set('Cache-Control', $response->getStatusCode() >= 400 ? 'no-store' : 'no-cache, must-revalidate');
         } elseif (! str_contains($response->headers->get('Cache-Control', ''), 'no-store')) {
             $response->headers->set('Cache-Control', 'no-store');

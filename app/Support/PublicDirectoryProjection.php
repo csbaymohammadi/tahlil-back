@@ -14,6 +14,7 @@ use App\Models\Media;
 use App\Models\PropFirm;
 use App\Models\StockBrokerage;
 use App\PageSettings\SettingsMedia;
+use App\Ratings\PlatformRatings;
 
 class PublicDirectoryProjection
 {
@@ -31,6 +32,7 @@ class PublicDirectoryProjection
             'description' => $record->description,
             'excerpt' => PublicText::plain($record->description !== '' ? $record->description : $record->content),
             ...CategoryAssignments::publicFields($record),
+            ...$this->aggregates($record),
         ];
         if ($record instanceof Broker) {
             return [...$data, 'filter_keys' => array_values(array_unique(['forex', ...array_column($data['category'], 'key')])), 'markets' => $record->markets];
@@ -41,7 +43,7 @@ class PublicDirectoryProjection
             'platform_label' => match ($type) {
                 'exchanges' => $record->platform_type, 'gold-platforms' => 'Gold Platform', 'prop-firms' => 'Prop Firm', default => 'Stock Brokerage'
             },
-            ...$this->aggregates($record)];
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -122,9 +124,9 @@ class PublicDirectoryProjection
         return $media !== null && $media->canonical_name === $parts[2] && $media->kind === $kind && app(MediaAccess::class)->public($media);
     }
 
-    /** @return array{rating_average: null, rating_count: int, comment_count: int} */
+    /** @return array{rating_average: float|null, rating_count: int, rating_revision: int, comment_count: int} */
     private function aggregates(Exchange|Broker|StockBrokerage|GoldPlatform|PropFirm $record): array
     {
-        return ['rating_average' => null, 'rating_count' => 0, 'comment_count' => $this->counts->for($record)];
+        return [...PlatformRatings::projection($record), 'comment_count' => $this->counts->for($record)];
     }
 }

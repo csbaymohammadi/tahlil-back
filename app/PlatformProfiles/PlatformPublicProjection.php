@@ -4,6 +4,7 @@ namespace App\PlatformProfiles;
 
 use App\Comments\CommentCounts;
 use App\Models\PlatformProfile;
+use App\Ratings\PlatformRatings;
 use App\Support\CategoryAssignments;
 use App\Support\PlatformProfileDefinition;
 
@@ -25,8 +26,7 @@ class PlatformPublicProjection
             'logo' => $profile->logo,
             'founded_year' => $profile->founded_year,
             ...CategoryAssignments::publicFields($profile),
-            'rating_average' => null,
-            'rating_count' => 0,
+            ...PlatformRatings::projection($profile),
             'comment_count' => app(CommentCounts::class)->for($profile),
         ];
         if ($definition->key === 'broker') {

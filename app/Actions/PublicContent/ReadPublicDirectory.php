@@ -66,7 +66,7 @@ class ReadPublicDirectory
             } else {
                 $query->orderByDesc('created_at')->orderByDesc('id');
             }
-            $records = $query->with('category')->withCount('visibleComments as comment_count')->offset(($page - 1) * 9)->limit(9)->get();
+            $records = $query->with(['category', 'ratingAggregate'])->withCount('visibleComments as comment_count')->offset(($page - 1) * 9)->limit(9)->get();
             $result = ['records' => $records, 'meta' => ['page' => $page, 'per_page' => 9, 'total' => $total, 'total_pages' => (int) ceil($total / 9)],
                 'filters' => ['q' => $filters['q'] ?? '', ...(in_array($type, ['exchanges', 'brokers'], true) ? ['category' => $effective] : []), 'sort' => $sort]];
             if (! in_array($type, ['exchanges', 'brokers'], true)) {
@@ -94,6 +94,6 @@ class ReadPublicDirectory
     {
         $class = $this->model($type);
 
-        return $class::public()->whereKeyNot($parentId)->with('category')->withCount('visibleComments as comment_count')->orderByDesc('created_at')->orderByDesc('id')->limit(9)->get();
+        return $class::public()->whereKeyNot($parentId)->with(['category', 'ratingAggregate'])->withCount('visibleComments as comment_count')->orderByDesc('created_at')->orderByDesc('id')->limit(9)->get();
     }
 }

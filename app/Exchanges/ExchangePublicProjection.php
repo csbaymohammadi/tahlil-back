@@ -4,6 +4,7 @@ namespace App\Exchanges;
 
 use App\Comments\CommentCounts;
 use App\Models\Exchange;
+use App\Ratings\PlatformRatings;
 use App\Support\CategoryAssignments;
 use App\Support\ExchangeSpecifications;
 
@@ -22,8 +23,7 @@ class ExchangePublicProjection
             'founded_year' => $exchange->founded_year,
             'platform_type' => $exchange->platform_type,
             ...CategoryAssignments::publicFields($exchange),
-            'rating_average' => null,
-            'rating_count' => 0,
+            ...PlatformRatings::projection($exchange),
             'comment_count' => app(CommentCounts::class)->for($exchange),
         ];
     }

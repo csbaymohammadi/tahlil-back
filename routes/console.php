@@ -37,3 +37,5 @@ Schedule::command('comments:prune')->hourly()->withoutOverlapping();
 
 Schedule::command('presentation:deliver')->everyTenSeconds()->runInBackground()->withoutOverlapping();
 Schedule::command('analytics:prune')->daily()->withoutOverlapping();
+
+Schedule::command('platform-ratings:prune')->hourly()->withoutOverlapping();

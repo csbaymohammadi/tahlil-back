@@ -7,6 +7,7 @@ use App\Bonuses\PublicBonusProjection;
 use App\Exchanges\ExchangePublicProjection;
 use App\Models\PageSetting;
 use App\Models\Tutorial;
+use App\Ratings\PlatformRatings;
 use App\Support\CategoryAssignments;
 use App\Tutorials\PublicTutorialProjection;
 use Illuminate\Database\Eloquent\Model;
@@ -49,6 +50,9 @@ class SettingsProjection
                     $records = $this->catalog->records($area, $row['key'], $row['selected_ids']);
                     $items = [];
                     $records->load(['category']);
+                    if ($records->isNotEmpty() && PlatformRatings::supports($records->first())) {
+                        $records->load('ratingAggregate');
+                    }
                     if ($records->isNotEmpty()) {
                         if ($records->first() instanceof Tutorial) {
                             $records->load('durations');
@@ -99,7 +103,7 @@ class SettingsProjection
         if ($area === 'menu') {
             $module = $key === 'exchanges' ? 'exchanges' : 'platform_profiles';
 
-            return [...CategoryAssignments::publicFields($record), 'id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
+            return [...PlatformRatings::projection($record), ...CategoryAssignments::publicFields($record), 'id' => (int) $record->id, 'slug' => $record->slug, 'title' => $record->title, 'english_name' => $record->english_name,
                 'logo' => $this->media->publicDomainImage((string) $record->logo, $module) ? $record->logo : '',
                 'href' => SettingsDefinition::MENU[$key][1].'/'.rawurlencode($record->slug)];
         }
@@ -113,7 +117,7 @@ class SettingsProjection
                 'href' => '/exchanges/'.rawurlencode($record->slug),
                 'logo' => $this->media->publicDomainImage((string) $record->logo, 'exchanges') ? $record->logo : '',
                 'founding_year' => (string) $record->founded_year, 'platform_label' => (string) $record->platform_type,
-                'rating_average' => $card['rating_average'], 'rating_count' => $card['rating_count'], 'comment_count' => $card['comment_count']];
+                'rating_average' => $card['rating_average'], 'rating_count' => $card['rating_count'], 'rating_revision' => $card['rating_revision'], 'comment_count' => $card['comment_count']];
         }
         if ($key === 'bonuses') {
             return $this->bonuses->summary($record);

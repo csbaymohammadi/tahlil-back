@@ -14,6 +14,7 @@ use App\Models\PropFirm;
 use App\Models\StockBrokerage;
 use App\Models\Tutorial;
 use App\PageSettings\SettingsMedia;
+use App\Ratings\PlatformRatings;
 use App\Tutorials\PublicTutorialProjection;
 use App\Tutorials\TutorialProviders;
 use Illuminate\Database\Eloquent\Model;
@@ -162,19 +163,24 @@ class PublicContentIndex
     /** @return list<string> */
     private function relations(string $type): array
     {
-        return ['categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['campaign.exchange'] : [])];
+        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['campaign.exchange'] : [])];
     }
 
     private function sourceStamp(Model $record): string
     {
         $author = $record instanceof Tutorial ? null : $record->author;
 
-        return hash('sha256', json_encode([
+        $values = [
             $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id', 'vid_time']),
             $record->categories->map(fn (Model $category): array => $category->only(['id', 'name', 'key', 'version', 'deleted_at']))->all(),
             $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']),
             $record instanceof Bonus ? $this->bonuses->campaign($record) : null,
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        ];
+        if (PlatformRatings::supports($record)) {
+            $values[] = PlatformRatings::projection($record);
+        }
+
+        return hash('sha256', json_encode($values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 
     /** @param array<string, mixed>|null $campaign */
@@ -186,6 +192,9 @@ class PublicContentIndex
             $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url', 'vid_time']),
             CategoryAssignments::publicFields($record), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
         ];
+        if (PlatformRatings::supports($record)) {
+            $values[] = PlatformRatings::projection($record);
+        }
         if ($record instanceof Tutorial) {
             $duration = app(PublicTutorialProjection::class)->duration($record->loadMissing('durations'));
             if ($duration['duration_seconds'] !== null) {

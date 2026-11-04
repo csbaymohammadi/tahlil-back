@@ -97,6 +97,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
             if ($status === 503) {
                 $publicCode = match (true) {
+                    $request->routeIs('platforms.rating.*') => 'RATINGS_UNAVAILABLE',
                     $request->is('api/v1/advertisements') => 'ADVERTISEMENTS_UNAVAILABLE',
                     $request->is('api/v1/page-settings') => 'PUBLIC_CONFIGURATION_UNAVAILABLE',
                     $request->is('api/v1/blog/*') => 'BLOG_UNAVAILABLE',

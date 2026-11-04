@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Comments\HasPublicComments;
+use App\Ratings\HasPlatformRatings;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ abstract class PlatformProfile extends Model
 {
     use HasCategories;
     use HasFactory;
+    use HasPlatformRatings;
     use HasPublicComments;
     use SoftDeletes;
 
