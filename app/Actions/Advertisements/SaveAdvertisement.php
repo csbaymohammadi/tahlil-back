@@ -19,7 +19,7 @@ class SaveAdvertisement
 {
     public function __construct(private RevokeSessions $auth, private UploadMedia $upload, private MediaReferences $references, private PublicChanges $changes, private SecurityEvents $events) {}
 
-    /** @param array{title?: string, description?: string, link?: string, show?: string, expected_version?: string} $data */
+    /** @param array{title?: string, description?: string, link?: string, link_bt?: string, show?: string, expected_version?: string} $data */
     public function handle(PanelSession $session, ?int $id, array $data, ?UploadedFile $image, string $requestId): Advertisement
     {
         $media = $image ? $this->upload->handle($session, $image, 'banner', (string) Str::uuid(), $requestId) : null;
@@ -34,7 +34,7 @@ class SaveAdvertisement
             if ($id !== null && $advertisement->version !== (int) $data['expected_version']) {
                 throw new PanelAuthException(409, 'VERSION_CONFLICT', 'The advertisement has changed. Fetch it before retrying.');
             }
-            $fields = array_intersect_key($data, array_flip(['title', 'description', 'link', 'show']));
+            $fields = array_intersect_key($data, array_flip(['title', 'description', 'link', 'link_bt', 'show']));
             if (isset($fields['show'])) {
                 $fields['show'] = $fields['show'] === '1';
             }

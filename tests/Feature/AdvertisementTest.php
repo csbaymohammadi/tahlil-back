@@ -327,4 +327,42 @@ class AdvertisementTest extends PanelTestCase
             ->assertUnprocessable()->assertJsonValidationErrors('link', 'error.fields');
         $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link' => 'original', 'version' => 1]);
     }
+
+    public function test_optional_button_label_is_returned_only_when_set_and_can_be_cleared(): void
+    {
+        Storage::fake('media');
+        $this->panel(User::factory()->panel()->create());
+        $link = '/offer';
+        $label = 'مشاهده پیشنهاد';
+        $data = $this->createAdvertisement(['link' => $link])->assertCreated()
+            ->assertJsonMissingPath('data.link_bt')->json('data');
+        $path = self::BASE.'/'.$data['id'];
+        $this->get('/api/v1/advertisements')->assertOk()->assertJsonMissingPath('data.0.link_bt');
+
+        $this->multipart($path, ['expected_version' => '1', 'link_bt' => ' '.$label.' '])
+            ->assertOk()->assertJsonPath('data.link_bt', $label)->assertJsonPath('data.version', 2);
+        $this->get($path)->assertOk()->assertJsonPath('data.link_bt', $label);
+        $this->get('/api/v1/advertisements')->assertOk()
+            ->assertJsonPath('data.0.link', $link)->assertJsonPath('data.0.link_bt', $label);
+        $this->multipart($path, ['expected_version' => '2', 'title' => 'ویرایش'])
+            ->assertOk()->assertJsonPath('data.link_bt', $label)->assertJsonPath('data.version', 3);
+        $this->multipart($path, ['expected_version' => '3', 'link_bt' => ''])
+            ->assertOk()->assertJsonMissingPath('data.link_bt')->assertJsonPath('data.version', 4);
+        $this->get('/api/v1/advertisements')->assertOk()
+            ->assertJsonPath('data.0.link', $link)->assertJsonMissingPath('data.0.link_bt');
+    }
+
+    public function test_invalid_button_label_is_rejected_without_updating_the_card(): void
+    {
+        Storage::fake('media');
+        $this->panel(User::factory()->panel()->create());
+        $data = $this->createAdvertisement(['link_bt' => 'Details'])->assertCreated()
+            ->assertJsonPath('data.link_bt', 'Details')->json('data');
+
+        foreach ([['Details'], '<b>Details</b>', str_repeat('a', 201)] as $value) {
+            $this->multipart(self::BASE.'/'.$data['id'], ['expected_version' => '1', 'link_bt' => $value])
+                ->assertUnprocessable()->assertJsonValidationErrors('link_bt', 'error.fields');
+        }
+        $this->assertDatabaseHas('advertisements', ['id' => $data['id'], 'link_bt' => 'Details', 'version' => 1]);
+    }
 }

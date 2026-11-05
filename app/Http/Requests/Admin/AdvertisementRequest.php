@@ -15,7 +15,7 @@ class AdvertisementRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        foreach (['title', 'description'] as $field) {
+        foreach (['title', 'description', 'link_bt'] as $field) {
             if (is_string($this->input($field))) {
                 $this->merge([$field => trim($this->input($field))]);
             }
@@ -37,7 +37,8 @@ class AdvertisementRequest extends FormRequest
         $required = $create ? ['required'] : ['sometimes', 'required'];
 
         return ['img' => [...$required, 'file'], 'title' => [...$required, 'string', 'max:200'],
-            'description' => [...$required, 'string', 'max:2000'], 'link' => ['sometimes', 'string'], 'show' => [...$required, 'string', Rule::in(['0', '1'])],
+            'description' => [...$required, 'string', 'max:2000'], 'link' => ['sometimes', 'string'],
+            'link_bt' => ['sometimes', 'string', 'max:200'], 'show' => [...$required, 'string', Rule::in(['0', '1'])],
             ...($create ? [] : ['expected_version' => $version])];
     }
 
@@ -47,13 +48,13 @@ class AdvertisementRequest extends FormRequest
             foreach (array_diff(array_keys($this->all()), array_keys($this->rules())) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
             }
-            foreach (['title', 'description'] as $field) {
+            foreach (['title', 'description', 'link_bt'] as $field) {
                 $value = $this->input($field);
                 if (is_string($value) && strip_tags($value) !== $value) {
                     $validator->errors()->add($field, 'Enter plain text.');
                 }
             }
-            if ($this->routeIs('panel.advertisements.update') && array_intersect(array_keys($this->all()), ['img', 'title', 'description', 'link', 'show']) === []) {
+            if ($this->routeIs('panel.advertisements.update') && array_intersect(array_keys($this->all()), ['img', 'title', 'description', 'link', 'link_bt', 'show']) === []) {
                 $validator->errors()->add('body', 'Supply at least one editable field.');
             }
         }];

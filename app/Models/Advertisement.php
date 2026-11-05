@@ -16,7 +16,7 @@ class Advertisement extends Model
 
     protected $guarded = ['*'];
 
-    protected $attributes = ['link' => ''];
+    protected $attributes = ['link' => '', 'link_bt' => ''];
 
     protected function casts(): array
     {

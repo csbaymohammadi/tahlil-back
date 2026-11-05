@@ -1,6 +1,6 @@
 # Homepage carousel advertisements API
 
-This service manages multiple advertisements for the homepage carousel. Each card has an image, title, description and visibility switch. Administrators control the manual order. The frontend implements the dashboard settings form, carousel and fixed card position.
+This service manages multiple advertisements for the homepage carousel. Each card has an image, title, description and visibility switch, with an optional destination and button label. Administrators control the manual order. The frontend implements the dashboard settings form, carousel and fixed card position.
 
 This resource is independent of the existing banner fields in page settings.
 
@@ -29,13 +29,15 @@ Both lists return all matching cards without pagination, ordered by `position`, 
 
 ## Create
 
-All four fields are required. Field names are lowercase and case-sensitive.
+Field names are lowercase and case-sensitive.
 
 | Field | Multipart value | Validation |
 | --- | --- | --- |
 | `img` | File | Exactly one image file; non-empty, at most 5 MiB (5,242,880 bytes) |
 | `title` | String | Required plain text, trimmed, at most 200 characters |
 | `description` | String | Required plain text, trimmed, at most 2,000 characters |
+| `link` | String | Optional destination |
+| `link_bt` | String | Optional plain-text button label, trimmed, at most 200 characters |
 | `show` | String | Exactly `"1"` for visible or `"0"` for hidden |
 
 JPEG, PNG, GIF, WebP and AVIF are subject to the existing shared-media content and decoding checks. SVG is rejected. The frontend prepares/crops images; the backend does not crop or resize them. See [shared media](16-shared-media-api.md) for format, animation and dimension limits. Files are uploaded internally with purpose `banner`; no separate media upload request or client-provided Idempotency-Key is needed.
@@ -45,6 +47,8 @@ const form = new FormData();
 form.append('img', imageFile);
 form.append('title', 'Advertisement title');
 form.append('description', 'Advertisement description');
+form.append('link', '/offers');
+form.append('link_bt', 'View offer');
 form.append('show', '1');
 
 const response = await fetch(`${apiOrigin}/api/v1/admin/advertisements`, {
@@ -65,6 +69,8 @@ A new card is appended after the current cards. The server controls `id`, `posit
     "img": "/media/45/banner.webp",
     "title": "Advertisement title",
     "description": "Advertisement description",
+    "link": "/offers",
+    "link_bt": "View offer",
     "show": true,
     "position": 1,
     "version": 1
@@ -85,6 +91,8 @@ GET `/api/v1/admin/advertisements/12` returns the single-card envelope shown abo
       "img": "/media/45/banner.webp",
       "title": "Advertisement title",
       "description": "Advertisement description",
+      "link": "/offers",
+      "link_bt": "View offer",
       "show": true,
       "position": 1,
       "version": 1
@@ -105,7 +113,7 @@ expected_version: 1
 show: 0
 ```
 
-Other examples of editable fields are `title`, `description`, and `img`. Omit `img` to retain the previous image. Send a new image file to replace it; an empty value or null cannot remove an image. Omitted text fields retain their existing values; supplied text fields cannot be empty.
+Other editable fields are `title`, `description`, `link`, `link_bt`, and `img`. Omit `img` to retain the previous image or send a new file to replace it. Omitted text fields retain their saved values. Send an empty string to clear `link` or `link_bt`.
 
 A successful update returns 200 and the full administrative object. `show` in responses is a JSON boolean. A real change increments `version`; a no-op preserves it. Always use the returned version in the next mutation.
 
@@ -144,6 +152,8 @@ GET `/api/v1/advertisements` returns visible, non-deleted cards with ready, non-
       "img": "/media/46/banner.png",
       "title": "Advertisement title",
       "description": "Advertisement description",
+      "link": "/offers",
+      "link_bt": "View offer",
       "show": true
     }
   ],
@@ -151,7 +161,7 @@ GET `/api/v1/advertisements` returns visible, non-deleted cards with ready, non-
 }
 ```
 
-The public object excludes `position` and `version`; preserve the returned array order. One active card still returns a one-element array. No active cards returns `data: []`; the frontend should hide the carousel container.
+The public object excludes `position` and `version`; preserve the returned array order. Both public and administrative responses omit `link_bt` when the label is empty. Render the label as plain text. One active card still returns a one-element array. No active cards returns `data: []`; the frontend should hide the carousel container.
 
 Hidden cards do not make their image publicly readable through this resource. A file shared with another public resource can remain public through that other resource. Existing authenticated administrators can preview hidden-card images.
 
