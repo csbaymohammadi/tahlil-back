@@ -17,16 +17,13 @@ class PublicBonusProjection
     public function __construct(private BonusPublicProjection $existing, private BonusMedia $media, private MediaAccess $access, private BlogHtmlSanitizer $sanitizer, private PublicArticleOutline $outline, private CommentCounts $comments) {}
 
     /** @return array<string, mixed> */
-    public function summary(Bonus $bonus): array
+    public function summary(Bonus $bonus, bool $detail = false): array
     {
         $aggregate = $bonus->ratingAggregate;
         if (! $aggregate || $aggregate->rating_count < 0 || $aggregate->rating_revision < 0 || ($aggregate->rating_count === 0 && $aggregate->vote_sum !== 0) || ($aggregate->rating_count > 0 && ($aggregate->vote_sum < $aggregate->rating_count || $aggregate->vote_sum > 5 * $aggregate->rating_count))) {
             throw new PanelAuthException(503, 'BONUSES_UNAVAILABLE', 'The rating aggregate is unavailable.');
         }
-        $campaign = $this->existing->campaign($bonus);
-        if ($campaign['provider']) {
-            $campaign['provider']['logo'] = $this->publicImage($campaign['provider']['logo']);
-        }
+        $campaign = $detail ? $this->existing->campaignDetail($bonus) : $this->existing->campaign($bonus);
 
         return ['id' => (int) $bonus->id, 'slug' => $bonus->slug, 'title' => $bonus->title,
             'href' => '/bonuses/'.rawurlencode($bonus->slug), 'description' => $bonus->description,
@@ -40,7 +37,7 @@ class PublicBonusProjection
     /** @return array<string, mixed> */
     public function detail(Bonus $bonus): array
     {
-        $summary = $this->summary($bonus);
+        $summary = $this->summary($bonus, detail: true);
         try {
             $content = $this->sanitizer->sanitizeForPublic($bonus->content, config('bonuses.trusted_media_hosts', []), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
         } catch (PanelAuthException) {

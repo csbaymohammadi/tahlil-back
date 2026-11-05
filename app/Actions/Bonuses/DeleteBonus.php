@@ -28,6 +28,7 @@ class DeleteBonus
             }
             $bonus->forceFill(['version' => $bonus->version + 1, 'updated_by' => $actor->id, 'deleted_by' => $actor->id])->save();
             $bonus->delete();
+            $bonus->campaign()->whereNotNull('next_transition_at')->update(['next_transition_at' => null]);
             $this->events->audit('bonus_deleted', $requestId, $actor->id, $bonus->id, ['slug' => $bonus->slug, 'status' => $bonus->status]);
             if ($bonus->status === 'published') {
                 $this->events->publicChange('bonus_deleted', $requestId, $bonus->id, ['slug' => $bonus->slug]);

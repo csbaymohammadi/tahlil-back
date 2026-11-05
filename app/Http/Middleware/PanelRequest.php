@@ -88,7 +88,7 @@ class PanelRequest
                 if (! $parsed instanceof \stdClass) {
                     throw new PanelAuthException(422, 'VALIDATION_FAILED', 'The body must be a JSON object.');
                 }
-                if ($request->routeIs('panel.page-settings.update', 'panel.profile.update')) {
+                if ($bonusItemMutation || $request->routeIs('panel.page-settings.update', 'panel.profile.update')) {
                     StrictJson::rejectDuplicateKeys($raw);
                 }
                 if ($request->routeIs('panel.page-settings.update')) {

@@ -4,6 +4,7 @@ namespace App\Actions\PlatformProfiles;
 
 use App\Actions\Auth\RevokeSessions;
 use App\Blog\BlogHtmlSanitizer;
+use App\Bonuses\BonusEvents;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
 use App\Models\PanelSession;
@@ -20,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 abstract class SavePlatformProfile
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments, private BonusEvents $bonusEvents) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -135,6 +136,9 @@ abstract class SavePlatformProfile
             }
 
             $this->publicIndex->sync($definition->slug, $profile->id);
+            if (($wasPublished || $isPublished) && array_intersect($changed, ['title', 'english_name', 'logo', 'slug', 'status']) !== []) {
+                $this->bonusEvents->providerChanged($definition->slug, $profile, $requestId);
+            }
 
             /** @var PlatformProfile $saved */
             $saved = $profile->fresh(['author', 'category']);

@@ -2,6 +2,8 @@
 
 namespace App\Actions\PublicContent;
 
+use App\Bonuses\BonusPublicProjection;
+use App\Models\BonusCampaign;
 use App\Ratings\PlatformRatings;
 use App\Support\CategoryAssignments;
 use App\Support\PublicContentIndex;
@@ -10,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class SearchPublicContent
 {
-    public function __construct(private PublicContentIndex $index) {}
+    public function __construct(private PublicContentIndex $index, private BonusPublicProjection $bonuses) {}
 
     /** @param array<string, mixed> $input
      * @return array<string, mixed> */
@@ -40,11 +42,16 @@ class SearchPublicContent
 
             foreach ($rows->groupBy('type') as $recordType => $group) {
                 $model = PublicContentIndex::TYPES[$recordType];
-                $records = $model::query()->select('id')->with(['categories', ...(isset(PlatformRatings::TYPES[$recordType]) ? ['ratingAggregate'] : [])])->whereIn('id', $group->pluck('record_id'))->get()->keyBy('id');
+                $records = $model::query()->select('id')->with(['categories', ...(isset(PlatformRatings::TYPES[$recordType]) ? ['ratingAggregate'] : []), ...($recordType === 'bonuses' ? [...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate'] : [])])->whereIn('id', $group->pluck('record_id'))->get()->keyBy('id');
                 foreach ($group as $row) {
                     $fields = CategoryAssignments::publicFields($records->get($row->record_id));
                     $row->category_id = $fields['category_id'];
                     $row->category = $fields['category'];
+                    if ($recordType === 'bonuses') {
+                        $bonus = $records->get($row->record_id);
+                        $row->campaign = $this->bonuses->campaign($bonus);
+                        $row->rating_fields = $bonus->ratingAggregate->projection();
+                    }
                     if (isset(PlatformRatings::TYPES[$recordType])) {
                         $row->rating_fields = PlatformRatings::projection($records->get($row->record_id));
                     }

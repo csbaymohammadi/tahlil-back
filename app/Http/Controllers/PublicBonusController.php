@@ -8,6 +8,7 @@ use App\Exceptions\PanelAuthException;
 use App\Http\Requests\PublicBonusRequest;
 use App\Http\Resources\PublicBonusResource;
 use App\Models\Bonus;
+use App\Models\BonusCampaign;
 use App\Support\PublicReadSnapshot;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -42,7 +43,7 @@ class PublicBonusController extends Controller
                 throw new PanelAuthException(404, 'BONUS_NOT_FOUND', 'The public bonus was not found.');
             }
             if ($latest) {
-                $records = Bonus::public()->whereKeyNot($result['bonus']->id)->with(['category', 'campaign.exchange', 'ratingAggregate'])->orderByDesc('published_at')->orderByDesc('id')->limit(5)->get();
+                $records = Bonus::public()->whereKeyNot($result['bonus']->id)->with(['category', ...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate'])->orderByDesc('published_at')->orderByDesc('id')->limit(5)->get();
                 $data = PublicBonusResource::collection($records)->resolve($request);
             } else {
                 $data = (new PublicBonusResource($result['bonus']))->resolve($request);

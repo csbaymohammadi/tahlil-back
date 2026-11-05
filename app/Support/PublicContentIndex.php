@@ -6,6 +6,7 @@ use App\Bonuses\BonusPublicProjection;
 use App\Exceptions\PanelAuthException;
 use App\Models\BlogArticle;
 use App\Models\Bonus;
+use App\Models\BonusCampaign;
 use App\Models\Broker;
 use App\Models\Exchange;
 use App\Models\GoldPlatform;
@@ -43,7 +44,7 @@ class PublicContentIndex
         }
         $description = PublicText::plain($record->description !== '' ? $record->description : ($record->content ?? ''));
         $searchDescription = $record->description !== '' ? PublicText::plain($record->description, mb_strlen($record->description)) : $description;
-        $campaign = $record instanceof Bonus ? $this->bonuses->campaign($record) : null;
+        $campaign = $record instanceof Bonus ? $this->bonuses->campaignDetail($record, forIndex: true) : null;
         $fingerprint = $this->fingerprint($record, $campaign);
         $existing = $query->first();
         $modified = $existing?->last_modified_at;
@@ -163,7 +164,7 @@ class PublicContentIndex
     /** @return list<string> */
     private function relations(string $type): array
     {
-        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['campaign.exchange'] : [])];
+        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? BonusCampaign::BONUS_RELATIONS : [])];
     }
 
     private function sourceStamp(Model $record): string
@@ -174,7 +175,7 @@ class PublicContentIndex
             $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id', 'vid_time']),
             $record->categories->map(fn (Model $category): array => $category->only(['id', 'name', 'key', 'version', 'deleted_at']))->all(),
             $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']),
-            $record instanceof Bonus ? $this->bonuses->campaign($record) : null,
+            $record instanceof Bonus ? $this->bonuses->campaignDetail($record, forIndex: true) : null,
         ];
         if (PlatformRatings::supports($record)) {
             $values[] = PlatformRatings::projection($record);

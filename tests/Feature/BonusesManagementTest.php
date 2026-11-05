@@ -15,6 +15,7 @@ use App\Models\Exchange;
 use App\Models\ExchangeCategory;
 use App\Models\Media;
 use App\Models\User;
+use Database\Factories\BonusFactory;
 use Database\Seeders\BonusCategorySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -33,7 +34,8 @@ class BonusesManagementTest extends PanelTestCase
         $this->panel($author);
         $created = $this->postJson(self::BASE.'/items', $this->payload(['status' => 'published']))->assertCreated()
             ->assertHeader('Location', self::BASE.'/items/1')->assertJsonPath('data.version', 1)
-            ->assertJsonPath('data.campaign', ['provider' => null, 'amount_display' => '', 'state' => 'unspecified'])
+            ->assertJsonPath('data.campaign.provider.name', 'Sample provider')
+            ->assertJsonPath('data.campaign.amount_display', '100 USDT')->assertJsonPath('data.campaign.state', 'unspecified')
             ->assertJsonPath('data.rating', null)->assertJsonPath('data.rating_count', 0)->assertJsonPath('data.rating_revision', 0);
         $firstDate = $created->json('data.published_at');
         $this->panel(User::factory()->panel()->create());
@@ -62,7 +64,7 @@ class BonusesManagementTest extends PanelTestCase
             ['description' => null], ['description' => str_repeat('x', 2001)], ['cover_image' => null], ['category_id' => ['']],
             ['category_id' => ['1']], ['meta_description' => str_repeat('x', 501)], ['status' => 'scheduled'],
             ['cover_image' => '//evil.test/x.png'], ['cover_image' => '/images/../x.png'], ['cover_image' => 'https://evil.test/a.png'],
-            ['cover_image' => 'https://service.tahlilex.com/%2e%2e/private.png'], ['cover_image' => 'data:image/png;base64,AAA'], ['content' => '<p>&nbsp;</p>'], ['content' => '<table><tr><td></td></tr></table>'],
+            ['cover_image' => 'https://service.tahlilex.com/%2e%2e/private.png'], ['cover_image' => 'data:image/png;base64,AAA'],
             ['content' => '<p onclick="evil()">Text</p>'], ['content' => '<svg></svg>'],
             ['content' => '<p><img src="data:image/png;base64,AA"></p>'], ['content' => '<iframe src="https://evil.test/"></iframe>'],
             ['rating' => 5], ['rating_count' => 30], ['rating_revision' => 2], ['campaign' => ['state' => 'ended']], ['provider' => 1], ['author_id' => 1], ['published_at' => '2026-01-01'],
@@ -79,7 +81,7 @@ class BonusesManagementTest extends PanelTestCase
     {
         $this->panel(User::factory()->panel()->create());
         $this->postJson(self::BASE.'/items', $this->payload(['reading_minutes' => 1440, 'title' => str_repeat('ش', 200)]))->assertCreated();
-        foreach (['title', 'slug', 'content', 'reading_minutes', 'status'] as $field) {
+        foreach (['title', 'slug', 'reading_minutes', 'status'] as $field) {
             $this->patchJson(self::BASE.'/items/1', ['expected_version' => 1, $field => ''])->assertUnprocessable();
         }
         $this->patchJson(self::BASE.'/items/1', ['expected_version' => 1])->assertUnprocessable();
@@ -167,7 +169,7 @@ class BonusesManagementTest extends PanelTestCase
         $foreignCategory = ExchangeCategory::factory()->create(['id' => 999]);
         $this->postJson(self::BASE.'/items', $this->payload(['category_id' => [$foreignCategory->id]]))->assertUnprocessable();
         $this->postJson(self::BASE.'/items', $this->payload(['slug' => 'draft-alias']))->assertCreated();
-        $this->patchJson(self::BASE.'/items/1', ['expected_version' => 1, 'slug' => 'shared-slug', 'status' => 'published'])->assertOk();
+        $this->patchJson(self::BASE.'/items/1', ['expected_version' => 1, 'slug' => 'shared-slug', 'status' => 'published', 'description' => 'Summary', 'campaign' => BonusFactory::campaignInput()])->assertOk();
         $this->assertSame('not_found', app(ResolvePublicBonus::class)->handle('draft-alias')['type']);
         $this->assertSame($exchange->id, app(ResolvePublicBonus::class)->handle('shared-slug')['bonus']->id);
         $this->patchJson(self::BASE.'/items/1', ['expected_version' => 2, 'slug' => 'new-slug'])->assertOk();
@@ -275,7 +277,10 @@ class BonusesManagementTest extends PanelTestCase
     /** @param array<string, mixed> $overrides @return array<string, mixed> */
     private function payload(array $overrides = []): array
     {
+        $publication = ($overrides['status'] ?? 'draft') === 'published'
+            ? ['description' => 'Campaign summary', 'campaign' => BonusFactory::campaignInput()] : [];
+
         return array_replace(['title' => 'Example Campaign', 'slug' => 'example-campaign', 'category_id' => [], 'reading_minutes' => 5,
-            'content' => '<h2>Overview</h2><p>Read the campaign conditions.</p>', 'status' => 'draft'], $overrides);
+            'content' => '<h2>Overview</h2><p>Read the campaign conditions.</p>', 'status' => 'draft'], $publication, $overrides);
     }
 }

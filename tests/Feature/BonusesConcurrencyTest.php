@@ -13,6 +13,7 @@ use App\Exceptions\PanelAuthException;
 use App\Models\Bonus;
 use App\Models\BonusCategory;
 use App\Models\User;
+use Database\Factories\BonusFactory;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -164,7 +165,7 @@ class BonusesConcurrencyTest extends TestCase
         $this->assertSame([200, 200, 200], $this->race([
             fn () => app(SubmitBonusRating::class)->handle($bonus->id, $first, 5, 'req_vote_a'),
             fn () => app(SubmitBonusRating::class)->handle($bonus->id, $second, 2, 'req_vote_b'),
-            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'description' => 'Edited during voting'], 'req_edit'),
+            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'description' => 'Edited during voting', 'campaign' => BonusFactory::campaignInput()], 'req_edit'),
         ]));
         $this->assertDatabaseHas('bonus_rating_aggregates', ['vote_sum' => 7, 'rating_count' => 2, 'rating_revision' => 2]);
         $this->assertSame('Edited during voting', $bonus->fresh()->description);

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Models\User;
+use Database\Factories\BonusFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -34,7 +35,7 @@ class ContentHtmlContractTest extends PanelTestCase
             $payload += ['english_name' => 'Contract', 'logo' => '/images/example.png', 'website_url' => 'https://example.com'];
         }
         if ($module === 'bonuses') {
-            $payload['reading_minutes'] = 1;
+            $payload += ['reading_minutes' => 1, 'description' => 'Example campaign summary.', 'campaign' => BonusFactory::campaignInput()];
         }
         $created = $this->postJson($base, $payload)->assertCreated();
         $id = $created->json('data.id');

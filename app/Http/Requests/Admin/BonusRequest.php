@@ -11,7 +11,9 @@ use Illuminate\Validation\Validator;
 
 class BonusRequest extends FormRequest
 {
-    public const EDITABLE = ['title', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status'];
+    public const EDITORIAL = ['title', 'slug', 'description', 'cover_image', 'content', 'category_id', 'reading_minutes', 'meta_description', 'status'];
+
+    public const EDITABLE = [...self::EDITORIAL, 'campaign'];
 
     public function authorize(): bool
     {
@@ -40,12 +42,13 @@ class BonusRequest extends FormRequest
             'slug' => [$required, 'string', 'min:1', 'max:200', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/D'],
             'description' => ['sometimes', 'string', 'max:2000'],
             'cover_image' => ['sometimes', 'string', 'max:2048'],
-            'content' => [$required, 'string'],
-            'category_id' => [$this->isMethod('POST') ? 'present' : 'sometimes', 'array', 'list'],
+            'content' => ['sometimes', 'string'],
+            'category_id' => ['sometimes', 'array', 'list'],
             'category_id.*' => ['required', 'integer:strict', 'min:1', 'max:9007199254740991', 'distinct:strict'],
-            'reading_minutes' => [$required, 'integer:strict', 'min:1', 'max:1440'],
+            'reading_minutes' => ['sometimes', 'nullable', 'integer:strict', 'min:1', 'max:1440'],
             'meta_description' => ['sometimes', 'string', 'max:500'],
-            'status' => [$required, 'string', Rule::in(['draft', 'published'])],
+            'campaign' => ['sometimes', 'array'],
+            'status' => ['sometimes', 'string', Rule::in(['draft', 'published'])],
         ];
     }
 
@@ -55,6 +58,9 @@ class BonusRequest extends FormRequest
             $raw = json_decode($this->getContent());
             if (is_object($raw) && property_exists($raw, 'category_id') && ! is_array($raw->category_id)) {
                 $validator->errors()->add('category_id', 'Supply a JSON array of category IDs.');
+            }
+            if (is_object($raw) && property_exists($raw, 'campaign')) {
+                $this->validateCampaignShape($raw->campaign, $validator);
             }
             foreach (array_diff(array_keys($this->all()), [...self::EDITABLE, ...($this->isMethod('PATCH') ? ['expected_version'] : [])]) as $field) {
                 $validator->errors()->add($field, 'This field is not accepted.');
@@ -73,10 +79,9 @@ class BonusRequest extends FormRequest
                     $validator->errors()->add($field, 'Enter plain text without HTML markup.');
                 }
             }
-            foreach (['reading_minutes'] as $field) {
-                if (array_key_exists($field, $this->all()) && ! is_int($this->input($field))) {
-                    $validator->errors()->add($field, 'Enter an integer value.');
-                }
+            $minutes = $this->input('reading_minutes');
+            if ($minutes !== null && ! is_int($minutes)) {
+                $validator->errors()->add('reading_minutes', 'Enter an integer value or null.');
             }
             if (is_string($this->input('cover_image')) && ! app(BonusMedia::class)->approvedImage($this->input('cover_image'))) {
                 $validator->errors()->add('cover_image', 'Use an approved HTTPS image or safe root-relative asset.');
@@ -84,7 +89,7 @@ class BonusRequest extends FormRequest
             $content = $this->input('content');
             if (is_string($content)) {
                 try {
-                    app(BlogHtmlSanitizer::class)->sanitize($content, config('bonuses.trusted_media_hosts'), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/']);
+                    app(BlogHtmlSanitizer::class)->sanitize($content, config('bonuses.trusted_media_hosts'), strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
                 } catch (PanelAuthException $exception) {
                     foreach ($exception->fields['content'] ?? ['The content is not supported.'] as $message) {
                         $validator->errors()->add('content', $message);
@@ -92,5 +97,24 @@ class BonusRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    private function validateCampaignShape(mixed $campaign, Validator $validator): void
+    {
+        if (! is_object($campaign)) {
+            $validator->errors()->add('campaign', 'Supply a JSON object.');
+
+            return;
+        }
+        foreach (['provider', 'reward', 'eligibility', 'conditions', 'redemption'] as $field) {
+            if (property_exists($campaign, $field) && ! is_object($campaign->{$field}) &&
+                ! ($field === 'provider' && $campaign->provider === null)) {
+                $validator->errors()->add('campaign.'.$field, 'Supply a JSON object.');
+            }
+        }
+        $redemption = $campaign->redemption ?? null;
+        if (is_object($redemption) && property_exists($redemption, 'steps') && ! is_array($redemption->steps)) {
+            $validator->errors()->add('campaign.redemption.steps', 'Supply a JSON array.');
+        }
     }
 }

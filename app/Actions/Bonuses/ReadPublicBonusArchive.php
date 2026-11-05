@@ -4,6 +4,7 @@ namespace App\Actions\Bonuses;
 
 use App\Bonuses\PublicBonusProjection;
 use App\Models\Bonus;
+use App\Models\BonusCampaign;
 use App\Models\BonusCategory;
 use App\Support\CategoryAssignments;
 use App\Support\PublicText;
@@ -26,7 +27,7 @@ class ReadPublicBonusArchive
         $all = 0;
         $total = 0;
         $items = [];
-        $records = Bonus::public()->with(['category', 'campaign.exchange', 'ratingAggregate'])->orderByDesc('published_at')->orderByDesc('id');
+        $records = Bonus::public()->with(['category', ...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate'])->orderByDesc('published_at')->orderByDesc('id');
         if ($search === '') {
             $categoryCounts = CategoryAssignments::publicCounts(Bonus::public());
             $all = $categoryCounts['all'];

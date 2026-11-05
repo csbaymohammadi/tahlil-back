@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\BonusRequest;
 use App\Http\Resources\Admin\BonusResource;
 use App\Models\Bonus;
+use App\Models\BonusCampaign;
 use App\Support\PanelIds;
 use App\Support\PlatformText;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,9 +34,12 @@ class BonusController extends Controller
         $perPage = (int) ($filters['per_page'] ?? 10);
         $search = PlatformText::panel((string) ($filters['q'] ?? ''));
         $bonusClass = Bonus::class;
-        $query = $bonusClass::query()->with(['author', 'category', 'ratingAggregate', 'campaign.exchange'])->when($search !== '', function (Builder $builder) use ($search): void {
+        $query = $bonusClass::query()->with(['author', 'category', 'ratingAggregate', ...BonusCampaign::BONUS_RELATIONS])->when($search !== '', function (Builder $builder) use ($search): void {
             $pattern = '%'.addcslashes($search, '\\%_').'%';
-            $builder->where(fn (Builder $nested) => $nested->where('title_normalized', 'like', $pattern)->orWhere('author_name_normalized', 'like', $pattern)->orWhereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->where('name_normalized', 'like', $pattern)->whereNull($categoryQuery->getModel()->qualifyColumn('deleted_at'))));
+            $builder->where(fn (Builder $nested) => $nested->where('title_normalized', 'like', $pattern)
+                ->orWhere('author_name_normalized', 'like', $pattern)
+                ->orWhereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->where('name_normalized', 'like', $pattern)->whereNull($categoryQuery->getModel()->qualifyColumn('deleted_at')))
+                ->orWhereHas('campaign', fn (Builder $campaign) => $campaign->matchingPanelSearch($search)));
         });
         if (isset($filters['category_id'])) {
             $query->whereHas('categories', fn (Builder $categoryQuery) => $categoryQuery->whereKey((int) $filters['category_id'])->whereNull($categoryQuery->getModel()->qualifyColumn('deleted_at')));
@@ -53,7 +57,7 @@ class BonusController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $bonusClass = Bonus::class;
-        $bonus = $bonusClass::query()->with(['author', 'category', 'ratingAggregate', 'campaign.exchange'])->find(PanelIds::parse($id));
+        $bonus = $bonusClass::query()->with(['author', 'category', 'ratingAggregate', ...BonusCampaign::BONUS_RELATIONS])->find(PanelIds::parse($id));
         if (! $bonus) {
             throw new PanelAuthException(404, 'BONUS_NOT_FOUND', 'The bonus was not found.');
         }

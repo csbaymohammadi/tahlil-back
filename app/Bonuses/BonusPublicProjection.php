@@ -3,30 +3,104 @@
 namespace App\Bonuses;
 
 use App\Comments\CommentCounts;
+use App\Media\MediaAccess;
 use App\Models\Bonus;
 use App\Models\BonusCampaign;
 use App\Models\Exchange;
+use App\Models\Media;
+use App\PageSettings\SettingsMedia;
 use App\PlatformProfiles\PublicContentOutline;
 use App\Support\CategoryAssignments;
 use App\Support\PlatformText;
+use Illuminate\Database\Eloquent\Model;
 
 class BonusPublicProjection
 {
-    public function __construct(private BonusMedia $media, private PublicContentOutline $outline) {}
+    public function __construct(private BonusMedia $media, private PublicContentOutline $outline, private MediaAccess $access, private SettingsMedia $settingsMedia) {}
 
-    /** @return array{provider: array<string, mixed>|null, amount_display: string, state: string} */
-    public function campaign(Bonus $bonus): array
+    /** @return array<string, mixed> */
+    public function campaign(Bonus $bonus, bool $panel = false, bool $forIndex = false): array
     {
         $campaign = $bonus->campaign;
-        $exchange = $campaign?->exchange;
-        $provider = $exchange && ! $exchange->trashed() && $exchange->status === 'published'
-            ? $this->exchangeIdentity($exchange) : $this->historicalProvider($campaign);
-        $amount = $campaign?->amount_display ?? '';
-        if (strip_tags($amount) !== $amount || mb_strlen($amount) > 120) {
-            $amount = '';
+        $terms = $campaign?->terms ?? BonusCampaignInput::DEFAULTS;
+        $legacyAmount = $campaign?->amount_display ?? '';
+        $amount = $campaign?->terms !== null ? BonusCampaignInput::amountDisplay($terms['reward'])
+            : $this->safeText($legacyAmount, 120);
+
+        return [
+            'provider' => $this->provider($campaign, $panel, $forIndex),
+            'type' => $terms['type'], 'reward' => $terms['reward'], 'amount_display' => $amount,
+            'availability' => $campaign?->availabilityMode() ?? 'unspecified',
+            ...($forIndex ? [] : ['state' => $campaign?->effectiveState(now()) ?? 'unspecified']),
+            'starts_at' => $campaign?->starts_at?->utc()->toISOString(),
+            'ends_at' => $campaign?->ends_at?->utc()->toISOString(),
+            'eligibility' => array_intersect_key($terms['eligibility'], array_flip(['audience', 'kyc_required', 'iran_eligibility', 'minimum_deposit', 'deposit_currency'])),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function campaignDetail(Bonus $bonus, bool $panel = false, bool $forIndex = false): array
+    {
+        $summary = $this->campaign($bonus, $panel, $forIndex);
+        $terms = $bonus->campaign?->terms ?? BonusCampaignInput::DEFAULTS;
+
+        return array_replace($summary, array_intersect_key($terms, array_flip(['eligibility', 'conditions', 'redemption', 'source_url', 'reviewed_at'])));
+    }
+
+    /** @return array{name: string, english_name: string, logo: string} */
+    public function providerSnapshot(Model $record, string $kind): array
+    {
+        return [
+            'name' => $this->safeText($record->title, 200),
+            'english_name' => $this->safeText($record->english_name, 200),
+            'logo' => $this->providerLogo($record->logo, $kind),
+        ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function provider(?BonusCampaign $campaign, bool $panel, bool $forIndex): ?array
+    {
+        if (! $campaign) {
+            return null;
+        }
+        $kind = $campaign->linkedKind();
+        $record = $campaign->linkedProvider();
+        $isPublic = $record !== null && ! $record->trashed() && $record->status === 'published';
+        $display = $this->historicalProvider($campaign);
+        if ($isPublic || ($panel && $record !== null && ! $record->trashed())) {
+            $display = ['name' => $this->safeText($record->title, 200),
+                'english_name' => $this->safeText($record->english_name, 200), 'logo' => $record->logo];
+        }
+        if ($display === null && ! ($panel && $kind !== null)) {
+            return null;
+        }
+        $kind ??= 'independent';
+        $display ??= ['name' => '', 'english_name' => '', 'logo' => ''];
+        if (! $panel) {
+            // The index tracks the editorial source; serving a logo still requires current media visibility.
+            $display['logo'] = $forIndex ? $display['logo'] : $this->providerLogo($display['logo'], $kind);
+        }
+        $id = $isPublic || $panel ? $campaign->linkedId() : null;
+
+        return ['kind' => $kind, 'id' => $id, 'exchange_id' => $isPublic && $kind === 'exchanges' ? $id : null, ...$display,
+            'href' => $isPublic ? '/'.$kind.'/'.rawurlencode($record->slug) : null];
+    }
+
+    private function providerLogo(string $logo, string $kind): string
+    {
+        if ($logo === '') {
+            return '';
+        }
+        if (preg_match('~^/media/([1-9][0-9]*)/([a-z0-9.-]+)$~D', $logo, $parts)) {
+            $media = Media::find($parts[1]);
+
+            return $media && $media->kind === 'image' && $media->canonical_name === $parts[2] && $this->access->public($media) ? $logo : '';
         }
 
-        return ['provider' => $provider, 'amount_display' => $amount, 'state' => $campaign?->state === 'ended' ? 'ended' : 'unspecified'];
+        $allowed = $kind === 'independent' ? $this->media->approvedProviderLogo($logo)
+            : $this->settingsMedia->publicDomainImage($logo, $kind === 'exchanges' ? 'exchanges' : 'platform_profiles');
+
+        return $allowed ? $logo : '';
     }
 
     /** @return array<string, mixed> */
@@ -60,7 +134,7 @@ class BonusPublicProjection
             $keywords[PlatformText::panel($label)] ??= trim($label);
         }
 
-        return [...$card, 'content' => $decorated['content'], 'outline' => $decorated['outline'], 'keywords' => array_values($keywords),
+        return [...$card, 'campaign' => $this->campaignDetail($bonus), 'content' => $decorated['content'], 'outline' => $decorated['outline'], 'keywords' => array_values($keywords),
             'meta_description' => $bonus->meta_description !== '' ? $bonus->meta_description : $this->excerpt($card['display_description'], 500),
             'updated_at' => $bonus->updated_at?->utc()->toISOString()];
     }
@@ -72,23 +146,25 @@ class BonusPublicProjection
             'logo' => $this->media->approvedImage($exchange->logo) ? $exchange->logo : ''];
     }
 
-    /** @return array<string, mixed>|null */
-    private function historicalProvider(?BonusCampaign $campaign): ?array
+    /** @return array{name: string, english_name: string, logo: string}|null */
+    private function historicalProvider(BonusCampaign $campaign): ?array
     {
-        $provider = $campaign?->provider;
+        $provider = $campaign->provider;
         if (! is_array($provider)) {
             return null;
         }
-        foreach (['name', 'english_name'] as $key) {
-            if (! is_string($provider[$key] ?? null) || trim($provider[$key]) === '' ||
-                mb_strlen($provider[$key]) > 200 || strip_tags($provider[$key]) !== $provider[$key]) {
-                return null;
-            }
+        $name = $this->safeText($provider['name'] ?? null, 200);
+        if ($name === '' && $campaign->provider_kind !== 'independent') {
+            return null;
         }
-        $logo = is_string($provider['logo'] ?? null) ? $provider['logo'] : '';
 
-        return ['exchange_id' => null, 'name' => $provider['name'], 'english_name' => $provider['english_name'],
-            'logo' => strlen($logo) <= 2048 && $this->media->approvedImage($logo) ? $logo : ''];
+        return ['name' => $name, 'english_name' => $this->safeText($provider['english_name'] ?? null, 200),
+            'logo' => $this->safeText($provider['logo'] ?? null, 2048)];
+    }
+
+    private function safeText(mixed $text, int $limit): string
+    {
+        return is_string($text) && strip_tags($text) === $text && mb_strlen($text) <= $limit ? trim($text) : '';
     }
 
     public function excerpt(string $html, int $limit = 300): string

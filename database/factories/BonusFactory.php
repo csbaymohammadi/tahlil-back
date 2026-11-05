@@ -36,6 +36,18 @@ class BonusFactory extends Factory
         });
     }
 
+    /** @return array<string, mixed> */
+    public static function campaignInput(): array
+    {
+        return [
+            'provider' => ['kind' => 'independent', 'name' => 'Sample provider'],
+            'type' => 'deposit',
+            'reward' => ['kind' => 'fixed', 'amount' => '100', 'currency' => 'USDT'],
+            'redemption' => ['url' => 'https://example.test/claim'],
+            'source_url' => 'https://example.test/terms',
+        ];
+    }
+
     public function published(): static
     {
         return $this->state(fn (): array => ['status' => 'published', 'published_at' => now()]);

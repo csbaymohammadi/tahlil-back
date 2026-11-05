@@ -6,6 +6,7 @@ use App\Models\Tutorial;
 use App\Models\User;
 use App\Support\CategoryAssignments;
 use App\Support\PublicContentIndex;
+use Database\Factories\BonusFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -115,7 +116,11 @@ class MultipleCategoriesTest extends PanelTestCase
         $response->assertJsonPath('data.category_id', [$first->id, $second->id])->assertJsonPath('data.category.0.id', $first->id)->assertJsonPath('data.category.1.id', $second->id);
         $this->assertCount(2, $response->json('data.category'));
         $base = '/api/v1/admin/'.$module.'/'.($module === 'blog' ? 'articles' : 'items');
-        $this->patchJson($base.'/'.$record->id, ['expected_version' => $record->version, 'category_id' => [$second->id, $first->id]])->assertOk();
+        $input = ['expected_version' => $record->version, 'category_id' => [$second->id, $first->id]];
+        if ($module === 'bonuses') {
+            $input += ['description' => 'Example campaign summary.', 'campaign' => BonusFactory::campaignInput()];
+        }
+        $this->patchJson($base.'/'.$record->id, $input)->assertOk();
         $this->get($public)->assertOk()->assertJsonPath('data.category_id', [$second->id, $first->id]);
     }
 

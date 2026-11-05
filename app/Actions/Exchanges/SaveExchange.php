@@ -4,6 +4,7 @@ namespace App\Actions\Exchanges;
 
 use App\Actions\Auth\RevokeSessions;
 use App\Blog\BlogHtmlSanitizer;
+use App\Bonuses\BonusEvents;
 use App\Exceptions\PanelAuthException;
 use App\Media\MediaReferences;
 use App\Models\Exchange;
@@ -21,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 
 class SaveExchange
 {
-    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments) {}
+    public function __construct(private RevokeSessions $sessions, private BlogHtmlSanitizer $html, private MediaReferences $media, private PublicContentIndex $publicIndex, private CategoryAssignments $categoryAssignments, private BonusEvents $bonusEvents) {}
 
     /** @param array<string, mixed> $input */
     public function handle(PanelSession $session, ?int $id, array $input, string $requestId): Exchange
@@ -117,7 +118,9 @@ class SaveExchange
             }
 
             $this->publicIndex->sync('exchanges', $exchange->id);
-            $this->publicIndex->refreshType('bonuses');
+            if (($wasPublished || $isPublished) && array_intersect($changed, ['title', 'english_name', 'logo', 'slug', 'status']) !== []) {
+                $this->bonusEvents->providerChanged('exchanges', $exchange, $requestId);
+            }
 
             return $exchange->fresh(['author', 'category']);
         });

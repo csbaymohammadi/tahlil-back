@@ -117,6 +117,15 @@ class SeedDemoContent
                                 $payload += ['cover_image' => self::IMAGE, 'reading_minutes' => 3 + (($sequence - 1) % 5)];
                                 if ($module !== 'bonuses') {
                                     $payload['scheduled_for'] = null;
+                                } else {
+                                    $payload['campaign'] = [
+                                        'provider' => ['kind' => 'independent', 'name' => 'ارائه‌دهنده نمونه تحلیل'],
+                                        'type' => 'other',
+                                        'reward' => ['kind' => 'custom', 'custom_text' => 'پاداش آزمایشی برای '.$payload['title']],
+                                        'availability' => 'ended',
+                                        'source_url' => 'https://example.com/demo/bonuses/'.$suffix.'/terms',
+                                        'redemption' => ['url' => 'https://example.com/demo/bonuses/'.$suffix],
+                                    ];
                                 }
                             }
                             $result = app($definition['save'])->handle($session, null, $payload, $requestId);

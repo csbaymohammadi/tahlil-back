@@ -35,6 +35,22 @@ class BonusMedia
             in_array(strtolower($parts['host'] ?? ''), config('bonuses.trusted_media_hosts', []), true);
     }
 
+    public function approvedProviderLogo(string $location): bool
+    {
+        if ($location === '' || preg_match('~^/media/[1-9][0-9]{0,15}/[a-z0-9.-]+$~D', $location)) {
+            return true;
+        }
+        $path = parse_url($location, PHP_URL_PATH);
+        if (! is_string($path)) {
+            return false;
+        }
+        $path = rawurldecode($path);
+
+        return ! preg_match('~^/media(?:/|$)~i', $path)
+            && preg_match('~\.(?:png|jpe?g|webp|gif|avif)$~iD', $path) === 1
+            && $this->approvedImage($location);
+    }
+
     public function replace(Bonus $bonus, User $actor): void
     {
         $this->attach($bonus, $actor, 'cover_image', [$bonus->cover_image], 'image', 'cover_image');
@@ -42,6 +58,11 @@ class BonusMedia
             $urls = app(BlogHtmlSanitizer::class)->managedSources($bonus->content, $kind);
             $this->attach($bonus, $actor, 'content-'.$kind, $urls, $kind, 'content');
         }
+    }
+
+    public function replaceProviderLogo(Bonus $bonus, User $actor, string $logo): void
+    {
+        $this->attach($bonus, $actor, 'provider_logo', [$logo], 'image', 'campaign.provider.logo');
     }
 
     /** @param list<string> $urls */

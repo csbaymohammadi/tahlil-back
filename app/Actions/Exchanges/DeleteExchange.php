@@ -3,6 +3,7 @@
 namespace App\Actions\Exchanges;
 
 use App\Actions\Auth\RevokeSessions;
+use App\Bonuses\BonusEvents;
 use App\Exceptions\PanelAuthException;
 use App\Models\Exchange;
 use App\Models\PanelSession;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class DeleteExchange
 {
-    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex, private BonusEvents $bonusEvents) {}
 
     public function handle(PanelSession $session, int $id, int $expectedVersion, string $requestId): void
     {
@@ -42,7 +43,9 @@ class DeleteExchange
                 ]);
             }
             $this->publicIndex->sync('exchanges', $id);
-            $this->publicIndex->refreshType('bonuses');
+            if ($wasPublished) {
+                $this->bonusEvents->providerChanged('exchanges', $exchange, $requestId);
+            }
         });
     }
 }

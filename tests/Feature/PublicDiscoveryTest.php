@@ -11,6 +11,7 @@ use App\Models\Exchange;
 use App\Models\Tutorial;
 use App\Models\User;
 use App\Support\PublicContentIndex;
+use Database\Factories\BonusFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -188,7 +189,11 @@ class PublicDiscoveryTest extends PanelTestCase
             $record = $model::factory()->create($attributes);
             app(PublicContentIndex::class)->sync($type, $record->id);
             $path = '/api/v1/admin/'.($type === 'news' ? 'news/items' : $type.'/items').'/'.$record->id;
-            $this->patchJson($path, ['expected_version' => 1, 'title' => 'Lifecycle after'])->assertOk();
+            $input = ['expected_version' => 1, 'title' => 'Lifecycle after'];
+            if ($type === 'bonuses') {
+                $input += ['description' => 'Example campaign summary.', 'campaign' => BonusFactory::campaignInput()];
+            }
+            $this->patchJson($path, $input)->assertOk();
             $this->get('/api/v1/search?q=Lifecycleafter')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.type', $type);
             $this->delete($path.'?expected_version=2')->assertNoContent();
             $this->get('/api/v1/search?q=Lifecycleafter')->assertOk()->assertJsonPath('meta.total', 0);

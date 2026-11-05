@@ -3,6 +3,7 @@
 namespace App\Bonuses;
 
 use App\Models\Bonus;
+use App\Models\BonusCampaign;
 use Illuminate\Support\Facades\DB;
 
 class ResolvePublicBonus
@@ -11,7 +12,7 @@ class ResolvePublicBonus
     public function handle(string $slug): array
     {
         $ownership = DB::table('bonus_slug_ownership')->where('slug', $slug)->first();
-        $bonus = $ownership ? Bonus::public()->withCount('visibleComments as comment_count')->with(['category', 'campaign.exchange', 'ratingAggregate'])->find($ownership->bonus_id) : null;
+        $bonus = $ownership ? Bonus::public()->withCount('visibleComments as comment_count')->with(['category', ...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate'])->find($ownership->bonus_id) : null;
         if (! $bonus) {
             return ['type' => 'not_found'];
         }
