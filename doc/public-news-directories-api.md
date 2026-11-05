@@ -1,5 +1,7 @@
 # Public News and Directories API — Standalone Frontend Handoff
 
+For current stock archive category filters, counts, and website URL state, see [Public directory category filters](public-directory-category-filters-api.md). It supersedes the earlier stock archive category contract and examples below.
+
 **Contract date:** 2026-10-27
 
 **Backend:** Laravel 13 / PHP 8.3

@@ -35,9 +35,9 @@ class PublicGoldPropBonusTest extends PanelTestCase
         $other = $class::factory()->published()->create();
         $class::factory()->create();
         SiteComment::factory()->create(['section' => $type, 'parent_id' => $record->id]);
-        $this->get('/api/v1/'.$type.'?q='.urlencode('کاری موسی'))->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $record->id)->assertJsonMissingPath('facets');
+        $this->get('/api/v1/'.$type.'?q='.urlencode('کاری موسی'))->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $record->id)->assertJsonPath('facets.all_count', 1);
         $this->get('/api/v1/'.$type.'?q=%25_')->assertOk()->assertJsonPath('meta.total', 1);
-        $this->get('/api/v1/'.$type.'?category=x')->assertUnprocessable();
+        $this->get('/api/v1/'.$type.'?category=x')->assertOk()->assertJsonPath('filters.category', null);
         $this->get('/api/v1/'.$type.'?page=999')->assertOk()->assertJsonPath('data', [])->assertJsonPath('meta.total', 2);
         $detail = $this->get('/api/v1/'.$type.'/'.$record->slug)->assertOk()->assertJsonPath('data.kind', $type)->assertJsonPath('data.comment_count', 1)->assertJsonPath('data.rating_average', null)->assertJsonPath('data.rating_count', 0)->assertJsonMissingPath('data.author');
         $this->assertCount($specifications, $detail->json('data.specifications'));

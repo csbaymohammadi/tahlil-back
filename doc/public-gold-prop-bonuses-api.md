@@ -1,5 +1,7 @@
 # Public gold platforms, prop firms, and bonuses API
 
+For current gold and prop archive category filters, counts, and website URL state, see [Public directory category filters](public-directory-category-filters-api.md). It supersedes the earlier gold and prop archive category contract and examples below.
+
 This is the frontend integration contract for the three public domains. The base path is `/api/v1`. IDs are numeric and scoped to their domain. The `href` values below are website paths; lookup endpoints use the API paths. Dates are UTC ISO 8601 strings or `null` when unavailable. Public JSON responses include `request_id` and `X-Request-ID`. Examples use illustrative data.
 
 ## Transport and shared behavior

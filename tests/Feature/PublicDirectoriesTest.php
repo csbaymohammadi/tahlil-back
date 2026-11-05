@@ -6,6 +6,10 @@ use App\Models\Broker;
 use App\Models\BrokerCategory;
 use App\Models\Exchange;
 use App\Models\ExchangeCategory;
+use App\Models\GoldPlatform;
+use App\Models\GoldPlatformCategory;
+use App\Models\PropFirm;
+use App\Models\PropFirmCategory;
 use App\Models\SiteComment;
 use App\Models\StockBrokerage;
 use App\Models\StockBrokerageCategory;
@@ -27,6 +31,15 @@ class PublicDirectoriesTest extends PanelTestCase
             'exchange' => ['exchanges', Exchange::class, 'exchange', 'exchange_slug_ownership', 'exchange_id', 'EXCHANGE_NOT_FOUND', 'EXCHANGES_UNAVAILABLE'],
             'forex' => ['brokers', Broker::class, 'broker', 'broker_slug_ownership', 'broker_id', 'BROKER_NOT_FOUND', 'BROKERS_UNAVAILABLE'],
             'stock' => ['stock-brokers', StockBrokerage::class, 'stock-broker', 'stock_brokerage_slug_ownership', 'stock_brokerage_id', 'STOCK_BROKER_NOT_FOUND', 'STOCK_BROKERS_UNAVAILABLE'],
+        ];
+    }
+
+    public static function categorizedDirectories(): array
+    {
+        return [
+            'stock' => ['stock-brokers', StockBrokerage::class, StockBrokerageCategory::class],
+            'gold' => ['gold-platforms', GoldPlatform::class, GoldPlatformCategory::class],
+            'prop' => ['prop-firms', PropFirm::class, PropFirmCategory::class],
         ];
     }
 
@@ -60,7 +73,7 @@ class PublicDirectoriesTest extends PanelTestCase
         $this->get('/api/v1/'.$type.'/'.$parent->slug.'/others')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $other->id)->assertJsonMissingPath('data.0.specifications');
         if ($type === 'stock-brokers') {
             $detail->assertJsonPath('data.kind', 'stock-brokers')->assertJsonPath('data.logo', '')->assertJsonPath('data.website_url', '')->assertJsonPath('data.platform_label', 'Stock Brokerage');
-            $list->assertJsonMissingPath('facets')->assertJsonMissingPath('filters.category');
+            $list->assertJsonPath('facets.all_count', 2)->assertJsonPath('filters.category', null);
         } elseif ($type === 'brokers') {
             $detail->assertJsonPath('data.platforms', 'WebTrader')->assertJsonPath('data.account_currency', 'USD')->assertJsonPath('data.specifications.account_currency', '');
         }
@@ -107,6 +120,54 @@ class PublicDirectoriesTest extends PanelTestCase
                 $this->get('/api/v1/brokers?q=Sample&category=forex')->assertJsonPath('data.0.filter_keys', ['forex']);
             }
         }
+    }
+
+    #[DataProvider('categorizedDirectories')]
+    public function test_public_archive_filters_by_live_category_with_search_only_facets(string $type, string $class, string $categoryClass): void
+    {
+        $first = $categoryClass::factory()->create(['name' => 'Alpha']);
+        $second = $categoryClass::factory()->create(['name' => 'دسته موسى', 'public_name_normalized' => 'دستهموسی']);
+        $empty = $categoryClass::factory()->create(['name' => 'Beta']);
+        $firstKey = 'category-'.$first->id;
+        $secondKey = 'category-'.$second->id;
+        $record = $class::factory()->published()->create(['title' => 'Matched provider', 'category_id' => $first->id]);
+        $record->categories()->attach($second->id, ['position' => 1]);
+        $class::factory()->published()->create(['title' => 'Matched uncategorized provider', 'category_id' => null]);
+        $class::factory()->published()->create(['title' => 'Different provider', 'category_id' => $first->id]);
+        $class::factory()->create(['title' => 'Matched draft', 'category_id' => $second->id]);
+        $class::factory()->published()->create(['title' => 'Matched removed', 'category_id' => $second->id])->delete();
+        $path = '/api/v1/'.$type;
+
+        $this->get($path.'?q=Matched&category='.$secondKey)->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $record->id)
+            ->assertJsonPath('data.0.category_id', [$first->id, $second->id])
+            ->assertJsonPath('data.0.category.0.key', $firstKey)
+            ->assertJsonPath('data.0.category.1.key', $secondKey)
+            ->assertJsonPath('meta', ['page' => 1, 'per_page' => 9, 'total' => 1, 'total_pages' => 1])
+            ->assertJsonPath('filters', ['q' => 'Matched', 'category' => $secondKey, 'sort' => 'default'])
+            ->assertJsonPath('facets', [
+                'all_count' => 2,
+                'uncategorized_count' => 1,
+                'categories' => [
+                    ['id' => $first->id, 'name' => 'Alpha', 'key' => $firstKey, 'count' => 1],
+                    ['id' => $empty->id, 'name' => 'Beta', 'key' => 'category-'.$empty->id, 'count' => 0],
+                    ['id' => $second->id, 'name' => 'دسته موسى', 'key' => $secondKey, 'count' => 1],
+                ],
+            ]);
+        $this->get($path.'?q='.urlencode('دسته موسی'))->assertOk()->assertJsonPath('meta.total', 1);
+        $this->get($path.'?category='.$firstKey.'&page=2&sort=alphabetical')->assertOk()
+            ->assertJsonPath('data', [])->assertJsonPath('meta.page', 2)->assertJsonPath('meta.total', 2);
+
+        $foreign = ExchangeCategory::factory()->create(['key' => 'foreign-only']);
+        foreach (['category=all', 'category=', 'category='.$foreign->key, 'category='.$firstKey.'&category='.$secondKey, 'category[]='.$firstKey, 'category[x]='.$firstKey, 'category=%FF', 'category='.str_repeat('a', 101)] as $query) {
+            $this->get($path.'?q=Matched&'.$query)->assertOk()->assertJsonPath('filters.category', null)->assertJsonPath('meta.total', 2);
+        }
+        $second->delete();
+        $this->get($path.'?q=Matched&category='.$secondKey)->assertOk()->assertJsonPath('filters.category', null)
+            ->assertJsonPath('facets.uncategorized_count', 1)->assertJsonCount(2, 'facets.categories');
+        $this->get($path.'?q='.urlencode('دسته موسی'))->assertOk()->assertJsonPath('meta.total', 0);
+        $this->get($path.'/'.$record->slug)->assertOk()->assertJsonPath('data.category_id', [$first->id])->assertJsonPath('data.category.0.key', $firstKey);
     }
 
     #[DataProvider('domains')]
@@ -179,9 +240,6 @@ class PublicDirectoriesTest extends PanelTestCase
             $category->delete();
             $this->get('/api/v1/'.$type.'?q='.urlencode('دسته موسی'))->assertOk()->assertJsonPath('meta.total', 0);
         }
-        $category = StockBrokerageCategory::factory()->create(['name' => 'OnlyCategoryNeedle']);
-        StockBrokerage::factory()->published()->create(['category_id' => $category->id]);
-        $this->get('/api/v1/stock-brokers?q=OnlyCategoryNeedle')->assertOk()->assertJsonPath('meta.total', 0);
         Broker::factory()->published()->create(['markets' => 'OnlyMarketNeedle']);
         $this->get('/api/v1/brokers?q=OnlyMarketNeedle')->assertOk()->assertJsonPath('meta.total', 1);
         $this->get('/api/v1/exchanges?q=OnlyMarketNeedle')->assertOk()->assertJsonPath('meta.total', 0);
@@ -202,9 +260,6 @@ class PublicDirectoriesTest extends PanelTestCase
         }
         foreach (['', '/others'] as $suffix) {
             $this->get('/api/v1/'.$type.'/'.$record->slug.$suffix.'?q=x')->assertUnprocessable();
-        }
-        if ($type === 'stock-brokers') {
-            $this->get('/api/v1/stock-brokers?category=all')->assertUnprocessable();
         }
         config(['presentation.public_read_rate_limit' => 1]);
         $this->get('/api/v1/'.$type)->assertTooManyRequests()->assertHeader('Retry-After');

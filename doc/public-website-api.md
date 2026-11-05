@@ -1,5 +1,7 @@
 # Public Website API — Complete Frontend Handoff
 
+For current category filters and website URL state in the stock, gold, and prop directories, see [Public directory category filters](public-directory-category-filters-api.md). It supersedes the earlier stock archive category contract and examples below.
+
 Implementation baseline: `e749b80` plus the public news/directories extension, Laravel 13 / PHP 8.3, 2026-10-26.
 
 This is the consolidated frontend contract for the implemented homepage/shared layout, blog, news, cryptocurrency exchanges, forex brokers, stock brokerages, public comments, global search, and sitemap content feed. Request/response details below describe the current backend, not proposed features. If an older panel handoff describes a different public projection, use this document for public website integration; the administrative contracts remain separate.

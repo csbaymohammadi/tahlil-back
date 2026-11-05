@@ -4,9 +4,7 @@ namespace App\Actions\PublicContent;
 
 use App\Exceptions\PanelAuthException;
 use App\Models\Broker;
-use App\Models\BrokerCategory;
 use App\Models\Exchange;
-use App\Models\ExchangeCategory;
 use App\Models\GoldPlatform;
 use App\Models\PropFirm;
 use App\Models\StockBrokerage;
@@ -40,24 +38,26 @@ class ReadPublicDirectory
                     if ($type === 'brokers') {
                         $query->orWhereRaw("markets_public_normalized LIKE ? ESCAPE '!'", [$pattern]);
                     }
-                    if (in_array($type, ['exchanges', 'brokers'], true)) {
-                        $query->orWhereHas('categories', fn (Builder $category) => $category->whereNull('deleted_at')->whereRaw("public_name_normalized LIKE ? ESCAPE '!'", [$pattern]));
-                    }
+                    $query->orWhereHas('categories', fn (Builder $category): Builder => CategoryAssignments::liveQuery($category)
+                        ->whereRaw("public_name_normalized LIKE ? ESCAPE '!'", [$pattern]));
                 });
             }
-            $categories = collect();
-            if (in_array($type, ['exchanges', 'brokers'], true)) {
-                $categoryClass = $type === 'exchanges' ? ExchangeCategory::class : BrokerCategory::class;
-                $categories = $categoryClass::query()->get()->sort(fn ($a, $b): int => strcmp(PublicText::normalize($a->name), PublicText::normalize($b->name)) ?: $a->id <=> $b->id)->values();
-            }
+            $categoryClass = CategoryAssignments::MODELS[$class];
+            $categories = $categoryClass::query()->get()
+                ->sort(fn ($a, $b): int => strcmp(PublicText::normalize($a->name), PublicText::normalize($b->name)) ?: $a->id <=> $b->id)
+                ->keyBy(CategoryAssignments::publicKey(...));
             $requestedCategory = $filters['category'] ?? null;
-            $selected = is_string($requestedCategory) && ! in_array($requestedCategory, ['', 'all', ...($type === 'brokers' ? ['forex'] : [])], true) ? $categories->first(fn ($category): bool => ($category->key ?? 'category-'.$category->id) === $requestedCategory) : null;
-            $effective = ($selected ? ($selected->key ?? 'category-'.$selected->id) : null) ?? ($type === 'brokers' && ($filters['category'] ?? null) === 'forex' ? 'forex' : null);
+            $virtualForex = $type === 'brokers' && $requestedCategory === 'forex';
+            $selected = is_string($requestedCategory) && $requestedCategory !== '' && $requestedCategory !== 'all' && ! $virtualForex
+                ? $categories->get($requestedCategory) : null;
+            $effective = $selected || $virtualForex ? $requestedCategory : null;
             $query = clone $matching;
             if ($selected) {
                 $query->whereHas('categories', fn (Builder $category): Builder => CategoryAssignments::liveQuery($category)->whereKey($selected->id));
             }
-            $total = (clone $query)->count();
+            $categoryCounts = CategoryAssignments::publicCounts($matching);
+            $all = $categoryCounts['all'];
+            $total = $selected ? (clone $query)->count() : $all;
             if ($sort === 'alphabetical') {
                 if ((clone $query)->whereNull('title_sort_key')->exists()) {
                     throw new PanelAuthException(503, $this->projection->unavailableCode($type), 'Public directory ordering requires synchronization.');
@@ -67,21 +67,24 @@ class ReadPublicDirectory
                 $query->orderByDesc('created_at')->orderByDesc('id');
             }
             $records = $query->with(['category', 'ratingAggregate'])->withCount('visibleComments as comment_count')->offset(($page - 1) * 9)->limit(9)->get();
-            $result = ['records' => $records, 'meta' => ['page' => $page, 'per_page' => 9, 'total' => $total, 'total_pages' => (int) ceil($total / 9)],
-                'filters' => ['q' => $filters['q'] ?? '', ...(in_array($type, ['exchanges', 'brokers'], true) ? ['category' => $effective] : []), 'sort' => $sort]];
-            if (! in_array($type, ['exchanges', 'brokers'], true)) {
-                return $result;
-            }
-            $categoryCounts = CategoryAssignments::publicCounts($matching);
-            $counts = collect($categoryCounts['counts']);
-            $all = $categoryCounts['all'];
 
-            return [...$result, 'facets' => ['all_count' => $all, ...($type === 'brokers' ? ['forex_count' => $all] : []), 'uncategorized_count' => $categoryCounts['uncategorized'],
-                'categories' => $categories->map(fn ($category): array => ['id' => (int) $category->id, 'name' => $category->name, 'key' => $category->key ?? 'category-'.$category->id, 'count' => $counts->get((string) $category->id, 0)])->all()]];
+            return [
+                'records' => $records,
+                'meta' => ['page' => $page, 'per_page' => 9, 'total' => $total, 'total_pages' => (int) ceil($total / 9)],
+                'filters' => ['q' => $filters['q'] ?? '', 'category' => $effective, 'sort' => $sort],
+                'facets' => [
+                    'all_count' => $all,
+                    ...($type === 'brokers' ? ['forex_count' => $all] : []),
+                    'uncategorized_count' => $categoryCounts['uncategorized'],
+                    'categories' => $categories->map(fn ($category, string $key): array => [
+                        'id' => (int) $category->id, 'name' => $category->name, 'key' => $key, 'count' => $categoryCounts['counts'][$category->id] ?? 0,
+                    ])->values()->all(),
+                ],
+            ];
         });
     }
 
-    /** @return class-string<Exchange|Broker|StockBrokerage> */
+    /** @return class-string<Exchange|Broker|StockBrokerage|GoldPlatform|PropFirm> */
     public function model(string $type): string
     {
         return match ($type) {
@@ -89,7 +92,7 @@ class ReadPublicDirectory
         };
     }
 
-    /** @return Collection<int, Exchange|Broker|StockBrokerage> */
+    /** @return Collection<int, Exchange|Broker|StockBrokerage|GoldPlatform|PropFirm> */
     public function others(string $type, int $parentId): Collection
     {
         $class = $this->model($type);

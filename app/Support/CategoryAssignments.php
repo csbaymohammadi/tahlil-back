@@ -84,14 +84,17 @@ class CategoryAssignments
         return $record->categories->filter(fn (Model $category): bool => ! $category->trashed())->unique('id')->values();
     }
 
-    /** @return array{category_id: list<int>, category: list<array{id: int, name: string, key?: string}>} */
-    public static function publicFields(Model $record): array
+    public static function publicKey(Model $category): string
     {
-        $categories = self::live($record)->map(function (Model $category): array {
-            $key = $category->getAttribute('key');
-            if ($key === null && ($category instanceof Models\BlogCategory || $category instanceof Models\NewsCategory || $category instanceof Models\BrokerCategory || $category instanceof Models\ExchangeCategory)) {
-                $key = 'category-'.$category->id;
-            }
+        return $category->getAttribute('key') ?? 'category-'.$category->getKey();
+    }
+
+    /** @return array{category_id: list<int>, category: list<array{id: int, name: string, key?: string}>} */
+    public static function publicFields(Model $record, bool $withKeys = false): array
+    {
+        $categories = self::live($record)->map(function (Model $category) use ($withKeys): array {
+            $key = $withKeys || $category instanceof Models\BlogCategory || $category instanceof Models\NewsCategory || $category instanceof Models\BrokerCategory || $category instanceof Models\ExchangeCategory
+                ? self::publicKey($category) : $category->getAttribute('key');
 
             return ['id' => (int) $category->id, 'name' => $category->name, ...($key !== null ? ['key' => $key] : [])];
         })->all();

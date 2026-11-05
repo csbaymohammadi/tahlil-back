@@ -19,10 +19,10 @@ class PublicReadRequest
         if ($request->getContent() !== '') {
             throw new PanelAuthException(422, 'VALIDATION_FAILED', 'This endpoint does not accept a body.');
         }
+        $directoryIndex = $request->routeIs('public.exchanges.index', 'public.brokers.index', 'public.stock-brokers.index', 'public.gold-platforms.index', 'public.prop-firms.index');
         $allowed = match (true) {
             $request->routeIs('public.news.index') => ['q', 'category_id', 'page', 'per_page'],
-            $request->routeIs('public.exchanges.index', 'public.brokers.index') => ['q', 'category', 'sort', 'page', 'per_page'],
-            $request->routeIs('public.stock-brokers.index', 'public.gold-platforms.index', 'public.prop-firms.index') => ['q', 'sort', 'page', 'per_page'],
+            $directoryIndex => ['q', 'category', 'sort', 'page', 'per_page'],
             $request->routeIs('public.bonuses.index', 'public.tutorials.index') => ['q', 'category', 'page', 'per_page'],
             $request->routeIs('public.stock-brokers.legacy') => ['source_path'],
             $request->routeIs('public.blog.index') => ['q', 'category_id', 'page', 'per_page'],
@@ -31,7 +31,7 @@ class PublicReadRequest
             $request->routeIs('comments.index') => ['page', 'per_page'],
             default => [],
         };
-        $categoryFallback = $request->routeIs('public.exchanges.index', 'public.brokers.index', 'public.bonuses.index', 'public.tutorials.index');
+        $categoryFallback = $directoryIndex || $request->routeIs('public.bonuses.index', 'public.tutorials.index');
         $categoryOccurrences = 0;
         $invalidCategory = false;
         $seen = [];

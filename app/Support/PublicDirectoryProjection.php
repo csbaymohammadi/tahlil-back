@@ -31,7 +31,7 @@ class PublicDirectoryProjection
             'href' => '/'.$type.'/'.rawurlencode($record->slug),
             'description' => $record->description,
             'excerpt' => PublicText::plain($record->description !== '' ? $record->description : $record->content),
-            ...CategoryAssignments::publicFields($record),
+            ...CategoryAssignments::publicFields($record, withKeys: true),
             ...$this->aggregates($record),
         ];
         if ($record instanceof Broker) {
