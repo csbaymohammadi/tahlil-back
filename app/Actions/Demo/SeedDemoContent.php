@@ -20,6 +20,7 @@ use App\Actions\PropFirms\SavePropFirm;
 use App\Actions\StockBrokers\ManageStockBrokerageCategories;
 use App\Actions\StockBrokers\SaveStockBrokerage;
 use App\Auth\PanelSessions;
+use App\Blog\BlogHtmlSanitizer;
 use App\Models;
 use App\Support\BrokerSpecifications;
 use App\Support\CategoryAssignments;
@@ -154,6 +155,34 @@ class SeedDemoContent
 
             return $report;
         });
+    }
+
+    public function matchesPublishedDemo(string $module, Model $record): bool
+    {
+        $definition = self::MODULES[$module] ?? null;
+        if ($definition === null || $record->status !== 'published' || $record->version !== 1 ||
+            ! preg_match('/^tahlil-demo-'.preg_quote($module, '/').'-(\d{3})$/D', $record->slug, $match)) {
+            return false;
+        }
+        $sequence = (int) $match[1];
+        if ($sequence < 1 || $sequence > count(self::VARIANTS) + 1) {
+            return false;
+        }
+        $variant = self::VARIANTS[$sequence - 2] ?? null;
+        $title = $variant === null ? $definition['title'].' ۰۰۱' : $definition['title'].' '.$variant['name'].'؛ '.$variant['topic'];
+        $description = $variant === null
+            ? 'محتوای آزمایشی برای بررسی نمایش کارت، تصویر، دسته‌بندی و جزئیات خدمات؛ این رکورد معرف کسب‌وکار واقعی نیست.'
+            : $definition['title'].' '.$variant['name'].' با تمرکز بر '.$variant['topic'].'؛ '.$variant['detail'];
+        if ($record->title !== $title || $record->description !== $description ||
+            ($record->getAttribute('logo') ?? $record->getAttribute('cover_image')) !== self::IMAGE) {
+            return false;
+        }
+        $html = $this->content($definition['title'], $variant);
+        $canonical = app(BlogHtmlSanitizer::class)->sanitize($html,
+            config($module === 'news' ? 'news.trusted_media_hosts' : 'blog.trusted_media_hosts', []),
+            rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
+
+        return hash_equals($canonical, $record->content);
     }
 
     /** @param array{name: string, english: string, topic: string, detail: string, city: string}|null $variant */

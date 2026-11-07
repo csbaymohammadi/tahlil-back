@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Actions\Demo\SeedDemoContent;
+use App\Actions\Demo\WithdrawDemoContent;
 use App\Models\BlogArticle;
+use App\Models\BlogCategory;
 use App\Models\PageSetting;
 use App\Models\PanelSession;
 use App\Models\User;
@@ -12,6 +14,7 @@ use Database\Seeders\DemoContentSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\PanelTestCase;
 
@@ -148,5 +151,35 @@ class DemoContentTest extends PanelTestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Create an active panel administrator');
         $this->seed(DemoContentSeeder::class);
+    }
+
+    public function test_verified_demo_withdrawal_backs_up_records_and_preserves_manually_edited_content(): void
+    {
+        $actor = User::factory()->panel()->create();
+        app(SeedDemoContent::class)->handle($actor);
+        $edited = BlogArticle::where('slug', 'tahlil-demo-articles-001')->firstOrFail();
+        $this->panel($actor);
+        $this->patchJson('/api/v1/admin/blog/articles/'.$edited->id, ['expected_version' => 1, 'title' => 'Real editorial replacement'])->assertOk();
+        $categories = BlogCategory::count();
+        $backup = sys_get_temp_dir().'/seo-demo-withdrawal-'.Str::uuid().'.json';
+        try {
+            $result = app(WithdrawDemoContent::class)->handle($actor, $backup);
+            $this->assertSame(77, $result['inspected']);
+            $this->assertSame(76, $result['withdrawn']);
+            $this->assertSame($edited->id, $result['skipped'][0]['id']);
+            $this->assertSame('published', $edited->fresh()->status);
+            $this->assertSame($categories, BlogCategory::count());
+            $snapshot = json_decode(file_get_contents($backup), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertCount(76, $snapshot['entries']);
+            $this->assertSame(0600, fileperms($backup) & 0777);
+            $this->get('/api/v1/blog/articles/tahlil-demo-articles-002')->assertNotFound();
+            $this->get('/api/v1/news/articles/tahlil-demo-news-001')->assertNotFound();
+            $this->get('/api/v1/exchanges/tahlil-demo-exchanges-001')->assertNotFound();
+            $this->assertDatabaseHas('blog_articles', ['slug' => 'tahlil-demo-articles-002', 'status' => 'draft', 'version' => 2]);
+            $this->assertDatabaseHas('blog_outbox', ['article_id' => BlogArticle::where('slug', 'tahlil-demo-articles-002')->value('id'), 'event' => 'blog_article_changed']);
+            $this->get('/api/v1/sitemap/entries')->assertOk()->assertJsonPath('meta.total', 12);
+        } finally {
+            @unlink($backup);
+        }
     }
 }

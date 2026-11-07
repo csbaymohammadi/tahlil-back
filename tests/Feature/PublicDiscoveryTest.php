@@ -160,12 +160,11 @@ class PublicDiscoveryTest extends PanelTestCase
     {
         $author = User::factory()->panel()->create();
         $exchange = Exchange::factory()->published()->create();
-        $bonus = Bonus::factory()->published()->create(['author_id' => $author->id]);
-        DB::table('bonus_campaigns')->where('bonus_id', $bonus->id)->update(['exchange_id' => $exchange->id]);
+        $article = BlogArticle::factory()->create(['author_id' => $author->id, 'status' => 'published']);
         $this->artisan('public-content:rebuild')->assertSuccessful();
-        $before = $this->get('/api/v1/sitemap/entries?type=bonuses')->assertOk()->json('meta.revision');
+        $before = $this->get('/api/v1/sitemap/entries?type=articles')->assertOk()->json('meta.revision');
         $author->forceFill(['bio' => 'Updated public biography'])->save();
-        $after = $this->get('/api/v1/sitemap/entries?type=bonuses')->assertOk()->json('meta.revision');
+        $after = $this->get('/api/v1/sitemap/entries?type=articles')->assertOk()->json('meta.revision');
         $this->assertNotSame($before, $after);
         $this->panel($author);
         $this->patchJson('/api/v1/admin/exchanges/items/'.$exchange->id, ['expected_version' => 1, 'status' => 'draft'])->assertOk();

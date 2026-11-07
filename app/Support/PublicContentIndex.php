@@ -59,7 +59,7 @@ class PublicContentIndex
         }
         $prefix = $type === 'articles' ? 'blog' : $type;
         $data = [
-            'type' => $type, 'record_id' => $id, 'title' => $record->title,
+            'type' => $type, 'record_id' => $id, 'title' => $record instanceof Bonus ? PublicText::plain($campaign['provider_name'], 255) : $record->title,
             'english_name' => (string) ($record->english_name ?? ''), 'slug' => $record->slug,
             'path' => '/'.$prefix.'/'.rawurlencode($record->slug), 'description' => $description,
             'image' => (string) ($record->logo ?? $record->cover_image ?? ''),
@@ -167,12 +167,12 @@ class PublicContentIndex
     /** @return list<string> */
     private function relations(string $type): array
     {
-        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['ratingAggregate'] : [])];
+        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...(in_array($type, ['articles', 'news'], true) ? ['author'] : []), ...($type === 'bonuses' ? ['ratingAggregate'] : [])];
     }
 
     private function sourceStamp(Model $record): string
     {
-        $author = $record instanceof Tutorial ? null : $record->author;
+        $author = $record instanceof BlogArticle || $record instanceof NewsItem ? $record->author : null;
 
         $values = [
             $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id', 'vid_time']),
@@ -190,8 +190,14 @@ class PublicContentIndex
     /** @param array<string, mixed>|null $campaign */
     private function fingerprint(Model $record, ?array $campaign): string
     {
-        $author = $record instanceof Tutorial ? null : $record->author;
+        $author = $record instanceof BlogArticle || $record instanceof NewsItem ? $record->author : null;
 
+        if ($record instanceof Bonus) {
+            return hash('sha256', json_encode([
+                $record->only(['slug', 'cover_image', 'content']), BonusFields::values($record),
+                CategoryAssignments::publicFields($record),
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        }
         $values = [
             $record->only(['title', 'english_name', 'slug', 'description', 'content', 'logo', 'cover_image', 'specifications', 'meta_description', 'reading_minutes', 'website_url', 'markets', 'access', 'support', 'founded_year', 'platform_type', 'youtube_url', 'aparat_url', 'vid_time']),
             CategoryAssignments::publicFields($record), $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']), $campaign,
