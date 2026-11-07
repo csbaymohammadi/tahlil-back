@@ -54,8 +54,15 @@ class BonusMedia
     public function replace(Bonus $bonus, User $actor): void
     {
         $this->attach($bonus, $actor, 'cover_image', [$bonus->cover_image], 'image', 'cover_image');
+        $sanitizer = app(BlogHtmlSanitizer::class);
+        try {
+            $safe = $sanitizer->sanitizeForPublic($bonus->content, config('bonuses.trusted_media_hosts', []),
+                strictLinks: true, rootAssetPrefixes: ['/images/', '/tahlilpanel/images/'], allowEmpty: true);
+        } catch (PanelAuthException) {
+            $safe = '';
+        }
         foreach (['image', 'video'] as $kind) {
-            $urls = app(BlogHtmlSanitizer::class)->managedSources($bonus->content, $kind);
+            $urls = $sanitizer->managedSources($safe, $kind);
             $this->attach($bonus, $actor, 'content-'.$kind, $urls, $kind, 'content');
         }
     }
@@ -68,16 +75,16 @@ class BonusMedia
     /** @param list<string> $urls */
     private function attach(Bonus $bonus, User $actor, string $field, array $urls, string $kind, string $errorField): void
     {
-        try {
-            $ids = [];
-            foreach (array_unique($urls) as $url) {
-                if (str_starts_with($url, '/media/')) {
+        $ids = [];
+        foreach (array_unique($urls) as $url) {
+            if (str_starts_with($url, '/media/')) {
+                try {
                     $ids[] = $this->references->resolveCanonical($url, $actor, $kind)->id;
+                } catch (PanelAuthException|ValidationException) {
+                    continue;
                 }
             }
-            $this->references->replace('bonus', $bonus->id, $field, $ids, $actor, kind: $kind);
-        } catch (PanelAuthException|ValidationException) {
-            throw ValidationException::withMessages([$errorField => ['Choose an accessible, ready media file of the required type.']]);
         }
+        $this->references->replace('bonus', $bonus->id, $field, $ids, $actor, kind: $kind);
     }
 }

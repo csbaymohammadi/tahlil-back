@@ -227,7 +227,7 @@ class TutorialCommentsConcurrencyTest extends TestCase
         $key = (string) Str::uuid();
         $results = $this->race([
             fn () => app(SubmitComment::class)->handle('bonus', $bonus->id, $payload, $key, 'visitor'),
-            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'status' => 'draft'], 'unpublish'),
+            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'is_published' => false], 'unpublish'),
         ]);
         $this->assertContains($results[0], [200, 404]);
         $this->assertSame(200, $results[1]);

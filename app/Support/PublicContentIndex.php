@@ -2,11 +2,10 @@
 
 namespace App\Support;
 
-use App\Bonuses\BonusPublicProjection;
+use App\Bonuses\BonusFields;
 use App\Exceptions\PanelAuthException;
 use App\Models\BlogArticle;
 use App\Models\Bonus;
-use App\Models\BonusCampaign;
 use App\Models\Broker;
 use App\Models\Exchange;
 use App\Models\GoldPlatform;
@@ -30,7 +29,7 @@ class PublicContentIndex
         'gold-platforms' => GoldPlatform::class, 'prop-firms' => PropFirm::class, 'bonuses' => Bonus::class,
     ];
 
-    public function __construct(private BonusPublicProjection $bonuses, private TutorialProviders $providers, private SettingsMedia $media) {}
+    public function __construct(private TutorialProviders $providers, private SettingsMedia $media) {}
 
     public function sync(string $type, int $id, bool $historical = false): void
     {
@@ -44,7 +43,11 @@ class PublicContentIndex
         }
         $description = PublicText::plain($record->description !== '' ? $record->description : ($record->content ?? ''));
         $searchDescription = $record->description !== '' ? PublicText::plain($record->description, mb_strlen($record->description)) : $description;
-        $campaign = $record instanceof Bonus ? $this->bonuses->campaignDetail($record, forIndex: true) : null;
+        $campaign = $record instanceof Bonus ? BonusFields::values($record) : null;
+        if ($record instanceof Bonus) {
+            $description = PublicText::plain($campaign['short_description']);
+            $searchDescription = PublicText::plain($campaign['short_description'], 2_097_152);
+        }
         $fingerprint = $this->fingerprint($record, $campaign);
         $existing = $query->first();
         $modified = $existing?->last_modified_at;
@@ -64,9 +67,9 @@ class PublicContentIndex
             'english_normalized' => PublicText::normalize((string) ($record->english_name ?? '')),
             'description_normalized' => PublicText::normalize($searchDescription),
             'category_normalized' => implode(' ', CategoryAssignments::live($record)->map(fn (Model $category): string => PublicText::normalize($category->name))->all()),
-            'provider_normalized' => PublicText::normalize($campaign['provider']['name'] ?? ''),
+            'provider_normalized' => PublicText::normalize($campaign['provider_name'] ?? ''),
             'provider_english_normalized' => PublicText::normalize($campaign['provider']['english_name'] ?? ''),
-            'amount_normalized' => PublicText::normalize($campaign['amount_display'] ?? ''),
+            'amount_normalized' => PublicText::normalize($campaign['amount'] ?? ''),
             'source_stamp' => $this->sourceStamp($record), 'content_fingerprint' => $fingerprint,
             'published_at' => $record->published_at, 'last_modified_at' => $modified,
         ];
@@ -109,7 +112,7 @@ class PublicContentIndex
             $model = self::TYPES[$type];
             $columns = ['id', 'title', 'slug', 'version', 'category_id', 'published_at', 'deleted_at'];
             if ($type !== 'tutorials') {
-                $columns = [...$columns, 'status', 'author_id'];
+                $columns = [...$columns, 'status', 'author_id', ...($type === 'bonuses' ? ['display_fields'] : [])];
             } else {
                 $columns = [...$columns, 'youtube_url', 'youtube_video_id', 'vid_time'];
             }
@@ -164,7 +167,7 @@ class PublicContentIndex
     /** @return list<string> */
     private function relations(string $type): array
     {
-        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? BonusCampaign::BONUS_RELATIONS : [])];
+        return [...(isset(PlatformRatings::TYPES[$type]) ? ['ratingAggregate'] : []), 'categories', 'category', ...($type === 'tutorials' ? [] : ['author']), ...($type === 'bonuses' ? ['ratingAggregate'] : [])];
     }
 
     private function sourceStamp(Model $record): string
@@ -175,7 +178,7 @@ class PublicContentIndex
             $record->only(['id', 'version', 'title', 'slug', 'status', 'category_id', 'published_at', 'deleted_at', 'youtube_url', 'youtube_video_id', 'vid_time']),
             $record->categories->map(fn (Model $category): array => $category->only(['id', 'name', 'key', 'version', 'deleted_at']))->all(),
             $author?->only(['id', 'name', 'bio', 'linkedin_url', 'avatar_media_id', 'deleted_at']),
-            $record instanceof Bonus ? $this->bonuses->campaignDetail($record, forIndex: true) : null,
+            $record instanceof Bonus ? BonusFields::values($record) : null,
         ];
         if (PlatformRatings::supports($record)) {
             $values[] = PlatformRatings::projection($record);

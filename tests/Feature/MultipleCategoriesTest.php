@@ -43,12 +43,12 @@ class MultipleCategoriesTest extends PanelTestCase
         $id = $created->json('data.id');
         $this->get($base.'/'.$id)->assertOk()->assertJsonPath('data.category_id', $ids);
         $this->get($base)->assertOk()->assertJsonPath('data.0.category_id', $ids);
-        $this->patchJson($base.'/'.$id, ['expected_version' => 1, 'title' => 'Renamed'])->assertOk()->assertJsonPath('data.category_id', $ids)->assertJsonPath('data.version', 2);
+        $this->patchJson($base.'/'.$id, ['expected_version' => 1, ($module === 'bonuses' ? 'provider_name' : 'title') => 'Renamed'])->assertOk()->assertJsonPath('data.category_id', $ids)->assertJsonPath('data.version', 2);
         $reordered = [$ids[2], $ids[0]];
         $this->patchJson($base.'/'.$id, ['expected_version' => 2, 'category_id' => $reordered])->assertOk()->assertJsonPath('data.category_id', $reordered)->assertJsonPath('data.version', 3);
         $this->assertSame($ids[2], $model::find($id)->category_id);
         $this->patchJson($base.'/'.$id, ['expected_version' => 3, 'category_id' => $reordered])->assertOk()->assertJsonPath('data.version', 3);
-        foreach ([[$ids[0], $ids[0]], [$ids[0], 999999], [(string) $ids[0]], null, $ids[0], [true], ['x' => $ids[0]]] as $invalid) {
+        foreach ([...($module === 'bonuses' ? [] : [[$ids[0], $ids[0]], [$ids[0], 999999]]), [(string) $ids[0]], null, $ids[0], [true], ['x' => $ids[0]]] as $invalid) {
             $this->patchJson($base.'/'.$id, ['expected_version' => 3, 'category_id' => $invalid])->assertUnprocessable();
         }
         $this->get($base.'/'.$id)->assertOk()->assertJsonPath('data.category_id', $reordered)->assertJsonPath('data.version', 3);

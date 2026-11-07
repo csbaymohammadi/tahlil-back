@@ -5,7 +5,6 @@ namespace App\PageSettings;
 use App\Blog\PublicArticleProjection;
 use App\Bonuses\PublicBonusProjection;
 use App\Exchanges\ExchangePublicProjection;
-use App\Models\BonusCampaign;
 use App\Models\PageSetting;
 use App\Models\Tutorial;
 use App\Ratings\PlatformRatings;
@@ -63,7 +62,7 @@ class SettingsProjection
                         if (in_array($row['key'], ['articles', 'news'], true)) {
                             $records->load('author.avatar');
                         } elseif ($row['key'] === 'bonuses') {
-                            $records->load([...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate']);
+                            $records->load(['ratingAggregate']);
                         }
                     }
                     foreach ($row['selected_ids'] as $id) {

@@ -13,7 +13,6 @@ use App\Exceptions\PanelAuthException;
 use App\Models\Bonus;
 use App\Models\BonusCategory;
 use App\Models\User;
-use Database\Factories\BonusFactory;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -165,10 +164,10 @@ class BonusesConcurrencyTest extends TestCase
         $this->assertSame([200, 200, 200], $this->race([
             fn () => app(SubmitBonusRating::class)->handle($bonus->id, $first, 5, 'req_vote_a'),
             fn () => app(SubmitBonusRating::class)->handle($bonus->id, $second, 2, 'req_vote_b'),
-            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'description' => 'Edited during voting', 'campaign' => BonusFactory::campaignInput()], 'req_edit'),
+            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'short_description' => 'Edited during voting'], 'req_edit'),
         ]));
         $this->assertDatabaseHas('bonus_rating_aggregates', ['vote_sum' => 7, 'rating_count' => 2, 'rating_revision' => 2]);
-        $this->assertSame('Edited during voting', $bonus->fresh()->description);
+        $this->assertSame('Edited during voting', $bonus->fresh()->display_fields['short_description']);
         $this->assertSame(2, $bonus->fresh()->version);
     }
 
@@ -181,7 +180,7 @@ class BonusesConcurrencyTest extends TestCase
             $results = $this->race([
                 fn () => app(SubmitBonusRating::class)->handle($bonus->id, $context, 5, 'req_racing_vote'),
                 fn () => $operation === 'draft'
-                    ? app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'status' => 'draft'], 'req_unpublish')
+                    ? app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'is_published' => false], 'req_unpublish')
                     : app(DeleteBonus::class)->handle($session, $bonus->id, 1, 'req_delete'),
             ]);
             $this->assertContains($results[0], [200, 404]);
@@ -216,7 +215,7 @@ class BonusesConcurrencyTest extends TestCase
         }
     }
 
-    public function test_concurrent_slug_and_version_checks_allow_only_one_winning_mutation(): void
+    public function test_concurrent_creates_get_distinct_slugs_and_stale_updates_have_one_winner(): void
     {
         $session = (new PanelSessions)->create(User::factory()->panel()->create())['record'];
         $payload = ['title' => 'Concurrent Bonus', 'slug' => 'concurrent-bonus', 'content' => '<p>Conditions</p>', 'category_id' => [], 'reading_minutes' => 5, 'status' => 'draft'];
@@ -225,12 +224,13 @@ class BonusesConcurrencyTest extends TestCase
             fn () => app(SaveBonus::class)->handle($session, null, $payload, 'req_create_b'),
         ]);
         sort($results);
-        $this->assertSame([200, 409], $results);
-        $this->assertDatabaseCount('bonuses', 1);
-        $bonus = Bonus::sole();
+        $this->assertSame([200, 200], $results);
+        $this->assertDatabaseCount('bonuses', 2);
+        $this->assertSame(2, Bonus::pluck('slug')->unique()->count());
+        $bonus = Bonus::firstOrFail();
         $results = $this->race([
-            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'description' => 'First'], 'req_edit_a'),
-            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'description' => 'Second'], 'req_edit_b'),
+            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'short_description' => 'First'], 'req_edit_a'),
+            fn () => app(SaveBonus::class)->handle($session, $bonus->id, ['expected_version' => 1, 'short_description' => 'Second'], 'req_edit_b'),
         ]);
         sort($results);
         $this->assertSame([200, 409], $results);

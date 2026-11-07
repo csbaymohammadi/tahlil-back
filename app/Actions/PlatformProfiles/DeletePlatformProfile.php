@@ -3,7 +3,6 @@
 namespace App\Actions\PlatformProfiles;
 
 use App\Actions\Auth\RevokeSessions;
-use App\Bonuses\BonusEvents;
 use App\Exceptions\PanelAuthException;
 use App\Models\PanelSession;
 use App\Support\PanelMutationLock;
@@ -13,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 abstract class DeletePlatformProfile
 {
-    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex, private BonusEvents $bonusEvents) {}
+    public function __construct(private RevokeSessions $sessions, private PublicContentIndex $publicIndex) {}
 
     abstract protected function definition(): PlatformProfileDefinition;
 
@@ -48,9 +47,6 @@ abstract class DeletePlatformProfile
                 ]);
             }
             $this->publicIndex->sync($definition->slug, $id);
-            if ($wasPublished) {
-                $this->bonusEvents->providerChanged($definition->slug, $profile, $requestId);
-            }
         });
     }
 }

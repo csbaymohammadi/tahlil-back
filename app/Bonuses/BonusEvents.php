@@ -2,16 +2,12 @@
 
 namespace App\Bonuses;
 
-use App\Models\BonusCampaign;
-use App\Support\PlatformText;
 use App\Support\PublicContentIndex;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class BonusEvents
 {
-    public function __construct(private PublicContentIndex $publicIndex, private BonusPublicProjection $projection) {}
+    public function __construct(private PublicContentIndex $publicIndex) {}
 
     /** @param array<string, mixed> $details */
     public function audit(string $event, string $requestId, ?int $actorId, int $targetId, array $details = [], string $targetType = 'bonus'): void
@@ -21,28 +17,6 @@ class BonusEvents
             'event' => $event, 'request_id' => $requestId,
             'details' => json_encode($details, JSON_THROW_ON_ERROR), 'created_at' => now(),
         ]);
-    }
-
-    public function providerChanged(string $kind, Model $provider, string $requestId): void
-    {
-        $snapshot = ! $provider->trashed() && $provider->status === 'published' ? $this->projection->providerSnapshot($provider, $kind) : null;
-        $linked = BonusCampaign::query()->where(function (Builder $query) use ($kind, $provider): void {
-            $query->where('provider_kind', $kind)->where('provider_id', $provider->id);
-            if ($kind === 'exchanges') {
-                $query->orWhere(fn (Builder $legacy) => $legacy->whereNull('provider_kind')->where('exchange_id', $provider->id));
-            }
-        });
-        foreach ($linked->with('bonus')->lazyById(100, 'bonus_id') as $campaign) {
-            if (! $campaign->bonus) {
-                continue;
-            }
-            if ($snapshot !== null && $campaign->terms !== null) {
-                $campaign->forceFill(['provider' => $snapshot, 'provider_search' => PlatformText::panel($snapshot['name'].' '.$snapshot['english_name'])])->save();
-            }
-            if ($campaign->bonus->status === 'published') {
-                $this->publicChange('bonus_provider_changed', $requestId, $campaign->bonus_id, ['slug' => $campaign->bonus->slug]);
-            }
-        }
     }
 
     /** @param array<string, mixed> $payload */

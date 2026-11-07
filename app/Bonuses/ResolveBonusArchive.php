@@ -3,7 +3,6 @@
 namespace App\Bonuses;
 
 use App\Models\Bonus;
-use App\Models\BonusCampaign;
 use App\Models\BonusCategory;
 use App\Support\CategoryAssignments;
 use App\Support\PlatformText;
@@ -21,7 +20,7 @@ class ResolveBonusArchive
         $categories = BonusCategory::orderBy('name_normalized')->orderBy('id')->get();
         $selected = is_int($category) ? $categories->firstWhere('id', $category) : $categories->firstWhere('key', $category);
         $needle = PlatformText::public($search);
-        $query = Bonus::public()->withCount('visibleComments as comment_count')->with(['category', ...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate']);
+        $query = Bonus::public()->withCount('visibleComments as comment_count')->with(['category', 'ratingAggregate']);
         $this->order($query);
         $counts = [];
         $total = 0;
@@ -38,8 +37,8 @@ class ResolveBonusArchive
         } else {
             foreach ($query->lazy(200) as $bonus) {
                 $card = $this->projection->card($bonus);
-                $provider = $card['campaign']['provider'];
-                $haystack = PlatformText::public(implode(' ', [$bonus->title, $card['display_description'], $provider['name'] ?? '', $provider['english_name'] ?? '', $card['campaign']['amount_display'], ...array_column($card['category'], 'name')]));
+                $display = BonusFields::values($bonus);
+                $haystack = PlatformText::public(implode(' ', [$bonus->title, $display['short_description'], $display['provider_name'], $display['amount'], ...array_column($card['category'], 'name')]));
                 if ($needle !== '' && ! str_contains($haystack, $needle)) {
                     continue;
                 }

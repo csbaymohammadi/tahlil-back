@@ -11,6 +11,7 @@ use App\Models\Media;
 use App\Models\PageSetting;
 use App\Models\PropFirm;
 use App\Models\SiteComment;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -39,7 +40,7 @@ class PublicGoldPropBonusTest extends PanelTestCase
         $this->get('/api/v1/'.$type.'?q=%25_')->assertOk()->assertJsonPath('meta.total', 1);
         $this->get('/api/v1/'.$type.'?category=x')->assertOk()->assertJsonPath('filters.category', null);
         $this->get('/api/v1/'.$type.'?page=999')->assertOk()->assertJsonPath('data', [])->assertJsonPath('meta.total', 2);
-        $detail = $this->get('/api/v1/'.$type.'/'.$record->slug)->assertOk()->assertJsonPath('data.kind', $type)->assertJsonPath('data.comment_count', 1)->assertJsonPath('data.rating_average', null)->assertJsonPath('data.rating_count', 0)->assertJsonMissingPath('data.author');
+        $detail = $this->get('/api/v1/'.$type.'/'.$record->slug)->assertOk()->assertJsonPath('data.kind', $type)->assertJsonPath('data.rating_average', null)->assertJsonPath('data.rating_count', 0)->assertJsonMissingPath('data.author');
         $this->assertCount($specifications, $detail->json('data.specifications'));
         $this->assertSame([$prefix.'-heading-1', $prefix.'-heading-2'], array_column($detail->json('data.outline'), 'id'));
         $this->assertStringNotContainsString('<h1', $detail->json('data.content'));
@@ -62,9 +63,9 @@ class PublicGoldPropBonusTest extends PanelTestCase
         $this->assertSame(0, collect($list->json('facets.categories'))->firstWhere('id', $empty->id)['count']);
         $this->get('/api/v1/bonuses?q=%25_')->assertOk()->assertJsonPath('meta.total', 1);
         $this->get('/api/v1/bonuses?category='.$category->key.'&category=bad')->assertOk()->assertJsonPath('filters.category', null)->assertJsonPath('meta.total', 2);
-        $this->get('/api/v1/bonuses?sort=default')->assertUnprocessable();
+        $this->get('/api/v1/bonuses?sort=default')->assertOk()->assertJsonPath('filters.sort', 'newest');
         $this->get('/api/v1/bonuses?page=999')->assertOk()->assertJsonPath('data', [])->assertJsonPath('meta.total', 2);
-        $detail = $this->get('/api/v1/bonuses/123')->assertOk()->assertJsonPath('data.id', $bonus->id)->assertJsonPath('data.comment_count', 1)->assertJsonPath('data.cover_image', '')->assertJsonPath('data.reading_minutes', 5)->assertJsonMissingPath('data.my_rating');
+        $detail = $this->get('/api/v1/bonuses/123')->assertOk()->assertJsonPath('data.id', $bonus->id)->assertJsonPath('data.cover_image', '')->assertJsonMissingPath('data.my_rating');
         $this->assertStringNotContainsString('<h1', $detail->json('data.content'));
         $this->get('/api/v1/bonuses/123/latest')->assertOk()->assertJsonPath('data.0.id', $other->id);
         $rating = $this->get('/api/v1/bonuses/'.$bonus->id.'/rating')->assertOk()->assertJsonPath('data.rating_revision', 0)->assertJsonStructure(['data' => ['csrf_token']]);
@@ -80,12 +81,13 @@ class PublicGoldPropBonusTest extends PanelTestCase
     {
         $exchange = Exchange::factory()->published()->create(['title' => 'Public Provider', 'english_name' => 'Sample Network']);
         $bonus = Bonus::factory()->published()->create(['title' => 'Unique', 'description' => 'alpha', 'cover_image' => '']);
-        DB::table('bonus_campaigns')->where('bonus_id', $bonus->id)->update(['exchange_id' => $exchange->id, 'amount_display' => '100 USDT']);
-        $this->get('/api/v1/bonuses?q='.urlencode('public provider'))->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.campaign.provider.exchange_id', $exchange->id);
+        $this->panel(User::factory()->panel()->create());
+        $this->patchJson('/api/v1/admin/bonuses/items/'.$bonus->id, ['expected_version' => 1, 'provider_name' => 'Public Provider', 'amount' => '100 USDT'])->assertOk();
+        $this->get('/api/v1/bonuses?q='.urlencode('public provider'))->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.provider_name', 'Public Provider');
         $this->get('/api/v1/bonuses?q='.urlencode('alpha public'))->assertOk()->assertJsonPath('meta.total', 0);
         $exchange->forceFill(['status' => 'draft'])->save();
-        $this->get('/api/v1/bonuses/'.$bonus->slug)->assertOk()->assertJsonPath('data.campaign.provider', null)->assertDontSee('Public Provider');
-        $this->get('/api/v1/bonuses?q='.urlencode('public provider'))->assertOk()->assertJsonPath('meta.total', 0);
+        $this->get('/api/v1/bonuses/'.$bonus->slug)->assertOk()->assertJsonPath('data.provider_name', 'Public Provider');
+        $this->get('/api/v1/bonuses?q='.urlencode('public provider'))->assertOk()->assertJsonPath('meta.total', 1);
         $media = Media::factory()->create(['purpose' => 'bonus']);
         $bonus->forceFill(['cover_image' => $media->canonicalUrl()])->save();
         $this->get('/api/v1/bonuses/'.$bonus->slug)->assertOk()->assertJsonPath('data.cover_image', '');

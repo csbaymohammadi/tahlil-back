@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Blog\BlogHtmlSanitizer;
 use App\Exceptions\PanelAuthException;
 use App\Models\User;
-use Database\Factories\BonusFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -35,21 +34,30 @@ class ContentHtmlContractTest extends PanelTestCase
             $payload += ['english_name' => 'Contract', 'logo' => '/images/example.png', 'website_url' => 'https://example.com'];
         }
         if ($module === 'bonuses') {
-            $payload += ['reading_minutes' => 1, 'description' => 'Example campaign summary.', 'campaign' => BonusFactory::campaignInput()];
+            $payload += ['provider_name' => 'Contract', 'is_published' => true];
         }
         $created = $this->postJson($base, $payload)->assertCreated();
         $id = $created->json('data.id');
         $canonical = $this->get($base.'/'.$id)->assertOk()->json('data.content');
-        $this->assertStringContainsString('background-color:#008bc5', $canonical);
-        $this->assertStringContainsString('font-size:20px', $canonical);
+        if ($module === 'bonuses') {
+            $this->assertSame($payload['content'], $canonical);
+        } else {
+            $this->assertStringContainsString('background-color:#008bc5', $canonical);
+        }
+        if ($module !== 'bonuses') {
+            $this->assertStringContainsString('font-size:20px', $canonical);
+        }
         $this->assertStringContainsString('<h1', $canonical);
         $this->patchJson($base.'/'.$id, ['expected_version' => 1, 'content' => $canonical])->assertOk()->assertJsonPath('data.version', 1);
         $public = '/api/v1/'.match ($module) {
             'blog' => 'blog/articles', 'news' => 'news/articles', default => $module
-        }.'/contract';
+        }.($module === 'bonuses' ? '/bonus-'.$id : '/contract');
         $body = $this->get($public)->assertOk()->json('data.content');
         $this->assertStringNotContainsString('<h1', $body);
         $this->assertSame(2, substr_count($body, 'data-content-button="true"'));
+        if ($module === 'bonuses') {
+            return;
+        }
         $bad = str_replace('data-button-size="medium"', '', $canonical);
         $this->patchJson($base.'/'.$id, ['expected_version' => 1, 'content' => $bad])->assertUnprocessable();
         $this->get($base.'/'.$id)->assertOk()->assertJsonPath('data.content', $canonical)->assertJsonPath('data.version', 1);

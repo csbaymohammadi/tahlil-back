@@ -95,7 +95,7 @@ return Application::configure(basePath: dirname(__DIR__))
             } else {
                 [$status, $code, $message] = [500, 'INTERNAL_ERROR', 'An unexpected error occurred.'];
             }
-            if ($status === 503) {
+            if ($status === 503 && ! ($exception instanceof PanelAuthException && $code === 'ANALYTICS_UNAVAILABLE')) {
                 $publicCode = match (true) {
                     $request->routeIs('platforms.rating.*') => 'RATINGS_UNAVAILABLE',
                     $request->is('api/v1/advertisements') => 'ADVERTISEMENTS_UNAVAILABLE',

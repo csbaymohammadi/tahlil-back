@@ -7,7 +7,6 @@ use App\Auth\PanelSessions;
 use App\Bonuses\BonusRatingContexts;
 use App\Models\Bonus;
 use App\Models\User;
-use Database\Factories\BonusFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -159,7 +158,7 @@ class BonusRatingTest extends TestCase
         $this->putJson($this->path($bonus), ['value' => 3])->assertOk();
         $session = (new PanelSessions)->create(User::factory()->panel()->create());
         $this->withUnencryptedCookie(PanelSessions::COOKIE, $session['token'])->withHeader('X-CSRF-Token', $session['store']->token());
-        $this->patchJson('/api/v1/admin/bonuses/items/'.$bonus->id, ['expected_version' => 1, 'description' => 'New summary', 'campaign' => BonusFactory::campaignInput()])
+        $this->patchJson('/api/v1/admin/bonuses/items/'.$bonus->id, ['expected_version' => 1, 'short_description' => 'New summary'])
             ->assertOk()->assertJsonPath('data.rating', 3)->assertJsonPath('data.rating_count', 1)->assertJsonPath('data.rating_revision', 1)->assertJsonPath('data.version', 2);
         $this->assertDatabaseHas('bonus_rating_aggregates', ['bonus_id' => $bonus->id, 'vote_sum' => 3, 'rating_revision' => 1]);
     }

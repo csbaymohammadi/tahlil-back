@@ -20,7 +20,7 @@ class PublicBonusRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['q' => ['sometimes', 'string', 'max:200', 'regex:/\A[\s\S]*\z/u'], 'category' => ['sometimes', 'nullable', 'string'],
+        return ['sort' => ['sometimes', 'string'], 'q' => ['sometimes', 'string', 'max:200', 'regex:/\A[\s\S]*\z/u'], 'category' => ['sometimes', 'nullable', 'string'],
             'page' => ['sometimes', 'regex:/^[1-9][0-9]*$/D', 'integer', 'max:9007199254740991'], 'per_page' => ['sometimes', 'in:9']];
     }
 }

@@ -1,4 +1,6 @@
-# Bonus campaign API handoff
+# Historical bonus campaign API handoff
+
+The current bonus API contract is [Bonus rebuild API](bonus-rebuild-api.md). Use its free-text fields and publication flag for the active integration.
 
 ## Routes and transport
 

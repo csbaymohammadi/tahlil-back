@@ -2,9 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Bonuses\BonusFields;
 use App\Models\Bonus;
 use App\Models\User;
 use App\Support\PlatformText;
+use App\Support\PublicText;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +28,15 @@ class BonusFactory extends Factory
     public function configure(): static
     {
         return $this->afterMaking(function (Bonus $bonus): void {
+            if ($bonus->display_fields === null) {
+                $bonus->display_fields = array_replace(array_fill_keys(BonusFields::TEXT, ''), [
+                    'provider_name' => $bonus->title, 'short_description' => $bonus->description,
+                ]);
+            }
+            $display = BonusFields::values($bonus);
+            $bonus->forceFill(['provider_search' => PlatformText::panel($display['provider_name']),
+                'amount_search' => PlatformText::panel($display['amount']),
+                'public_search' => PublicText::normalize($display['provider_name'].' '.$display['amount'].' '.$display['short_description'])]);
             $bonus->forceFill(['title_normalized' => PlatformText::panel($bonus->title), 'title_public_normalized' => PlatformText::public($bonus->title),
                 'description_public_normalized' => PlatformText::public($bonus->description)]);
         })->afterCreating(function (Bonus $bonus): void {

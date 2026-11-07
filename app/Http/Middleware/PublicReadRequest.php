@@ -23,7 +23,8 @@ class PublicReadRequest
         $allowed = match (true) {
             $request->routeIs('public.news.index') => ['q', 'category_id', 'page', 'per_page'],
             $directoryIndex => ['q', 'category', 'sort', 'page', 'per_page'],
-            $request->routeIs('public.bonuses.index', 'public.tutorials.index') => ['q', 'category', 'page', 'per_page'],
+            $request->routeIs('public.bonuses.index') => ['q', 'category', 'sort', 'page', 'per_page'],
+            $request->routeIs('public.tutorials.index') => ['q', 'category', 'page', 'per_page'],
             $request->routeIs('public.stock-brokers.legacy') => ['source_path'],
             $request->routeIs('public.blog.index') => ['q', 'category_id', 'page', 'per_page'],
             $request->routeIs('public.search') => ['q', 'surface', 'type', 'page', 'per_page'],

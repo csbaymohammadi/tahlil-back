@@ -89,7 +89,12 @@ class SeedDemoContent
                         $variant = self::VARIANTS[$sequence - 2] ?? null;
                         $suffix = str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
                         $slug = 'tahlil-demo-'.$module.'-'.$suffix;
-                        $record = $model::withTrashed()->where('slug', $slug)->first();
+                        $record = $model::withTrashed()->where(function ($query) use ($slug, $module): void {
+                            $query->where('slug', $slug);
+                            if ($module === 'bonuses') {
+                                $query->orWhere('meta_description', $slug);
+                            }
+                        })->first();
                         $created = $record === null;
                         if ($created) {
                             $categoryClass = CategoryAssignments::MODELS[$model];
@@ -118,13 +123,12 @@ class SeedDemoContent
                                 if ($module !== 'bonuses') {
                                     $payload['scheduled_for'] = null;
                                 } else {
-                                    $payload['campaign'] = [
-                                        'provider' => ['kind' => 'independent', 'name' => 'ارائه‌دهنده نمونه تحلیل'],
-                                        'type' => 'other',
-                                        'reward' => ['kind' => 'custom', 'custom_text' => 'پاداش آزمایشی برای '.$payload['title']],
-                                        'availability' => 'ended',
-                                        'source_url' => 'https://example.com/demo/bonuses/'.$suffix.'/terms',
-                                        'redemption' => ['url' => 'https://example.com/demo/bonuses/'.$suffix],
+                                    $payload = [
+                                        'provider_name' => $payload['title'], 'short_description' => $payload['description'],
+                                        'content' => $payload['content'], 'cover_image' => self::IMAGE,
+                                        'category_id' => $categories, 'is_published' => true,
+                                        'amount' => 'پاداش آزمایشی '.$suffix, 'display_status' => 'نمونه',
+                                        'website_url' => 'https://example.com/demo/bonuses/'.$suffix,
                                     ];
                                 }
                             }
@@ -132,6 +136,9 @@ class SeedDemoContent
                             $record = match ($module) {
                                 'articles' => $result->article, 'news' => $result->newsItem, default => $result
                             };
+                            if ($module === 'bonuses') {
+                                $record->forceFill(['meta_description' => $slug])->save();
+                            }
                         }
                         if (! isset($records[$module]) && ! $record->trashed() && $record->status === 'published') {
                             $records[$module] = $record;

@@ -338,7 +338,8 @@ class PropFirmsTest extends PanelTestCase
     public function test_admin_lists_normalize_names_paginate_and_do_not_search_private_body_fields(): void
     {
         $this->panel(User::factory()->panel()->create());
-        $records = PropFirm::factory()->count(12)->create(['created_at' => '2026-10-23 10:00:00']);
+        $controlCategory = PropFirmCategory::factory()->create(['name' => 'Control category']);
+        $records = PropFirm::factory()->count(12)->create(['created_at' => '2026-10-23 10:00:00', 'category_id' => $controlCategory->id]);
         $matching = PropFirm::factory()->published()->create([
             'title' => 'شرکت یک', 'english_name' => 'Distinct Firm', 'description' => 'Description needle',
         ]);

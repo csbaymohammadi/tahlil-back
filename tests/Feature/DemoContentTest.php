@@ -29,12 +29,12 @@ class DemoContentTest extends PanelTestCase
 
                 continue;
             }
-            $all = $model::where('slug', 'like', 'tahlil-demo-'.$type.'-%')->get();
+            $all = $model::where($type === 'bonuses' ? 'meta_description' : 'slug', 'like', 'tahlil-demo-'.$type.'-%')->get();
             $this->assertCount(11, $all);
-            foreach (['title', 'slug', 'description', 'content'] as $field) {
+            foreach (['title', 'slug', ...($type === 'bonuses' ? [] : ['description']), 'content'] as $field) {
                 $this->assertCount(11, $all->pluck($field)->unique(), $type.' must have distinct '.$field);
             }
-            $record = $all->firstWhere('slug', 'tahlil-demo-'.$type.'-011');
+            $record = $all->firstWhere($type === 'bonuses' ? 'meta_description' : 'slug', 'tahlil-demo-'.$type.'-011');
             $this->assertSame('published', $record->status);
             $this->assertSame($actor->id, $record->created_by);
             $this->assertStringContainsString('آزمایشی', $record->content);
@@ -93,10 +93,10 @@ class DemoContentTest extends PanelTestCase
         $descriptions = $contents = [];
         foreach ($originals as $type => [$record, $attributes]) {
             $this->assertSame($attributes, $record->fresh()->getAttributes());
-            $new = $record::where('slug', 'like', 'tahlil-demo-'.$type.'-%')->where('id', '!=', $record->id)->get();
+            $new = $record::where($type === 'bonuses' ? 'meta_description' : 'slug', 'like', 'tahlil-demo-'.$type.'-%')->where('id', '!=', $record->id)->get();
             $this->assertCount(10, $new);
             $this->assertCount(10, $new->pluck('title')->unique());
-            $descriptions = [...$descriptions, ...$new->pluck('description')->all()];
+            $descriptions = [...$descriptions, ...($type === 'bonuses' ? $new->map(fn ($item) => $item->display_fields['short_description'])->all() : $new->pluck('description')->all())];
             $contents = [...$contents, ...$new->pluck('content')->all()];
             if ($type !== 'articles' && $type !== 'news' && $type !== 'bonuses') {
                 $this->assertCount(10, $new->map(fn (Model $item): string => json_encode($item->specifications, JSON_THROW_ON_ERROR))->unique());

@@ -45,7 +45,7 @@ class Bonus extends Model
 
     protected function casts(): array
     {
-        return ['category_id' => 'integer', 'author_id' => 'integer', 'reading_minutes' => 'integer',
+        return ['display_fields' => 'array', 'category_id' => 'integer', 'author_id' => 'integer', 'reading_minutes' => 'integer',
             'version' => 'integer', 'published_at' => 'immutable_datetime'];
     }
 }

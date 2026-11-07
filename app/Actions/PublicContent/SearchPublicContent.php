@@ -2,8 +2,7 @@
 
 namespace App\Actions\PublicContent;
 
-use App\Bonuses\BonusPublicProjection;
-use App\Models\BonusCampaign;
+use App\Bonuses\PublicBonusProjection;
 use App\Ratings\PlatformRatings;
 use App\Support\CategoryAssignments;
 use App\Support\PublicContentIndex;
@@ -12,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class SearchPublicContent
 {
-    public function __construct(private PublicContentIndex $index, private BonusPublicProjection $bonuses) {}
+    public function __construct(private PublicContentIndex $index, private PublicBonusProjection $bonuses) {}
 
     /** @param array<string, mixed> $input
      * @return array<string, mixed> */
@@ -42,14 +41,15 @@ class SearchPublicContent
 
             foreach ($rows->groupBy('type') as $recordType => $group) {
                 $model = PublicContentIndex::TYPES[$recordType];
-                $records = $model::query()->select('id')->with(['categories', ...(isset(PlatformRatings::TYPES[$recordType]) ? ['ratingAggregate'] : []), ...($recordType === 'bonuses' ? [...BonusCampaign::BONUS_RELATIONS, 'ratingAggregate'] : [])])->whereIn('id', $group->pluck('record_id'))->get()->keyBy('id');
+                $columns = $recordType === 'bonuses' ? ['id', 'slug', 'status', 'cover_image', 'display_fields'] : ['id'];
+                $records = $model::query()->select($columns)->with(['categories', ...(isset(PlatformRatings::TYPES[$recordType]) ? ['ratingAggregate'] : []), ...($recordType === 'bonuses' ? ['ratingAggregate'] : [])])->whereIn('id', $group->pluck('record_id'))->get()->keyBy('id');
                 foreach ($group as $row) {
                     $fields = CategoryAssignments::publicFields($records->get($row->record_id));
                     $row->category_id = $fields['category_id'];
                     $row->category = $fields['category'];
                     if ($recordType === 'bonuses') {
                         $bonus = $records->get($row->record_id);
-                        $row->campaign = $this->bonuses->campaign($bonus);
+                        $row->bonus_card = $this->bonuses->summary($bonus);
                         $row->rating_fields = $bonus->ratingAggregate->projection();
                     }
                     if (isset(PlatformRatings::TYPES[$recordType])) {
