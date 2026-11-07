@@ -2275,4 +2275,300 @@ The following are captured responses, not invented examples. They show one publi
 
 ## Production rollout evidence
 
-Pending rollout verification. This section will be completed from the actual server inspection before final handoff. Real receiver delivery remains pending a destination URL; no signing secrets, cookies or private backup contents are included in this document.
+Backend implementation commit: `3dc30c4`. Observed from outside the server at **2026-11-07T22:25:01.599277+00:00** (UTC; local Tehran date is November 8). Production API host: `service.tahlilex.com`.
+
+The server was briefly put into maintenance mode. Code was deployed, the public index rebuilt, verified demo records withdrawn through their existing domain save actions in one transaction, the index checked/rebuilt, configuration/routes cached, PHP-FPM reloaded and the application reopened. No migration or dependency change was required.
+
+### Demonstration-content review
+
+| Domain | Inspected | Withdrawn | Preserved |
+|---|---:|---:|---:|
+| Articles | 11 | 11 | 0 |
+| News | 11 | 11 | 0 |
+| Exchanges | 11 | 11 | 0 |
+| Brokers | 11 | 11 | 0 |
+| Stock brokers | 11 | 11 | 0 |
+| Gold platforms | 11 | 11 | 0 |
+| Prop firms | 11 | 10 | 1 |
+| Total | 77 | 76 | 1 |
+
+**Preserved for editorial review:** prop firm ID `11`, slug `tahlil-demo-prop-firms-011`, version `2`. Its modification disqualifies it from automatic seed withdrawal. It remains public and in the feed; this is intentional preservation, not a claim that every demo-looking slug is now private. Review its content manually before deciding whether to withdraw it.
+
+Private pre-mutation backup: `/var/backups/tahlil/seo-isr-20261108/demo-before-withdrawal.json`, 464,610 bytes, root-owned file mode `0600` under a private directory. It contains the inventory, affected original records and public-index entries. Non-UTF8 database binary values are losslessly represented by `{"__encoding":"base64","value":"..."}`; restoration must decode those markers. Backup contents are not distributed to the frontend. Categories, votes, comments, media files and record IDs were not deleted/reset by withdrawal.
+
+The sitemap went from **93 to 17** entries. All **76 withdrawn canonical API detail paths were independently requested from outside the server and returned domain 404**. None remains in the full feed, search identities or rendered public page-settings selections. There were no separate historical aliases on these withdrawn production records; historical-slug withdrawal behavior was demonstrated by the isolated fixture tests above.
+
+### Production HTTP checks
+
+Anonymous external checks completed without an admin session or CSRF. All nine archives and their `page=99999` requests returned 200. All 40 selected smoke requests and all 76 withdrawn detail checks completed with their expected status; no temporary service failure was deliberately caused on production.
+
+| Endpoint | HTTP | Public total | Page 99999 |
+|---|---:|---:|---|
+| `/api/v1/blog/articles` | 200 | 5 | empty; real total_pages=1 |
+| `/api/v1/news/articles` | 200 | 3 | empty; real total_pages=1 |
+| `/api/v1/tutorials` | 200 | 4 | empty; real total_pages=1 |
+| `/api/v1/bonuses` | 200 | 0 | empty; real total_pages=0 |
+| `/api/v1/exchanges` | 200 | 2 | empty; real total_pages=1 |
+| `/api/v1/brokers` | 200 | 1 | empty; real total_pages=1 |
+| `/api/v1/stock-brokers` | 200 | 1 | empty; real total_pages=1 |
+| `/api/v1/gold-platforms` | 200 | 0 | empty; real total_pages=0 |
+| `/api/v1/prop-firms` | 200 | 1 | empty; real total_pages=1 |
+
+`/api/v1/page-settings`, `/api/v1/search`, and `/api/v1/sitemap/entries?limit=1000` returned 200. Search and sitemap both contain 17 identities after withdrawal. Live details and related/latest/others were checked for the remaining non-demo article, news, tutorial, exchange, broker and stock-broker records. No gold-platform or bonus record remained available for a production detail 200; their full detail behavior is covered by fixtures, not by inserting fake production content. The preserved prop-firm record is the sole remaining demo-prefixed feed entry.
+
+### Captured production samples
+
+These excerpts retain actual response values/request IDs. Feed examples are explicitly reduced to the inspected record and metadata to avoid duplicating unrelated production content.
+
+**Feed before withdrawal (excerpt)**
+
+```json
+{
+  "data": [
+    {
+      "type": "articles",
+      "id": 5,
+      "title": "راهنمای نمونه مقایسه پلتفرم‌های مالی ۰۰۱",
+      "path": "/blog/tahlil-demo-articles-001",
+      "last_modified_at": null
+    }
+  ],
+  "meta": {
+    "type": "all",
+    "limit": 1000,
+    "total": 93,
+    "has_more": false,
+    "next_cursor": null,
+    "revision": "2c2e212628f5c263cf55b81a474e56ccfac53e3c4355444dbb84d7df5e0629cb"
+  },
+  "request_id": "req_886a5be9-c415-4f8a-b859-eb02d54a03b5"
+}
+```
+
+**Feed after withdrawal (same identity absent)**
+
+```json
+{
+  "data": [],
+  "meta": {
+    "type": "all",
+    "limit": 1000,
+    "total": 17,
+    "has_more": false,
+    "next_cursor": null,
+    "revision": "631d8340d8cb3acd666514001d68a94f2567b6d0ed5cfede7fa629323be3d552"
+  },
+  "request_id": "req_ab719dc4-b6c5-416f-a329-b68873da832d"
+}
+```
+
+**/api/v1/blog/articles/tahlil-demo-articles-001**
+
+```json
+{
+  "path": "/api/v1/blog/articles/tahlil-demo-articles-001",
+  "status": 404,
+  "body": {
+    "error": {
+      "code": "ARTICLE_NOT_FOUND",
+      "message": "The public article was not found.",
+      "fields": {}
+    },
+    "request_id": "req_cd056901-3079-4bab-9b3f-433f685be698"
+  }
+}
+```
+
+**/api/v1/blog/articles?page=99999**
+
+```json
+{
+  "path": "/api/v1/blog/articles?page=99999",
+  "status": 200,
+  "body": {
+    "data": [],
+    "meta": {
+      "page": 99999,
+      "per_page": 6,
+      "total": 5,
+      "total_pages": 1
+    },
+    "facets": {
+      "all_count": 5,
+      "uncategorized_count": 1,
+      "categories": [
+        {
+          "id": 14,
+          "name": "ارز",
+          "key": "category-14",
+          "count": 0
+        },
+        {
+          "id": 1,
+          "name": "اصلی",
+          "key": "category-1",
+          "count": 1
+        },
+        {
+          "id": 8,
+          "name": "ایران",
+          "key": "category-8",
+          "count": 4
+        },
+        {
+          "id": 2,
+          "name": "بروکر ها",
+          "key": "category-2",
+          "count": 1
+        },
+        {
+          "id": 12,
+          "name": "تتر",
+          "key": "category-12",
+          "count": 1
+        },
+        {
+          "id": 7,
+          "name": "تومان",
+          "key": "category-7",
+          "count": 0
+        },
+        {
+          "id": 5,
+          "name": "دلار",
+          "key": "category-5",
+          "count": 0
+        },
+        {
+          "id": 6,
+          "name": "ریال",
+          "key": "category-6",
+          "count": 0
+        },
+        {
+          "id": 3,
+          "name": "صرافی ها",
+          "key": "category-3",
+          "count": 0
+        },
+        {
+          "id": 4,
+          "name": "طلا",
+          "key": "category-4",
+          "count": 0
+        },
+        {
+          "id": 9,
+          "name": "قهوه",
+          "key": "category-9",
+          "count": 0
+        },
+        {
+          "id": 10,
+          "name": "هوش مصنوعی",
+          "key": "category-10",
+          "count": 0
+        },
+        {
+          "id": 11,
+          "name": "یلدا",
+          "key": "category-11",
+          "count": 0
+        }
+      ]
+    },
+    "request_id": "req_2e0a1634-5802-49f1-9519-a0c8df00e4e6"
+  }
+}
+```
+
+**/api/v1/blog/articles/dd-sasaa**
+
+```json
+{
+  "path": "/api/v1/blog/articles/dd-sasaa",
+  "status": 200,
+  "body": {
+    "data": {
+      "id": 1,
+      "slug": "dd-sasaa",
+      "title": "گر شللللششیشسیسششسییشسشسیششیسیسش",
+      "href": "/blog/dd-sasaa",
+      "cover_image": "/media/9/cover.png",
+      "description": "گر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار دارید",
+      "excerpt": "گر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار دارید",
+      "category_id": [
+        8,
+        2,
+        12,
+        1
+      ],
+      "category": [
+        {
+          "id": 8,
+          "name": "ایران",
+          "key": "category-8"
+        },
+        {
+          "id": 2,
+          "name": "بروکر ها",
+          "key": "category-2"
+        },
+        {
+          "id": 12,
+          "name": "تتر",
+          "key": "category-12"
+        },
+        {
+          "id": 1,
+          "name": "اصلی",
+          "key": "category-1"
+        }
+      ],
+      "author": {
+        "id": 4,
+        "name": "احسان باقرزاده"
+      },
+      "reading_minutes": 4,
+      "published_at": "2026-10-29T15:56:08.000000Z",
+      "content": "<p style=\"text-align: right\">گر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار دارید</p>",
+      "outline": [],
+      "updated_at": "2026-10-31T13:53:40.000000Z",
+      "meta_description": "گر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار دارید",
+      "seo_description": "گر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار داریدگر شما یک طراح هستین و یا با طراحی های گرافیکی سروکار دارید",
+      "author_profile": {
+        "id": 4,
+        "name": "احسان باقرزاده",
+        "bio": "React} DVP",
+        "linkedin_url": "",
+        "avatar_url": "/media/8/avatar.png"
+      },
+      "tags": [
+        "ایران",
+        "بروکر ها",
+        "تتر",
+        "اصلی"
+      ],
+      "comment_count": 0
+    },
+    "request_id": "req_e6dacb72-2559-48d3-bffd-9baaaf322451"
+  }
+}
+```
+
+### Scheduler and receiver status
+
+- Production cron runs Laravel `schedule:run` every minute as `www-data`. `schedule:list` includes `presentation:deliver`, `blog:publish-due` and `news:publish-due` with their configured ten-second repeat cadence. Scheduler logs confirmed launches after rollout; cron, Nginx and PHP-FPM were active.
+- Before withdrawal: 221 pending deliveries, all retrying, oldest `2026-10-26 12:52:04` UTC. After the scheduler bridged the 76 new withdrawal events: 297 pending, 237 already attempted at the observation time. Counts change as the existing scheduler retries. Recorded failure classification was `delivery_failed`; no secret or raw transport credentials were exposed.
+- Configuration still reports a receiver configured, but the actual frontend receiver has **not been declared ready**. Events remain pending and are not marked delivered. No manual real-receiver test was performed or claimed. After the final HTTPS receiver URL is supplied, configure it securely, run a coordinated test and report the actual event ID and receiver HTTP status. Signing secrets should be exchanged through the existing private configuration channel, not this document.
+
+## Frontend acceptance checklist
+
+1. Preserve all existing fields and category arrays; read current response fields rather than generated mock values.
+2. Distinguish domain 404 from transient 503; retain previous ISR content on a temporary backend failure.
+3. Follow historical API redirects to the final record and apply its website `href` as canonical.
+4. Keep requested page numbers; do not turn an out-of-range empty page into the last page.
+5. Restart sitemap traversal on `SITEMAP_CURSOR_STALE`; omit `lastmod` when the backend value is null.
+6. Verify webhook signatures from raw bytes, deduplicate by event ID, process distinct events even with an equal home revision, and return 2xx only after durable acceptance.
+7. Configure fallback timed revalidation until the actual receiver is connected. The endpoint URL and a production test delivery are the remaining integration dependency.
+8. Review the preserved edited prop-firm record before deciding whether it is real content.
