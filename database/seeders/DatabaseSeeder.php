@@ -16,13 +16,6 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(PageSettingsSeeder::class);
-        $this->call([RoleSeeder::class, PanelAdministratorSeeder::class, ExchangeCategorySeeder::class, BrokerCategorySeeder::class, StockBrokerageCategorySeeder::class, GoldPlatformCategorySeeder::class, PropFirmCategorySeeder::class, BonusCategorySeeder::class, TutorialCategorySeeder::class]);
-        User::withTrashed()->firstOrCreate(
-            ['email' => 'test@example.com'],
-            fn (): array => User::factory()->raw([
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-            ]),
-        );
+        $this->call([RoleSeeder::class, PanelAdministratorSeeder::class]);
     }
 }
